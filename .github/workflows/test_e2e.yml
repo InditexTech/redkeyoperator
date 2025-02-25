@@ -3,15 +3,13 @@ name: Build, Push and run E2E test
 on:
   pull_request:
     branches:
-      - '*'
+      - 'develop*'
     paths-ignore: 
       - 'docs/**'
       - '.github/**'
       - '_local_tools/**'
 
 env:
-  DP_TOKEN: ${{ secrets.DIST_PLAT_DEPLOYER_TOKEN }}
-  DP_USERNAME: ${{ secrets.DIST_PLAT_DEPLOYER_USERNAME }}
   KUBECONFIG: /tmp/kubeconfig.yaml
   GO_VER: 1.23.1
   KUBEBUILDER_VER: 2.3.1
