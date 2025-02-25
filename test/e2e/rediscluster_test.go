@@ -2,12 +2,14 @@ package e2e
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+
 	pv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -811,7 +813,7 @@ var _ = Describe("Redisclusters", func() {
 			// Try to change the storage in redis-cluster
 			Eventually(func() bool {
 				_, err := framework.ChangeRedisClusterStorage(ctx, k8sClient, namespacedName, initialStorage, desiredStorage, initialReplicas)
-				return err == nil
+				return err != nil && strings.Contains(err.Error(), "Changing the storage size is not allowed")
 			}).Should(BeTrue())
 
 			Eventually(func() bool {
@@ -872,45 +874,9 @@ var _ = Describe("Redisclusters", func() {
 
 		})
 
-		It("Should handle the storage and replicas in redisCluster correctly", func() {
-			initialStorage := string("500Mi")
-			desiredStorage := string("1Gi")
-			expectedReplicas := int32(6)
-			rdclName := fmt.Sprintf("%s-%s", "storage-management", RedisClusterName)
-			namespacedName = types.NamespacedName{Name: rdclName, Namespace: RedisNamespace}
-			initialReplicas := int32(3)
-
-			Eventually(func() bool {
-				err := framework.EnsureClusterExistsOrCreate(k8sClient, namespacedName, initialReplicas, initialStorage, 0, true, false, redisv1.Pdb{}, redisv1.RedisClusterOverrideSpec{})
-				return err == nil
-			}).Should(BeTrue())
-
-			// Try to change the storage in redis-cluster
-			Eventually(func() bool {
-				_, err := framework.ChangeRedisClusterStorage(ctx, k8sClient, namespacedName, initialStorage, desiredStorage, expectedReplicas)
-				return err == nil
-			}).Should(BeTrue())
-
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, namespacedName, fetchedRedisCluster)
-				return err == nil
-			}).Should(BeTrue())
-
-			time.Sleep(15 * time.Second)
-
-			Expect(fetchedRedisCluster.Spec.Storage).To(Equal((initialStorage)))
-			Expect(fetchedRedisCluster.Spec.Replicas).To(Equal((expectedReplicas)))
-
-			Eventually(func() bool {
-				isOk, err := framework.CheckRedisCluster(k8sClient, ctx, fetchedRedisCluster)
-				return isOk && err == nil
-			}).Should(BeTrue())
-
-		})
-
 		It("Should scaledown with storage in redisCluster correctly", func() {
 			initialStorage := string("500Mi")
-			initialReplicas := int32(6)
+			initialReplicas := int32(3)
 			expectedReplicas := int32(1)
 			rdclName := fmt.Sprintf("%s-%s", "storage-management", RedisClusterName)
 			namespacedName = types.NamespacedName{Name: rdclName, Namespace: RedisNamespace}
@@ -1274,7 +1240,7 @@ var _ = Describe("Redisclusters", func() {
 			Expect(fetchedStatefulSet.Spec.Template.Spec.Containers[0].Image).To(Equal(expectedImage))
 
 		})
-		It("Should be error status when you change from ephemeral to storage", func() {
+		It("Should not allow to change from ephemeral to storage", func() {
 			initialStorage := string("1Gi")
 			initialReplicas := int32(1)
 			rdclName := fmt.Sprintf("%s-%s", "resources-management", RedisClusterName)
@@ -1289,7 +1255,7 @@ var _ = Describe("Redisclusters", func() {
 			Eventually(func() bool {
 				_, err := framework.ChangeRedisClusterEphemeral(ctx, k8sClient, namespacedName, initialStorage, initialReplicas)
 				return err == nil
-			}).Should(BeTrue())
+			}).Should(BeFalse())
 
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, namespacedName, fetchedRedisCluster)
@@ -1297,7 +1263,7 @@ var _ = Describe("Redisclusters", func() {
 			}).Should(BeTrue())
 
 			Eventually(func() bool {
-				return fetchedRedisCluster.Status.Status == "Error"
+				return fetchedRedisCluster.Status.Status == "Ready"
 			}).Should(BeTrue())
 
 			err := k8sClient.Delete(ctx, fetchedRedisCluster)

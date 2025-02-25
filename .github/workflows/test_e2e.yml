@@ -3,7 +3,7 @@ name: Build, Push and run E2E test
 on:
   pull_request:
     branches:
-      - develop*
+      - '*'
     paths-ignore: 
       - 'docs/**'
       - '.github/**'

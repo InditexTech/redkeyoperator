@@ -515,7 +515,7 @@ bundle-push: ## Push the bundle image.
 
 ##@ Test
 .PHONY: test-e2e
-test-e2e: process-manifests ## Execute e2e application test
+test-e2e: process-manifests-crd ## Execute e2e application test
 	$(info $(M) running e2e tests...)
 	$(info $(M) generating sonar report...)
 	$(eval TEST_COVERAGE_PROFILE_OUTPUT_DIRNAME=$(shell dirname $(TEST_COVERAGE_PROFILE_OUTPUT)))
@@ -524,7 +524,7 @@ test-e2e: process-manifests ## Execute e2e application test
 	ginkgo ./test/e2e -cover -coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT) -json > $(TEST_REPORT_OUTPUT_E2E)
 
 .PHONY: test-e2e-cov
-test-e2e-cov: ## Execute e2e application test
+test-e2e-cov: process-manifests-crd ## Execute e2e application test
 	$(info $(M) generating coverage report...)
 	$(eval TEST_REPORT_OUTPUT_DIRNAME=$(shell dirname $(TEST_REPORT_OUTPUT)))
 	mkdir -p $(TEST_REPORT_OUTPUT_DIRNAME)

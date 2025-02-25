@@ -1,4 +1,4 @@
-# End to End Test for Kubernetes and Openshift Redis Operator
+# End to End Test for Kubernetes Redis Operator
 
 ## Purpose
 
