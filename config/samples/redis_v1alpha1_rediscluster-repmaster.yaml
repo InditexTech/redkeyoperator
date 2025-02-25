@@ -1,0 +1,32 @@
+apiVersion: redis.inditex.com/v1alpha1
+kind: RedisCluster
+metadata:
+  name: redis-cluster
+  labels:
+    tier: redis-cluster
+    team: team-a
+    custom: labels
+spec:
+  config: |
+    maxmemory 70mb
+    maxmemory-samples 5
+    rdbcompression no
+    rdbchecksum no
+    appendonly no
+    protected-mode no
+  image: redislabs/redisgraph:2.8.9
+  purgekeysonrebalance: false
+  replicas: 3
+  replicasPerMaster: 1
+  ephemeral: true
+  labels:
+    tier: redis-cluster
+    team: team-a
+    custom: labels
+  resources:
+    limits:
+      cpu: 50m
+      memory: 50Mi
+    requests:
+      cpu: 50m
+      memory: 50Mi

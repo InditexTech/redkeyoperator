@@ -1,0 +1,15 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-operator
+  labels:
+    control-plane: redis-operator
+spec:
+  template:
+    spec:
+      containers:
+        - name: redis-operator
+          resources:
+            requests:
+              cpu: 0.3
+              memory: 200Mi

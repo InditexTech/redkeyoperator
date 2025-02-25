@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-operator
+  labels:
+    control-plane: redis-operator
+spec:
+  selector:
+    matchLabels:
+      control-plane: redis-operator
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        control-plane: redis-operator
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      containers:
+      - command:
+        - /manager
+        args:
+        - --leader-elect
+        - --max-concurrent-reconciles
+        - "10"
+        image: redis-operator:0.3.0
+        imagePullPolicy: Always
+        name: redis-operator
+        securityContext:
+          allowPrivilegeEscalation: false
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: "1"
+            memory: 1Gi
+        env:
+          - name: WATCH_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.annotations['olm.targetNamespaces']
+        
+      serviceAccountName: redis-operator-sa
+      terminationGracePeriodSeconds: 10

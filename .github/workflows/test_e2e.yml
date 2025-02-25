@@ -1,0 +1,45 @@
+name: Build, Push and run E2E test
+
+on:
+  pull_request:
+    branches:
+      - develop*
+    paths-ignore: 
+      - 'docs/**'
+      - '.github/**'
+      - '_local_tools/**'
+
+env:
+  DP_TOKEN: ${{ secrets.DIST_PLAT_DEPLOYER_TOKEN }}
+  DP_USERNAME: ${{ secrets.DIST_PLAT_DEPLOYER_USERNAME }}
+  KUBECONFIG: /tmp/kubeconfig.yaml
+  GO_VER: 1.23.1
+  KUBEBUILDER_VER: 2.3.1
+  OPERATOR_NAME: redis-operator
+  LATEST_RELEASE_TAG: 1.0.3
+
+jobs:
+  e2e-tests:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VER }}
+
+      - name: Setup kubectl
+        run: |
+          curl -sLO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" -o kubectl
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/kubectl
+
+      - name: Setup e2e environment
+        run: chmod +x ${GITHUB_WORKSPACE}/test/cmd/create_local_cluster_testing.sh && ${GITHUB_WORKSPACE}/test/cmd/create_local_cluster_testing.sh ${{ env.OPERATOR_NAME }}
+
+      - name: Install ginkgo
+        run: go install github.com/onsi/ginkgo/v2/ginkgo
+
+      - name: Run tests for Kubernetes
+        run: |
+          make test-e2e-cov OPERATOR_IMAGE=${{ env.OPERATOR_NAME }}:0.1.0

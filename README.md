@@ -1,3 +1,29 @@
-# Redis Operator
+# ![Redis Operator icon](docs/images/badge.png) Redis Operator for Kubernetes
 
-Redis Operator
+The easiest way to deploy and manage a Redis cluster in Kubernetes implementing the [operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/).
+
+This operator implements a controller that extends the Kubernetes API allowing to seamlessly deploy a Redis cluster, monitor the deployed resources implementing a reconciliation loop, logging events, manage cluster scaling and recover from errors.
+
+Redis operator is built using [kubebuilder](https://github.com/kubernetes-sigs/kubebuilder) and [operator-sdk](https://github.com/operator-framework/operator-sdk).
+
+## Features
+
+* Redis cluster creation
+* Redis cluster fixing
+* Slots allocation
+* PVC
+* Sidecar pods support (e.g. custom metrics applications)
+* Persistence
+* RedisGraph support
+
+## Documentation
+
+Refer to [operator guide](./docs/operator-guide/toc.md) to have an overview of the main Redis configuration and management options, and a troubleshooting guide.
+
+If you are a developer, you'll find interesting information in the [developer guide](./docs/developer-guide.md).
+
+## Versions
+
+* Go version: v1.23.1
+* Operator SDK version: v1.37.0
+

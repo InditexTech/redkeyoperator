@@ -1,0 +1,50 @@
+apiVersion: redis.inditex.com/v1alpha1
+kind: RedisCluster
+metadata:
+  annotations:
+    inditex.com/technology: 'redis:2.6.0'
+    resourceVersion: '17702546521'
+  name: redis-cluster-modules-test
+  namespace: redis-operator
+  labels:
+    app: redis-cluster-modules-test
+    domain: productandcatalog
+    tenant: za
+    build: modified-by-amiga-admin
+    application: kpiengine
+    layer: middleware-redis
+    platform: meccanoarteixo2
+    environment: preint
+    version: 2.6.0
+    template: senttpl-redis_2.6.0
+    type: middleware
+    slot: meckpieng
+spec:
+  config: |
+    maxmemory 1700mb
+    cluster-enabled no
+    loadmodule /opt/redis-stack/lib/redisearch.so
+    loadmodule /opt/redis-stack/lib/rejson.so
+    loadmodule /opt/redis-stack/lib/redistimeseries.so
+  deletePVC: false
+  ephemeral: true
+  image: redis/redis-stack-server:7.2.0-v6
+  labels:
+    app: redis-cluster-modules-test
+    domain: productandcatalog
+    tenant: za
+    application: kpiengine
+    layer: middleware-redis
+    platform: meccanoarteixo2
+    environment: preint
+    version: 2.6.0
+    template: senttpl-redis_2.6.0
+    type: middleware
+    slot: meckpieng
+  replicas: 1
+  resources:
+    limits:
+      cpu: 100m
+      memory: 100Mi
+  storage: 500Mi
+  

@@ -1,0 +1,33 @@
+apiVersion: redis.inditex.com/v1alpha1
+kind: RedisCluster
+metadata:
+  name: redis-cluster
+  labels:
+    app: redis
+    team: team-a
+    custom: labels
+spec:
+  replicas: 1
+  storage: 500Mi
+  accessModes: 
+  - ReadWriteOnce
+  deletePVC: false
+  image: redislabs/redisgraph:2.8.9
+  purgekeysonrebalance: false
+  labels:
+    team: team-a
+    custom: labels
+  resources:
+    limits:
+      cpu: 100m
+      memory: 100Mi
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  config: |
+    maxmemory 200mb
+    maxmemory-samples 5
+    maxmemory-policy allkeys-lru
+    appendonly yes
+    protected-mode no
+    loadmodule /usr/lib/redis/modules/redisgraph.so

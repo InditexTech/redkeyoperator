@@ -1,0 +1,61 @@
+package kubernetes
+
+import (
+	"context"
+
+	redisv1 "github.com/inditextech/redisoperator/api/v1"
+	"github.com/inditextech/redisoperator/internal/redis"
+	v1 "k8s.io/api/apps/v1"
+	pv1 "k8s.io/api/policy/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+)
+
+func FindExistingStatefulSet(ctx context.Context, client client.Client, req ctrl.Request) (*v1.StatefulSet, error) {
+	statefulset := &v1.StatefulSet{}
+	err := client.Get(ctx, types.NamespacedName{Name: req.Name, Namespace: req.Namespace}, statefulset)
+	if err != nil {
+		return nil, err
+	}
+	return statefulset, nil
+}
+
+func GetStatefulSetSelectorLabel(ctx context.Context, client client.Client, redisCluster *redisv1.RedisCluster) string {
+	statefulset, err := FindExistingStatefulSet(ctx, client, reconcile.Request{NamespacedName: types.NamespacedName{
+		Name:      redisCluster.Name,
+		Namespace: redisCluster.Namespace,
+	}})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return redis.RedisClusterComponentLabel
+		}
+		return ""
+	}
+	if statefulset.Spec.Template.Labels[redis.RedisClusterComponentLabel] != "" {
+		// new label
+		return redis.RedisClusterComponentLabel
+	} else {
+		return "app"
+	}
+}
+
+func FindExistingDeployment(ctx context.Context, client client.Client, req ctrl.Request) (*v1.Deployment, error) {
+	deployment := &v1.Deployment{}
+	err := client.Get(ctx, types.NamespacedName{Name: req.Name, Namespace: req.Namespace}, deployment)
+	if err != nil {
+		return nil, err
+	}
+	return deployment, nil
+}
+
+func FindExistingPodDisruptionBudget(ctx context.Context, client client.Client, req ctrl.Request) (*pv1.PodDisruptionBudget, error) {
+	pdb := &pv1.PodDisruptionBudget{}
+	err := client.Get(ctx, types.NamespacedName{Name: req.Name, Namespace: req.Namespace}, pdb)
+	if err != nil {
+		return nil, err
+	}
+	return pdb, nil
+}

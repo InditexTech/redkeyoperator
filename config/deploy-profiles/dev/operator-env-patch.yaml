@@ -1,0 +1,12 @@
+- op: remove
+  path: /spec/template/spec/containers/0/livenessProbe
+- op: remove
+  path: /spec/template/spec/containers/0/readinessProbe
+- op: replace
+  path: /spec/template/spec/containers/0/env
+  value:
+  - name: WATCH_NAMESPACE
+    value: watch-namespace
+- op: replace
+  path: /spec/template/spec/containers/0/imagePullPolicy
+  value: Always
