@@ -1,6 +1,6 @@
 # Contributing to Redis Operator
 
-Thank you for considering contributing to Redis Operator We appreciate your interest in helping improve this project.
+Thank you for considering contributing to Redis Operator. We appreciate your interest in helping improve this project.
 
 Whether you are fixing bugs, adding features, or improving documentation, your contributions are welcome. By following this guide, you'll help ensure that your contributions are accepted and make the process easier for everyone.
 

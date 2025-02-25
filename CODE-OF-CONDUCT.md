@@ -51,3 +51,7 @@ Project maintainers are obligated to respect the privacy and security of the rep
 ## Attribution
 
 This Code of Conduct is adapted from the [Contributor Covenant](https://www.contributor-covenant.org/), version 2.0, available at https://www.contributor-covenant.org/version/2/0/code_of_conduct.html.
+
+## Contact
+
+If you have any question, you can contact us by writing an email to oso@inditex.com.
