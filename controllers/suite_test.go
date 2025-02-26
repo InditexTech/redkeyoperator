@@ -51,7 +51,6 @@ var _ = BeforeSuite(func() {
 
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:    scheme.Scheme,
-		Namespace: "",
 	})
 
 	Expect(err).ToNot(HaveOccurred())

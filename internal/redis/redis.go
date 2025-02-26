@@ -387,7 +387,7 @@ func AddStatefulSetStorage(statefulSet *v1.StatefulSet, req ctrl.Request, spec r
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes: accessModesTypes,
-			Resources: corev1.ResourceRequirements{
+			Resources: corev1.VolumeResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceStorage: resource.MustParse(storage),
 				},
