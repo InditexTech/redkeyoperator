@@ -4,10 +4,10 @@ go 1.23.0
 
 require (
 	github.com/go-logr/logr v1.4.2
-	github.com/go-redis/redis/v8 v8.11.5
 	github.com/joho/godotenv v1.5.1
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
+	github.com/redis/go-redis/v9 v9.7.1
 	github.com/stretchr/testify v1.10.0
 	k8s.io/api v0.32.2
 	k8s.io/apiextensions-apiserver v0.32.2

@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	redisclient "github.com/go-redis/redis/v8"
+	redisclient "github.com/redis/go-redis/v9"
 )
 
 const (
