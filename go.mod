@@ -8,7 +8,6 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
-	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
 	k8s.io/api v0.32.2
 	k8s.io/apiextensions-apiserver v0.32.2

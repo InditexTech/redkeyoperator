@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	redisclient "github.com/go-redis/redis/v8"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -18,6 +17,7 @@ const (
 	NewHashSlot
 	AssignedHashSlot
 )
+
 
 // detail info for redis node.
 type NodeInfo struct {
@@ -76,7 +76,6 @@ func NewClusterNode(addr string) (node *ClusterNode, err error) {
 	hostport := strings.Split(addr, "@")[0]
 	parts := strings.Split(hostport, ":")
 	if len(parts) < 2 {
-		logrus.Errorf("Invalid IP or Port (given as %s) - use IP:Port format", addr)
 		return nil, fmt.Errorf("invalid IP or Port (given as %s) - use IP:Port format", addr)
 	}
 
@@ -84,7 +83,6 @@ func NewClusterNode(addr string) (node *ClusterNode, err error) {
 		// ipv6 in golang must like: "[fe80::1%lo0]:53", see detail in net/dial.go
 		host, port, err = net.SplitHostPort(hostport)
 		if err != nil {
-			logrus.Errorf("New cluster node error: %s!", err)
 			return nil, err
 		}
 	} else {
@@ -113,7 +111,6 @@ func NewClusterNode(addr string) (node *ClusterNode, err error) {
 
 	err = node.Connect()
 	if err != nil {
-		logrus.Errorf("Cannot connect to the node %s", err)
 		return nil, fmt.Errorf("cannot connect to the node %s", err)
 	}
 
@@ -344,7 +341,7 @@ func (clusterNode *ClusterNode) AssertEmpty() bool {
 	db0, e := clusterNode.Call("INFO", "db0").Text()
 	if err != nil || !strings.Contains(info, "cluster_known_nodes:1") ||
 		e != nil || strings.Trim(db0, " ") != "" {
-		logrus.Fatalf("Node %s is not empty. Either the node already knows other nodes (check with CLUSTER NODES) or contains some key in database 0.", clusterNode.String())
+		return false
 	}
 
 	return true
