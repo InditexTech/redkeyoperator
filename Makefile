@@ -80,7 +80,7 @@ IMG_DEV_WEBHOOK ?= redis-operator-webhook:0.1.0-dev
 
 # Image URL to use for deploying the operator pod when using `debug` deployment profile.
 # A base golang image is used with Delve installed, in order to be able to remotely debug the manager.
-IMG_DEBUG ?= delve:1.23.1
+IMG_DEBUG ?= delve:1.24.0
 
 CHANNELS ?= alpha,beta
 

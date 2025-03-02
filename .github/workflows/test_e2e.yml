@@ -11,7 +11,7 @@ on:
 
 env:
   KUBECONFIG: /tmp/kubeconfig.yaml
-  GO_VER: 1.23.1
+  GO_VER: 1.24.0
   KUBEBUILDER_VER: 2.3.1
   OPERATOR_NAME: redis-operator
   LATEST_RELEASE_TAG: 1.0.3
