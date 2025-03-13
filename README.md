@@ -27,7 +27,6 @@ If you are a developer, you'll find interesting information in the [developer gu
 * Go version: v1.24.0
 * Operator SDK version: v1.37.0
 
-
 ## License
 
 Copyright 2025 Inditex.

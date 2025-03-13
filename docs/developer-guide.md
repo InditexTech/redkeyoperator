@@ -20,7 +20,7 @@ Three **Deployment Profiles** have been defined. Basically, these profiles deter
 |---------|---------------------------------------------|---------|
 | debug | inditex-docker-snapshot.jfrog.io/production/itxapps/delve:1.24.0 | Debug code from your IDE using Delve |
 | dev | redis-operator:0.1.0 | Test a locally built (from source code) release | 
-| pro | axinregistry1.central.inditex.grp/itxapps/operator.redis-operator:1.2.1 | Test a released version |
+| pro | operator.redis-operator:1.2.1 | Test a released version |
 
 ## Create your Kubernetes cluster
 
