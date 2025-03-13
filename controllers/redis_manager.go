@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/api/apps/v1"
 	pv1 "k8s.io/api/policy/v1"
 	"k8s.io/client-go/util/retry"
-	redisclient "github.com/go-redis/redis/v8"
+	redisclient "github.com/redis/go-redis/v9"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	controllerruntime "sigs.k8s.io/controller-runtime"

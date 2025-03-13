@@ -15,6 +15,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubectl/pkg/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -77,8 +79,14 @@ var _ = BeforeSuite(func() {
 	k8sManager, err := ctrl.NewManager(testEnv.Config, ctrl.Options{
 		NewClient:          config.NewClient(),
 		Scheme:             scheme.Scheme,
-		Namespace:          RedisNamespace,
-		MetricsBindAddress: metricsAddr,
+		Cache: cache.Options{
+			DefaultNamespaces: map[string]cache.Config{
+				RedisNamespace: {},
+			},
+		},
+		Metrics: 				server.Options{
+			BindAddress: metricsAddr,
+		},
 	})
 	Expect(err).ToNot(HaveOccurred())
 

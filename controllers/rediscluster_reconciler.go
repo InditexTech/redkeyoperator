@@ -26,8 +26,6 @@ import (
 
 	finalizer "github.com/inditextech/redisoperator/internal/finalizers"
 	redisv1 "github.com/inditextech/redisoperator/api/v1"
-
-	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // RedisClusterReconciler reconciles a RedisCluster object
@@ -75,7 +73,7 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 func (r *RedisClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&redisv1.RedisCluster{}).
-		Watches(&source.Kind{Type: &corev1.ConfigMap{}}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(r.PreFilter())).
+		Watches(&corev1.ConfigMap{}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(r.PreFilter())).
 		Owns(&v1.StatefulSet{}).
 		WithOptions(controller.Options{MaxConcurrentReconciles: 10}).
 		Complete(r)

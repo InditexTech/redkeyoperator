@@ -1,13 +1,9 @@
 package redis
 
 import (
-	"bufio"
 	"fmt"
 	"math"
-	"os"
 	"strings"
-
-	"github.com/sirupsen/logrus"
 )
 
 func Uniq(list []string) []string {
@@ -67,17 +63,6 @@ func ToStringArray(in []interface{}) []string {
 	}
 
 	return result
-}
-
-func YesOrDie(msg string) {
-	fmt.Printf("%s (type 'yes' to accept): ", msg)
-
-	reader := bufio.NewReader(os.Stdin)
-	text, _ := reader.ReadString('\n')
-
-	if !strings.EqualFold(strings.TrimSpace(text), "yes") {
-		logrus.Fatalf("*** Aborting...")
-	}
 }
 
 func Round(num float64) int {
