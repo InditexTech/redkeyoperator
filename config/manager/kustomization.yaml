@@ -1,0 +1,17 @@
+namespace: default
+
+resources:
+- operator.yaml
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+- files:
+  - redis_operator_config.yaml
+  name: redis-operator-config
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+

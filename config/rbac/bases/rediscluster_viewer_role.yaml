@@ -1,0 +1,22 @@
+# permissions for end users to view redisclusters.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: rediscluster-viewer-role
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+rules:
+- apiGroups:
+  - redis.inditex.com
+  resources:
+  - redisclusters
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - redis.inditex.com
+  resources:
+  - redisclusters/status
+  verbs:
+  - get

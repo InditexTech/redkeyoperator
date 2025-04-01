@@ -1,0 +1,34 @@
+apiVersion: redis.inditex.com/v1alpha1
+kind: RedisCluster
+metadata:
+  name: redis-cluster
+  namespace: redis-operator
+  labels:
+    tier: redis-cluster
+    team: team-a
+    custom: labels
+spec:
+  config: |
+    maxmemory 90mb
+    maxmemory-samples 5
+    maxmemory-policy allkeys-lru
+    protected-mode no
+    appendonly no
+    save ""
+  image: redis/redis-stack-server:7.4.0-v3
+  purgekeysonrebalance: false
+  pdb:
+    enabled: true
+    pdbSizeUnavailable: 1
+  replicas: 1
+  ephemeral: true
+  accessModes: 
+  - ReadWriteOnce
+  labels:
+    tier: redis-cluster
+    team: team-a
+    custom: labels
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi

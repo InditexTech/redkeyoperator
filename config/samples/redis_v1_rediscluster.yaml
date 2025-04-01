@@ -1,0 +1,74 @@
+apiVersion: redis.inditex.com/v1
+kind: RedisCluster
+metadata:
+  labels:
+    app.kubernetes.io/name: redis-cluster-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: rediscluster-sample
+spec:
+  replicas: 1
+  ephemeral: true
+  # storage: 100Mi
+  accessModes: 
+  - ReadWriteOnce
+  deletePVC: false
+  image: redis/redis-stack-server:7.4.0-v3
+  purgekeysonrebalance: false
+  labels:
+    team: team-a
+    custom: labels
+  config: |
+    maxmemory 200mb
+    maxmemory-samples 5
+    maxmemory-policy allkeys-lru
+    appendonly no
+    save ""
+    protected-mode no
+    loadmodule /usr/lib/redis/modules/redisgraph.so
+  # override:
+  #   service:
+  #     metadata:
+  #       annotations:
+  #         traffic.inditex.com/weight: "101"
+  #       labels:
+  #         inditex.com/test: "test"
+  #     spec:
+  #       ports:
+  #       - name: prometheus
+  #         port: 9090
+  #         targetPort: 9090
+  #         protocol: TCP
+  #       selector:
+  #         inditex.com/test: "test"
+  #   statefulSet:
+  #     metadata:
+  #       annotations:
+  #         traffic.inditex.com/weight: "10"
+  #     spec:
+  #       template:
+  #         metadata:
+  #           labels:
+  #             inditex.com/test: "test"
+  #         spec:
+  #           tolerations:
+  #             - key: "test"
+  #               operator: "Equal"
+  #               value: "test"
+  #               effect: "NoSchedule"
+  #           topologySpreadConstraints:
+  #           - maxSkew: 1
+  #             topologyKey: kubernetes.io/hostname
+  #             whenUnsatisfiable: DoNotSchedule
+  #             labelSelector:
+  #               matchLabels:
+  #                 app: foo
+  #             matchLabelKeys:
+  #               - pod-template-hash
+  #           containers: 
+  #           - name: nginx
+  #             image: nginx
+  #           - name: redis
+  #             env:
+  #              - name: test
+  #                value: test
+  #           terminationGracePeriodSeconds: 10

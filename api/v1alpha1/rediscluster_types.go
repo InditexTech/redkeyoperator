@@ -1,0 +1,237 @@
+package v1alpha1
+
+import (
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
+)
+
+// NOTE: The status values Upgrading, ScalingUp and ScalingDown should be replaced with conditions because these conditions
+// can occur independently of the basic states Error, Initializing and Ready. Configuring should probably be removed eventually because the
+// stata value should only tell the end user whether the redis cluster is ready to receive traffic, if is initializing or there has been an error.
+// Any redis specific information should be represented by conditions.
+
+// StatusUpgrading: A RedisCluster enters this status when when:
+//   - there are differences between the existing configuration in the configmap
+//     and the configuration of the RedisCluster object merged with the default configuration set in the code.
+//   - there is a mismatch between the StatefulSet object labels and the RedisCluster Spec labels.
+//   - a mismatch exists between RedisCluster resources defined under spec and effective resources defined in the StatefulSet.
+//   - the images set in RedisCluster under spec and the image set in the StatefulSet object are not the same.
+//     The cluster is upgraded, reconfiguring the objects to solve these mismatches.
+//
+// StatusScalingDown: RedisCluster replicas > StatefulSet replicas
+//
+//	The cluster enters in this status to remove excess nodes.
+//
+// StatusScalingUp: RedisCluster replicas < StatefulSet replicas
+//
+//	The cluster enters in this status to create the needed nodes to equal the desired replicas with the current replicas.
+//
+// Ready: The cluster has the correct configuration, the desired number of replicas, is rebalances and ready to be used.
+//
+//	The operator checks pediodically if the cluster can be kept in this status.
+//
+// Configuring: Not all the cluster slots are OK but every cluster node are up and ready.
+//
+//	If the cluster needs a meet or a rebalance, being in Ready status, its status will switch to
+//	Configuring.
+//
+// Initializing: Not all the cluster slots are OK and not all the cluster nodes are up and ready.
+// Error: An error is detected in the cluster.
+//   - Storage capacity mismatch.
+//   - Storage class mismatch.
+//   - Scaling up the cluster before upgrading raises an error.
+//   - Scaling down the cluster after upgradind raises an error.
+//   - Scaling up when in StatusScalingUp status goes wrong.
+//   - Scaling down when in StatusScalingDown status goes wrong.
+//     The operator tries to recover the cluster from error checking the configuration and/or scaling the cluster.
+var StatusUpgrading = "Upgrading"
+var StatusScalingDown = "ScalingDown"
+var StatusScalingUp = "ScalingUp"
+
+var StatusReady = "Ready"
+var StatusConfiguring = "Configuring"
+var StatusInitializing = "Initializing"
+var StatusError = "Error"
+
+var ConditionUpgrading = metav1.Condition{
+	Type:               "Upgrading",
+	LastTransitionTime: metav1.Now(),
+	Message:            "Redis cluster is upgrading",
+	Reason:             "RedisClusterUpgrading",
+	Status:             metav1.ConditionTrue,
+}
+
+var ConditionScalingUp = metav1.Condition{
+	Type:               "ScalingUp",
+	LastTransitionTime: metav1.Now(),
+	Message:            "Redis cluster is scaling up",
+	Reason:             "RedisClusterScalingUp",
+	Status:             metav1.ConditionTrue,
+}
+var ConditionScalingDown = metav1.Condition{
+	Type:               "ScalingDown",
+	LastTransitionTime: metav1.Now(),
+	Message:            "Redis cluster is scaling down",
+	Reason:             "RedisClusterScalingDown",
+	Status:             metav1.ConditionTrue,
+}
+
+// RedisClusterSpec defines the desired state of RedisCluster
+// +kubebuilder:validation:XValidation:rule="self.ephemeral || has(self.storage)", message="Ephemeral or storage must be set"
+// +kubebuilder:validation:XValidation:rule="!(self.ephemeral && has(self.storage))", message="Ephemeral and storage cannot be combined"
+type RedisClusterSpec struct {
+	// +kubebuilder:validation:Optional
+	// RedisAuth
+	Auth     RedisAuth `json:"auth,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// Redis version
+	Version  string    `json:"version,omitempty"`
+
+	// Replicas specifies the number of Redis nodes in the cluster.
+	// +kubebuilder:validation:Required
+	Replicas int32     `json:"replicas,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// ReplicasPerMaster specifies how many replicas should be attached to each Redis Master
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Number of replicas per Master Node"
+	ReplicasPerMaster    int32                           `json:"replicasPerMaster,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// Image is the Redis image to use.
+	Image                string                          `json:"image,omitempty"`
+	
+	// +kubebuilder:validation:Optional
+	// DeletePVC specifies if the PVC should be deleted when the RedisCluster is deleted.
+	DeletePVC            bool                            `json:"deletePVC,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// Backup specifies if the RedisCluster should be backed up.
+	Backup               bool                            `json:"backup,omitempty"`
+	
+	// +kubebuilder:validation:Optional
+	// Monitoring specifies the monitoring configuration for the RedisCluster.
+	Monitoring           *v1.PodTemplateSpec             `json:"monitoring,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// PurgeKeysOnRebalance specifies if keys should be purged on rebalance.
+	PurgeKeysOnRebalance bool                            `json:"purgekeysonrebalance,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// Config is the Redis configuration to use.
+	Config               string                          `json:"config,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// Resources is the resource requirements for the RedisCluster.
+	Resources            *v1.ResourceRequirements        `json:"resources,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// Labels is the labels to add to the RedisCluster.
+	Labels               *map[string]string              `json:"labels,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// Pdb is the PodDisruptionBudget configuration for the RedisCluster.
+	Pdb                  Pdb                             `json:"pdb,omitempty"`
+	
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=true
+    // +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Changing the ephemeral field is not allowed"
+	// Ephemeral storage is not persisted across pod restarts.
+	Ephemeral            bool                            `json:"ephemeral"`
+
+	// +kubebuilder:validation:Optional
+    // +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Changing the storage size is not allowed"
+	// Storage is the amount of persistent storage to request for each Redis node.
+	Storage              string                          `json:"storage,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=""
+    // +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Changing the storage class name is not allowed"
+	// StorageClassName is the name of the StorageClass to use for the PVC.
+	StorageClassName     string                          `json:"storageClassName"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={ReadWriteOnce}
+    // +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Changing the storage access modes is not allowed"
+	// +kubebuilder:validation:items:Enum={ReadWriteOnce,ReadOnlyMany,ReadWriteMany}
+	// AccessModes is the list of access modes for the PVC.
+	AccessModes          []v1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
+}
+
+func (redisClusterSpec RedisClusterSpec) NodesNeeded() int {
+	return int(redisClusterSpec.Replicas + (redisClusterSpec.Replicas * redisClusterSpec.ReplicasPerMaster))
+}
+
+// RedisClusterStatus defines the observed state of RedisCluster
+type RedisClusterStatus struct {
+	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
+	// Important: Run "make manifests" to regenerate code after modifying this file
+	Nodes      map[string]*RedisNode `json:"nodes"`
+	Slots      []*SlotRange          `json:"slots"`
+	Status     string                `json:"status"`
+	Conditions []metav1.Condition    `json:"conditions,omitempty"`
+}
+
+type SlotRange struct {
+	Start int `json:"start"`
+	End   int `json:"end"`
+}
+
+type RedisNode struct {
+	NodeName string `json:"name"`
+	NodeID   string `json:"nodeid"`
+	IP       string `json:"ip"`
+}
+
+// RedisAuth
+type RedisAuth struct {
+	SecretName string `json:"secret,omitempty"`
+}
+type Pdb struct {
+	Enabled            bool               `json:"enabled,omitempty"`
+	PdbSizeUnavailable intstr.IntOrString `json:"pdbSizeUnavailable,omitempty"`
+	PdbSizeAvailable   intstr.IntOrString `json:"pdbSizeAvailable,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:shortName=rdcl
+// +kubebuilder:printcolumn:name="Replicas",type="integer",JSONPath=".spec.replicas",description="Amount of Redis nodes"
+// +kubebuilder:printcolumn:name="Image",type="string",JSONPath=".spec.image",description="Source image for Redis instance"
+// +kubebuilder:printcolumn:name="Storage",type="string",JSONPath=".spec.storage",description="Amount of storage for Redis"
+// +kubebuilder:printcolumn:name="StorageClassName",type="string",JSONPath=".spec.storageClassName",description="Storage Class to be used by the PVC"
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.status",description="The status of Redis cluster"
+// +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas,selectorpath=.status.selector
+// RedisCluster is the Schema for the redisclusters API
+type RedisCluster struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              RedisClusterSpec   `json:"spec,omitempty"`
+	Status            RedisClusterStatus `json:"status,omitempty"`
+}
+
+func (redisCluster RedisCluster) NodesNeeded() int {
+	return redisCluster.Spec.NodesNeeded()
+}
+
+//+kubebuilder:object:root=true
+
+// RedisClusterList contains a list of RedisCluster
+type RedisClusterList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []RedisCluster `json:"items"`
+}
+
+func init() {
+	SchemeBuilder.Register(&RedisCluster{}, &RedisClusterList{})
+}
+
+func (r RedisCluster) NamespacedName() types.NamespacedName {
+	return types.NamespacedName{
+		Namespace: r.GetNamespace(),
+		Name:      r.GetName(),
+	}
+}
