@@ -137,12 +137,11 @@ help: ##	Display this help.
 
 ##@ General
 .PHONY: verify
-verify: deps tidy checkfmt fmt lint vet build test-sonar ## Check the code
-	$(info $(M) checking code...)
+verify: deps tidy checkfmt lint vet build test-cov ## Check the code
 
 deps: ## Installs dependencies
-	$(info $(M) Installing dependencies...)
-	GONOSUMDB=honnef.co/go/* GONOPROXY=honnef.co/go/* $(GO) install honnef.co/go/tools/cmd/staticcheck@v0.5.1
+	$(info $(M) installing dependencies...)
+	GONOSUMDB=honnef.co/go/* GONOPROXY=honnef.co/go/* $(GO) install honnef.co/go/tools/cmd/staticcheck@v0.6.1
 
 .PHONY: version 
 version:: ## Print the current version of the project.
@@ -223,7 +222,7 @@ tidy: ##	Run go mod tidy
 
 .PHONY: run
 run: ##	Execute the program locally
-	$(info $(M) Running app...)
+	$(info $(M) running app...)
 	CONFIGMAP_PATH=./config_test/configmap.local.yml SECRET_PATH=./config_test/secrets.local.yml $(GO) run ./cmd/main.go
 
 dev-build: ##	Build manager binary.
@@ -557,7 +556,7 @@ test-e2e-cov: process-manifests-crd ginkgo ## Execute e2e application test
 
 .PHONY: test-sonar 
 test-sonar: ## Execute the application test for Sonar (coverage + test report)
-	$(info $(M) generating sonar report...)
+	$(info $(M) running tests and generating sonar report...)
 	$(eval TEST_COVERAGE_PROFILE_OUTPUT_DIRNAME=$(shell dirname $(TEST_COVERAGE_PROFILE_OUTPUT)))
 	$(eval TEST_REPORT_OUTPUT_DIRNAME=$(shell dirname $(TEST_REPORT_OUTPUT)))
 	mkdir -p $(TEST_COVERAGE_PROFILE_OUTPUT_DIRNAME) $(TEST_REPORT_OUTPUT_DIRNAME)
@@ -565,7 +564,7 @@ test-sonar: ## Execute the application test for Sonar (coverage + test report)
 
 .PHONY: test-cov
 test-cov: ## Execute the application test with coverage
-	$(info $(M) generating coverage report...)
+	$(info $(M) running tests and generating coverage report...)
 	$(eval TEST_REPORT_OUTPUT_DIRNAME=$(shell dirname $(TEST_REPORT_OUTPUT)))
 	mkdir -p $(TEST_REPORT_OUTPUT_DIRNAME)
 	$(GO) test ./controllers/ ./internal/*/ ./api/*/ -coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT) -covermode=count

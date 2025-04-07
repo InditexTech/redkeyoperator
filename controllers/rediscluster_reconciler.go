@@ -24,8 +24,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	finalizer "github.com/inditextech/redisoperator/internal/finalizers"
 	redisv1 "github.com/inditextech/redisoperator/api/v1"
+	finalizer "github.com/inditextech/redisoperator/internal/finalizers"
 )
 
 // RedisClusterReconciler reconciles a RedisCluster object

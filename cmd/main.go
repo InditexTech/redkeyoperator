@@ -97,8 +97,8 @@ func main() {
 
 	// Controller options
 	ctrlOptions := ctrl.Options{
-		Scheme:                 scheme,
-		Metrics: 				server.Options{
+		Scheme: scheme,
+		Metrics: server.Options{
 			BindAddress: metricsAddr,
 		},
 		WebhookServer: webhook.NewServer(webhook.Options{
@@ -107,7 +107,7 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "db95d8a6.inditex.com",
-		Client: 			   client.Options{
+		Client: client.Options{
 			Cache: &client.CacheOptions{
 				DisableFor: []client.Object{
 					&corev1.ConfigMap{},
@@ -161,12 +161,12 @@ func getWatchNamespace() (map[string]cache.Config, error) {
 	if !found {
 		return nil, fmt.Errorf("%s must be set", watchNamespaceEnvVar)
 	}
-	
+
 	watchNamespaces := make(map[string]cache.Config)
 	for _, ns := range strings.Split(namespaces, ",") {
 		setupLog.Info("manager set up with namespace", "namespace", ns)
 		watchNamespaces[ns] = cache.Config{}
 	}
-		
+
 	return watchNamespaces, nil
 }

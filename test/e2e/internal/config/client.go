@@ -20,4 +20,3 @@ func NewClient() client.NewClientFunc {
 		return c, err
 	}
 }
-

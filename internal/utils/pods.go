@@ -76,7 +76,8 @@ type PodReadyWait struct {
 }
 
 func (prw PodReadyWait) WaitForPodsToBecomeReady(ctx context.Context, interval, timeout time.Duration, listOptions *client.ListOptions, expectedReadyReplicas int) error {
-	return wait.Poll(interval, timeout, func() (bool, error) {
+
+	return wait.PollUntilContextTimeout(ctx, interval, timeout, false, func(ctx context.Context) (bool, error) {
 		pods := &corev1.PodList{}
 		if err := prw.Client.List(ctx, pods, listOptions); err != nil {
 			return false, err

@@ -428,7 +428,7 @@ func createAndInsertDataIntoCluster(pods *corev1.PodList) error {
 func waitForContainerReady(pod corev1.Pod) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	return wait.PollImmediateWithContext(ctx, 1*time.Second, 300*time.Second, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, 1*time.Second, 300*time.Second, true, func(ctx context.Context) (bool, error) {
 		if isContainerReady(pod) {
 			return true, nil
 		}
@@ -591,7 +591,7 @@ func waitForObjectStatus(ctx context.Context, client client.Client, nsName types
 	duration := time.Duration(timeoutSeconds) * time.Second
 	var lastKnownStatus string
 
-	err := wait.PollImmediateWithContext(ctx, interval, duration, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, interval, duration, true, func(ctx context.Context) (bool, error) {
 		redisCluster := &redisv1.RedisCluster{}
 		err := client.Get(ctx, nsName, redisCluster)
 		if err != nil {
@@ -942,7 +942,7 @@ func waitForRedisClusterDeletion(ctx context.Context, client client.Client, nsNa
 	interval := 3 * time.Second
 	duration := time.Duration(timeoutSeconds) * time.Second
 
-	err := wait.PollImmediateWithContext(ctx, interval, duration, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, interval, duration, true, func(ctx context.Context) (bool, error) {
 		redisCluster := &redisv1.RedisCluster{}
 		err := client.Get(ctx, nsName, redisCluster)
 		if err != nil {

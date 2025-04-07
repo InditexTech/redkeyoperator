@@ -37,7 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
 )
 
 const (
@@ -1274,6 +1273,7 @@ func (r *RedisClusterReconciler) CreateConfigMap(req ctrl.Request, spec redisv1.
 }
 
 func (r *RedisClusterReconciler) CreateMonitoringDeployment(ctx context.Context, req ctrl.Request, rediscluster *redisv1.RedisCluster, labels map[string]string) *v1.Deployment {
+	var replicas = int32(1)
 	d := &v1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      req.Name + "-monitoring",
@@ -1285,7 +1285,7 @@ func (r *RedisClusterReconciler) CreateMonitoringDeployment(ctx context.Context,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{redis.RedisClusterLabel: req.Name, r.GetStatefulSetSelectorLabel(rediscluster): "monitoring"},
 			},
-			Replicas: pointer.Int32(1),
+			Replicas: &replicas,
 		},
 	}
 	d.Spec.Template.Labels = make(map[string]string)

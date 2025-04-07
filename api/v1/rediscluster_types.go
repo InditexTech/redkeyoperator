@@ -80,83 +80,83 @@ var ConditionScalingDown = metav1.Condition{
 type RedisClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	// RedisAuth
-	Auth     RedisAuth `json:"auth,omitempty"`
+	Auth RedisAuth `json:"auth,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// Redis version
-	Version  string    `json:"version,omitempty"`
+	Version string `json:"version,omitempty"`
 
 	// Replicas specifies the number of Redis nodes in the cluster.
 	// +kubebuilder:validation:Required
-	Replicas int32     `json:"replicas"`
+	Replicas int32 `json:"replicas"`
 
 	// +kubebuilder:validation:Optional
 	// ReplicasPerMaster specifies how many replicas should be attached to each Redis Master
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Number of replicas per Master Node"
-	ReplicasPerMaster    int32                           `json:"replicasPerMaster,omitempty"`
+	ReplicasPerMaster int32 `json:"replicasPerMaster,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// Image is the Redis image to use.
-	Image                string                          `json:"image,omitempty"`
+	Image string `json:"image,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// DeletePVC specifies if the PVC should be deleted when the RedisCluster is deleted.
-	DeletePVC            bool                            `json:"deletePVC,omitempty"`
+	DeletePVC bool `json:"deletePVC,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// Backup specifies if the RedisCluster should be backed up.
-	Backup               bool                            `json:"backup,omitempty"`
+	Backup bool `json:"backup,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// Monitoring specifies the monitoring configuration for the RedisCluster.
-	Monitoring           *MonitoringSpec                 `json:"monitoring,omitempty"`
+	Monitoring *MonitoringSpec `json:"monitoring,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// PurgeKeysOnRebalance specifies if keys should be purged on rebalance.
-	PurgeKeysOnRebalance bool                            `json:"purgekeysonrebalance,omitempty"`
+	PurgeKeysOnRebalance bool `json:"purgekeysonrebalance,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// Config is the Redis configuration to use.
-	Config               string                          `json:"config,omitempty"`
+	Config string `json:"config,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// Resources is the resource requirements for the RedisCluster.
-	Resources            *v1.ResourceRequirements        `json:"resources,omitempty"`
+	Resources *v1.ResourceRequirements `json:"resources,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// Labels is the labels to add to the RedisCluster.
-	Labels               *map[string]string              `json:"labels,omitempty"`
+	Labels *map[string]string `json:"labels,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// Pdb is the PodDisruptionBudget configuration for the RedisCluster.
-	Pdb                  Pdb                             `json:"pdb,omitempty"`
+	Pdb Pdb `json:"pdb,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	Override             *RedisClusterOverrideSpec       `json:"override,omitempty"`
+	Override *RedisClusterOverrideSpec `json:"override,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=true
-    // +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Changing the ephemeral field is not allowed"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Changing the ephemeral field is not allowed"
 	// Ephemeral storage is not persisted across pod restarts.
-	Ephemeral            bool                            `json:"ephemeral"`
+	Ephemeral bool `json:"ephemeral"`
 
 	// +kubebuilder:validation:Optional
-    // +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Changing the storage size is not allowed"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Changing the storage size is not allowed"
 	// Storage is the amount of persistent storage to request for each Redis node.
-	Storage              string                          `json:"storage,omitempty"`
+	Storage string `json:"storage,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=""
-    // +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Changing the storage class name is not allowed"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Changing the storage class name is not allowed"
 	// StorageClassName is the name of the StorageClass to use for the PVC.
-	StorageClassName     string                          `json:"storageClassName"`
+	StorageClassName string `json:"storageClassName"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default={ReadWriteOnce}
-    // +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Changing the storage access modes is not allowed"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Changing the storage access modes is not allowed"
 	// +kubebuilder:validation:items:Enum={ReadWriteOnce,ReadOnlyMany,ReadWriteMany}
 	// AccessModes is the list of access modes for the PVC.
-	AccessModes          []v1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
+	AccessModes []v1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
 }
 
 func (redisClusterSpec RedisClusterSpec) NodesNeeded() int {

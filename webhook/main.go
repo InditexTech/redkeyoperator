@@ -13,11 +13,11 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	redisv1 "github.com/inditextech/redisoperator/api/v1"
 	redisv1alpha1 "github.com/inditextech/redisoperator/api/v1alpha1"
@@ -70,8 +70,8 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 	godotenv.Load("./.env")
 	ctrlOptions := ctrl.Options{
-		Scheme:                 scheme,
-		Metrics: 				server.Options{
+		Scheme: scheme,
+		Metrics: server.Options{
 			BindAddress: metricsAddr,
 		},
 		WebhookServer: webhook.NewServer(webhook.Options{
@@ -80,7 +80,7 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "db95d8a6-webhook.inditex.com",
-		Client: 			   client.Options{
+		Client: client.Options{
 			Cache: &client.CacheOptions{
 				DisableFor: []client.Object{
 					&corev1.ConfigMap{},
