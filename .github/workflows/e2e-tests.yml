@@ -7,7 +7,6 @@ on:
       - 'main*'
     paths-ignore: 
       - 'docs/**'
-      - '.github/**'
   workflow_dispatch:
 
 env:

@@ -224,7 +224,7 @@ dev-build: ##	Build manager binary.
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -o bin/manager ./cmd/main.go
 
 dev-build-webhook: ##	Build webhook binary.
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -o bin/webhook ./cmd/webhook/main.go
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -C webhook -o ../bin/webhook  main.go
 
 docker-build: test ##	Build docker image with the manager (uses `${IMG}` image name).
 	docker build -t ${IMG} .
