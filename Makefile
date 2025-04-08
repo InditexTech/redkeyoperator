@@ -1,5 +1,3 @@
-
-
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
@@ -92,13 +90,10 @@ CHANNELS ?= alpha,beta
 # Can be overwritten with make bundle IMAGE_REF=<some-registry>/<project-name-bundle>:<tag>
 IMAGE_REF ?= $(IMG)
 
-# Namespace to deploy to.
-# Takes the active namespace. If no namespace active, then `redis-operator` is used by default.
-NAMESPACE ?= $(shell kubectl config view --minify --output 'jsonpath={..namespace}'; echo)
-ifeq ($(NAMESPACE), )
-	NAMESPACE := redis-operator
-endif
+# Namespace in which the manager will be deployed.
+NAMESPACE ?= redis-operator
 
+# Namespace in which the webhook will be deployed.
 WEBHOOK_NAMESPACE := redis-operator-webhook
 
 # Allowed deploying profiles.

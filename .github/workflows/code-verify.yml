@@ -1,0 +1,23 @@
+name: Static code analysis and unit testing
+on:
+  push:
+    paths-ignore: 
+      - 'docs/**'
+  workflow_dispatch:
+
+jobs:
+  code-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - id: parse-gomod
+        name: Extract Go version from go.mod file
+        uses: Arthur1/parse-gomod-action@v0
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ steps.parse-gomod.outputs.go}}
+      - name: Run code checks and unit tests
+        run: |
+          make verify
