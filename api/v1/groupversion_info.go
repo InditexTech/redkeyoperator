@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2025 INDUSTRIA DE DISEÑO TEXTIL, S.A. (INDITEX, S.A.)
+//
+// SPDX-License-Identifier: Apache-2.0
+
 // Package v1 contains API Schema definitions for the redis v1 API group.
 // +kubebuilder:object:generate=true
 // +groupName=redis.inditex.com
