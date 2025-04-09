@@ -1,0 +1,43 @@
+name: Check if new version is greater than last repository released version
+
+inputs:
+  new_version:
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - id: get_latest_release
+      name: Get latest released version from GitHub
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const repo = {
+          owner: context.repo.owner,
+          repo: context.repo.repo,
+          };
+          let release
+          try {
+            release = await github.rest.repos.getLatestRelease(repo);
+          } catch(e) {
+            console.log(e);
+          }
+          if (release.status === '404') {
+            return 'v0.0.0';
+          }
+          return release.data.tag_name;
+        result-encoding: string
+    - name: Check new version is coherent
+      shell: bash
+      run: |
+        CURRENT_VERSION=${{ steps.get_latest_release.outputs.result }}
+        EXTRACTED_VERSION=v${{ inputs.new_version }} # Prepending 'v' to match GitHub format
+        if [ "$EXTRACTED_VERSION" = "$CURRENT_VERSION" ]; then
+            echo "New version ($EXTRACTED_VERSION) is equal to the current release ($CURRENT_VERSION). Failing the job."
+            exit 1
+        elif [ "$(printf '%s\n' "$CURRENT_VERSION" "$EXTRACTED_VERSION" | sort -V | head -n1)" != "$CURRENT_VERSION" ]; then
+            echo "New version ($EXTRACTED_VERSION) is less than the current release ($CURRENT_VERSION). Failing the job."
+            exit 1
+        else
+            echo "Version check passed. New version ($EXTRACTED_VERSION) is greater than the current release ($CURRENT_VERSION)."
+        fi

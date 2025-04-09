@@ -1,0 +1,16 @@
+name: Get version from Makefile
+
+outputs:
+  version:
+    description: Current makefile version
+    value: ${{ steps.makefile_version.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Extract version
+      id: makefile_version
+      shell: bash
+      run: |
+          VERSION=$(make version)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT

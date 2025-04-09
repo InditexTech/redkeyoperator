@@ -1,0 +1,98 @@
+name: Release and publish a new version
+
+on:
+  pull_request:
+    types: [closed]
+    branches: ['main', 'hotfix/*']
+
+env:
+  REGISTRY: ghcr.io
+  OWNER: InditexTech
+  OPERATOR_NAME: redis-operator
+  WEBHOOK_NAME: redis-operator-webhook
+
+jobs:
+  create-release:
+    name: Create release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Get version from Makefile
+        id: makefile_version
+        uses: ./.github/workflows/actions/get-version-from-makefile
+      - name: Check version
+        uses: ./.github/workflows/actions/check-version
+        with:
+          new_version: ${{ steps.makefile_version.outputs.version }}
+      - name: Create release
+        uses: ncipollo/release-action@v1.16.0
+        id: github-release
+        continue-on-error: true
+        with:
+          tag: v${{ steps.makefile_version.outputs.version }}
+          commit: main
+          body: |
+            Check out the [changelog](CHANGELOG.md) for version v${{ steps.makefile_version.outputs.version }}
+  publish-operator-image:
+    name: Publish Redis Operator image to the registry
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Get version from Makefile
+        id: makefile_version
+        uses: ./.github/workflows/actions/get-version-from-makefile
+      - name: Login to registry ${{ env.REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.OPERATOR_NAME }}:${{ steps.makefile_version.outputs.version }}
+  publish-operator-webhook-image:
+    name: Publish Redis Operator Webhook image to the registry
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Get version from Makefile
+        id: makefile_version
+        uses: ./.github/workflows/actions/get-version-from-makefile
+      - name: Login to registry ${{ env.REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: webhook/Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.WEBHOOK_NAME }}:${{ steps.makefile_version.outputs.version }}
+#   publish-operator:
+#     name: Publish Redis Operator to OperatorHub.io
+#     needs: [create-release, publish-operator-image, publish-operator-webhook-image]
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: checkout code
+#         uses: actions/checkout@v4
