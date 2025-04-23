@@ -12,7 +12,9 @@ import (
 )
 
 func SetConditionFalse(log logr.Logger, redisCluster *redisv1.RedisCluster, condition metav1.Condition) {
-	log.Info("Condition set to false", "condition", condition)
 	condition.Status = metav1.ConditionFalse
-	meta.SetStatusCondition(&redisCluster.Status.Conditions, condition)
+	changed := meta.SetStatusCondition(&redisCluster.Status.Conditions, condition)
+	if changed {
+		log.Info("Condition set to false", "condition", condition)
+	}
 }
