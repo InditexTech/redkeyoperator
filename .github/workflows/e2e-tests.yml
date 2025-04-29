@@ -62,8 +62,7 @@ jobs:
       with:
         install: true
         driver-opts: |
-          image=moby/buildkit:stable
-        # wire the cache directories
+          image=moby/buildkit:v0.21.0
         cache-from: type=local,src=/tmp/.buildx-cache
         cache-to:   type=local,dest=/tmp/.buildx-cache,mode=max
 
