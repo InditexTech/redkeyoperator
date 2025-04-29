@@ -75,14 +75,15 @@ var _ = BeforeSuite(func() {
 
 	cfg, err := testEnv.Start()
 	if err != nil {
-		if !errors.IsAlreadyExists(err) {
+		if errors.IsAlreadyExists(err) {
+			GinkgoWriter.Printf("warning: CRD already existed, continuing: %v\n", err)
+			err = nil
+		} else {
 			Fail(fmt.Sprintf("failed to start test environment: %v", err))
 		}
-		GinkgoWriter.Printf("warning: CRD already existed, continuing: %v\n", err)
 	}
 	Expect(cfg).NotTo(BeNil())
 	Expect(err).NotTo(HaveOccurred())
-	Expect(cfg).NotTo(BeNil())
 
 	// register all schemes in one shot
 	utilruntime.Must(redisv1.AddToScheme(scheme.Scheme))

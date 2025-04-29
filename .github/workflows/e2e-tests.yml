@@ -93,6 +93,9 @@ jobs:
         cache-from: type=local,src=/tmp/.buildx-cache
         cache-to:   type=local,dest=/tmp/.buildx-cache,mode=max
 
+    - name: 📥 Load operator image into KinD
+      run: kind load docker-image --name local-cluster-test redis-operator:0.1.0
+
     - name: 📦  Pull dependency images & load into KinD
       run: |
         for img in \
