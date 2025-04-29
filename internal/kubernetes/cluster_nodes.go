@@ -501,7 +501,7 @@ func (nodeList *ClusterNodeList) ReshardNode(ctx context.Context, source, target
 
 		if strings.Contains(stderr.String(), "Please fix your cluster problems") {
 			log.Info("Cluster is down, trying to fix it")
-			err = nodeList.FixCluster(ctx, target, log)
+			err = nodeList.FixCluster(ctx, source, log)
 			if err != nil {
 				return err
 			}
@@ -521,7 +521,7 @@ func (nodeList *ClusterNodeList) FixCluster(ctx context.Context, node *ClusterNo
 	log.Info("Fixing cluster", "node", node.Name())
 
 	var buf bytes.Buffer
-	_, err := fmt.Fprintf(&buf, "/usr/bin/redis-cli --cluster fix %s:6379", node.GetIp())
+	_, err := fmt.Fprintf(&buf, "/usr/bin/redis-cli --cluster fix %s:6379 --cluster-yes", node.GetIp())
 	if err != nil {
 		return err
 	}
