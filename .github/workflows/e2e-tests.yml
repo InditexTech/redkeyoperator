@@ -8,6 +8,12 @@ on:
     paths-ignore: 
       - 'docs/**'
   workflow_dispatch:
+    inputs:
+      test_parallel_process:
+        description: 'Number of parallel processes for E2E tests'
+        required: false
+        default: '4'
+    
 
 env:
   KUBECONFIG: /tmp/kubeconfig.yaml
@@ -18,22 +24,26 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - id: parse-gomod
-        name: Extract Go version from go.mod file
-        uses: Arthur1/parse-gomod-action@v0
-      - name: Setup Go
-        uses: actions/setup-go@v5
+
+      - uses: actions/setup-go@v5
         with:
-          go-version: ${{ steps.parse-gomod.outputs.go}}
+          go-version-file: go.mod
+
       - name: Setup kubectl
         run: |
           curl -sLO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" -o kubectl
           chmod +x kubectl
           sudo mv kubectl /usr/local/bin/kubectl
+      
       - name: Setup e2e environment
         run: chmod +x ${GITHUB_WORKSPACE}/test/cmd/create_local_cluster_testing.sh && ${GITHUB_WORKSPACE}/test/cmd/create_local_cluster_testing.sh ${{ env.OPERATOR_NAME }}
+      
       - name: Install ginkgo
         run: go install github.com/onsi/ginkgo/v2/ginkgo
+
       - name: Run tests for Kubernetes
         run: |
-          make test-e2e-cov OPERATOR_IMAGE=${{ env.OPERATOR_NAME }}:0.1.0 TEST_PARALLEL_PROCESS=4
+          make test-e2e-cov \
+            OPERATOR_IMAGE=${{ env.OPERATOR_NAME }}:0.1.0 \
+            TEST_PARALLEL_PROCESS=${{ env.TEST_PARALLEL_PROCESS }} \
+            GOMAXPROCS=${{ env.TEST_PARALLEL_PROCESS }} \

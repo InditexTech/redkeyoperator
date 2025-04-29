@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+
 	redisv1 "github.com/inditextech/redisoperator/api/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -72,6 +74,10 @@ var _ = BeforeSuite(func() {
 	}
 
 	cfg, err := testEnv.Start()
+	if !errors.IsAlreadyExists(err) {
+		Fail(fmt.Sprintf("failed to start test environment: %v", err))
+	}
+	Expect(cfg).NotTo(BeNil())
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 

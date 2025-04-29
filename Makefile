@@ -550,7 +550,7 @@ test-e2e: process-manifests-crd ginkgo ## Execute e2e application test
 			-coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT) \
 			--json-report $(TEST_REPORT_OUTPUT_E2E)\
 			./test/e2e \
-	    	GOMAXPROCS=$(TEST_PARALLEL_PROCESS) \
+	    	GOMAXPROCS=$(GOMAXPROCS) \
 	    	OPERATOR_IMAGE=$(IMG_DEV) \
 	    	REDIS_IMAGE=$(REDIS_IMAGE) \
 	    	CHANGED_REDIS_IMAGE=$(CHANGED_REDIS_IMAGE) \
@@ -568,7 +568,7 @@ test-e2e-cov: process-manifests-crd ginkgo ## Execute e2e application test
 			-covermode=count \
 			-coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT) \
 			./test/e2e \
-			GOMAXPROCS=$(TEST_PARALLEL_PROCESS) \
+			GOMAXPROCS=$(GOMAXPROCS) \
 			OPERATOR_IMAGE=$(IMG_DEV) \
 			REDIS_IMAGE=$(REDIS_IMAGE) \
 			CHANGED_REDIS_IMAGE=$(CHANGED_REDIS_IMAGE) \
