@@ -36,4 +36,4 @@ jobs:
         run: go install github.com/onsi/ginkgo/v2/ginkgo
       - name: Run tests for Kubernetes
         run: |
-          make test-e2e-cov OPERATOR_IMAGE=${{ env.OPERATOR_NAME }}:0.1.0
+          make test-e2e-cov OPERATOR_IMAGE=${{ env.OPERATOR_NAME }}:0.1.0 TEST_PARALLEL_PROCESS=4

@@ -1,5 +1,4 @@
 // SPDX-FileCopyrightText: 2025 INDUSTRIA DE DISEÑO TEXTIL, S.A. (INDITEX, S.A.)
-//
 // SPDX-License-Identifier: Apache-2.0
 
 package e2e
@@ -7,21 +6,25 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"sort"
+	"os"
+	"slices"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	gomegatypes "github.com/onsi/gomega/types"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	redisv1 "github.com/inditextech/redisoperator/api/v1"
 	"github.com/inditextech/redisoperator/internal/redis"
@@ -32,6 +35,25 @@ const (
 	RedisClusterName = "rediscluster-test"
 	version          = "6.0.2"
 )
+
+var (
+	defaultSidecarImage = "alpine:3.1.2"
+	changedRedisImage   = "redis/redis-stack-server:7.2.0-v10"
+)
+
+func getSidecarImage() string {
+	if img := os.Getenv("SIDECARD_IMAGE"); img != "" {
+		return img
+	}
+	return defaultSidecarImage
+}
+
+func getChangedRedisImage() string {
+	if img := os.Getenv("CHANGED_REDIS_IMAGE"); img != "" {
+		return img
+	}
+	return changedRedisImage
+}
 
 // helper: creates a namespace with a GenerateName prefix and waits for it to be ready
 func createNamespace(ctx context.Context, c client.Client, prefix string) *corev1.Namespace {
@@ -57,12 +79,23 @@ func deleteNamespace(ctx context.Context, c client.Client, ns *corev1.Namespace)
 	Expect(c.List(ctx, &rcList, &client.ListOptions{Namespace: ns.Name})).To(Succeed())
 
 	for i := range rcList.Items {
-		rc := &rcList.Items[i]
-		// strip all finalizers
-		rc.Finalizers = nil
-		Expect(c.Update(ctx, rc)).To(Succeed(), "removing finalizers from %s/%s", rc.Namespace, rc.Name)
+		name := rcList.Items[i].Name
+		ns := rcList.Items[i].Namespace
+
+		// Strip finalizers with retry
+		Expect(retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			rc := &redisv1.RedisCluster{}
+			if err := c.Get(ctx, client.ObjectKey{Namespace: ns, Name: name}, rc); err != nil {
+				return err
+			}
+			rc.Finalizers = nil
+			return c.Update(ctx, rc)
+		})).To(Succeed(), "removing finalizers from %s/%s", ns, name)
+
 		// delete the CR immediately
-		Expect(c.Delete(ctx, rc)).To(Succeed(), "deleting RedisCluster %s/%s", rc.Namespace, rc.Name)
+		Expect(c.Delete(ctx, &redisv1.RedisCluster{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns},
+		})).To(Succeed(), "deleting RedisCluster %s/%s", ns, name)
 	}
 
 	// 2) Delete the namespace
@@ -75,1016 +108,906 @@ func deleteNamespace(ctx context.Context, c client.Client, ns *corev1.Namespace)
 	}, defaultWait, defaultPoll).Should(BeTrue(), "namespace %s should be gone", ns.Name)
 }
 
-var _ = Describe("Redis Operator & RedisCluster", Label("operator", "cluster"), func() {
+var _ = Describe("Redis Operator & RedisCluster E2E", Label("operator", "cluster"), func() {
 	var (
 		namespace *corev1.Namespace
 	)
 
-	BeforeEach(func() {
-		// 1) create a fresh namespace per spec
-		namespace = createNamespace(ctx, k8sClient, fmt.Sprintf("redis-e2e-%d", GinkgoParallelProcess()))
+	// mustCreateAndReady creates a cluster and blocks until it's Ready
+	mustCreateAndReady := func(name string, replicas, replicasPerMaster int32, storage string, purgeKeys, ephemeral bool, pdb redisv1.Pdb, userOverride redisv1.RedisClusterOverrideSpec) *redisv1.RedisCluster {
+		key := types.NamespacedName{Namespace: namespace.Name, Name: name}
+		Expect(framework.EnsureClusterExistsOrCreate(
+			ctx, k8sClient, key,
+			replicas, replicasPerMaster,
+			storage, purgeKeys, ephemeral,
+			pdb, userOverride,
+		)).To(Succeed())
 
-		// 2) install the operator into that namespace
-		By("installing the Redis Operator into " + namespace.Name)
+		rc, err := framework.WaitForReady(ctx, k8sClient, key)
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(rc.Spec.Replicas).To(Equal(replicas))
+		Expect(rc.Spec.Storage).To(Equal(storage))
+		Expect(rc.Spec.PurgeKeysOnRebalance).To(Equal(purgeKeys))
+		Expect(rc.Spec.Ephemeral).To(Equal(ephemeral))
+		Expect(rc.Kind).To(Equal("RedisCluster"))
+		Expect(rc.APIVersion).To(Equal("redis.inditex.com/v1"))
+		Expect(rc.Spec.Auth).To(Equal(redisv1.RedisAuth{}))
+		Expect(rc.Spec.Image).To(Equal(os.Getenv("REDIS_IMAGE")))
+		Expect(rc.Spec.Pdb).To(Equal(pdb))
+		Expect(rc.Spec.ReplicasPerMaster).To(Equal(replicasPerMaster))
+		Expect(rc.Name).To(Equal(name))
+		Expect(rc.Spec.Version).To(Equal(version))
+		return rc
+	}
+
+	BeforeEach(func() {
+		namespace = createNamespace(ctx, k8sClient, fmt.Sprintf("redis-e2e-%d", GinkgoParallelProcess()))
 		Expect(EnsureOperatorSetup(ctx, namespace.Name)).To(Succeed())
 	})
-
 	AfterEach(func() {
-		if namespace != nil {
-			deleteNamespace(ctx, k8sClient, namespace)
-		}
+		deleteNamespace(ctx, k8sClient, namespace)
 	})
 
-	Context("when the operator is installed", func() {
-		It("should deploy its controller Deployment and become healthy", func() {
-			operatorDep := &appsv1.Deployment{}
+	Context("Operator health", func() {
+		It("deploys and becomes healthy", func() {
+			dep := &appsv1.Deployment{}
 			Eventually(func() bool {
-				err := k8sClient.Get(ctx,
-					client.ObjectKey{Namespace: namespace.Name, Name: "redis-operator"},
-					operatorDep,
-				)
-				return err == nil && operatorDep.Status.AvailableReplicas >= 1
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace.Name, Name: "redis-operator"}, dep)
+				return err == nil && dep.Status.AvailableReplicas >= 1
 			}, defaultWait*2, defaultPoll).Should(BeTrue())
 		})
 	})
 
-	Context("when managing a RedisCluster with 3 replicas", func() {
-		It("creates a cluster", func() {
-			key := types.NamespacedName{Namespace: namespace.Name, Name: "rdcl-test"}
+	Context("Lifecycle: create & scale", func() {
+		const base = "rdcl"
 
-			Expect(framework.EnsureClusterExistsOrCreate(
-				ctx,
-				k8sClient,
-				key,
-				3,
-				0,
-				"",
-				true,
-				true,
-				redisv1.Pdb{},
-				redisv1.RedisClusterOverrideSpec{},
-			)).To(Succeed())
+		// helper: every phase in want must appear somewhere in trace
+		expectPhases := func(trace []string, want ...string) {
+			for _, p := range want {
+				Expect(trace).To(ContainElement(p),
+					"phase %q not present in trace %v", p, trace)
+			}
+		}
 
-			By("waiting for it to become Ready")
-			Eventually(func() error {
-				_, err := framework.WaitForReady(ctx, k8sClient, key)
-				return err
-			}, defaultWait*2, defaultPoll).Should(Succeed())
+		DescribeTable("scale cycles",
+			func(initial, target int32, phases []string) {
+				// unique name per entry so jobs can run in parallel
+				name := fmt.Sprintf("%s-%d-%d", base, initial, target)
+				key := types.NamespacedName{Namespace: namespace.Name, Name: name}
 
-			// now fetch and assert
-			rd := &redisv1.RedisCluster{}
-			Expect(k8sClient.Get(ctx, key, rd)).To(Succeed())
-			Expect(rd.Spec.Replicas).To(Equal(int32(3)))
-			Expect(rd.Kind).To(Equal("RedisCluster"))
-			Expect(rd.APIVersion).To(Equal("redis.inditex.com/v1"))
-			Expect(rd.Spec.Auth).To(Equal(redisv1.RedisAuth{}))
-			Expect(rd.Name).To(Equal("rdcl-test"))
-			Expect(rd.Spec.Version).To(Equal(version))
-		})
+				mustCreateAndReady(name, initial, 0, "", true, true, redisv1.Pdb{}, redisv1.RedisClusterOverrideSpec{})
+
+				// change replicas → wait Ready again
+				rc, trace, err := framework.ChangeCluster(ctx, k8sClient, key,
+					framework.ChangeClusterOptions{
+						Mutate: func(r *redisv1.RedisCluster) { r.Spec.Replicas = target },
+					})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(rc.Spec.Replicas).To(Equal(target))
+
+				// every wanted phase must have shown up at least once
+				expectPhases(trace, phases...)
+			},
+
+			Entry("up → 3", int32(0), int32(3),
+				[]string{redisv1.StatusScalingUp, redisv1.StatusReady}),
+			Entry("up → 5", int32(3), int32(5),
+				[]string{redisv1.StatusScalingUp, redisv1.StatusReady}),
+			Entry("down → 3", int32(5), int32(3),
+				[]string{redisv1.StatusScalingDown, redisv1.StatusReady}),
+			Entry("down → 0", int32(3), int32(0),
+				[]string{redisv1.StatusReady}),
+		)
 	})
 
-	Context("when scaling a RedisCluster from zero to one replica and to zero again", func() {
-		It("should scale up correctly and remain healthy", func() {
-			key := types.NamespacedName{Namespace: namespace.Name, Name: "scale-test"}
+	Context("PodTemplate override", func() {
+		const baseName = "override-test"
+		var key types.NamespacedName
 
-			By("creating a RedisCluster with 0 replicas")
-			Expect(framework.EnsureClusterExistsOrCreate(
-				ctx, k8sClient, key,
-				0,  // replicas
-				0,  // replicasPerMaster
-				"", // storage
-				true,
-				true,
-				redisv1.Pdb{},
-				redisv1.RedisClusterOverrideSpec{},
-			)).To(Succeed())
+		// little helper: expect N containers in the STS template
+		wantContainers := func(n int) func(*appsv1.StatefulSet) bool {
+			return func(sts *appsv1.StatefulSet) bool {
+				return len(sts.Spec.Template.Spec.Containers) == n
+			}
+		}
 
-			By("waiting for initial Ready status")
-			_, err := framework.WaitForReady(ctx, k8sClient, key)
-			Expect(err).NotTo(HaveOccurred())
+		type entry struct {
+			name        string
+			initial     *redisv1.RedisClusterOverrideSpec
+			update      *redisv1.RedisClusterOverrideSpec // nil → no update step
+			validateSTS func(*appsv1.StatefulSet) bool    // after last step
+		}
 
-			By("scaling the cluster up to 3 replicas")
-			rd, err := framework.ChangeConfiguration(ctx, k8sClient, key,
-				3, 0, // replicas, replicasPerMaster
-				true,          // ephemeral
-				nil,           // resources
-				"",            // image
-				redisv1.Pdb{}, // pdb
-				redisv1.RedisClusterOverrideSpec{},
-				[]string{"ScalingUp", "Ready"}, // expected status
-			)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(rd.Name).To(Equal("scale-test"))
-			Expect(rd.Spec.Replicas).To(Equal(int32(3)))
-			Expect(rd.Status.Status).To(Equal("Ready"))
-
-			By("scaling the cluster up to 5 replicas")
-			rd, err = framework.ChangeConfiguration(ctx, k8sClient, key,
-				5, 0, // replicas, replicasPerMaster
-				true,          // ephemeral
-				nil,           // resources
-				"",            // image
-				redisv1.Pdb{}, // pdb
-				redisv1.RedisClusterOverrideSpec{},
-				[]string{"ScalingUp", "Ready"}, // expected status
-			)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(rd.Name).To(Equal("scale-test"))
-			Expect(rd.Spec.Replicas).To(Equal(int32(5)))
-			Expect(rd.Status.Status).To(Equal("Ready"))
-
-			By("scaling the cluster down to 3 replicas")
-			rd, err = framework.ChangeConfiguration(ctx, k8sClient, key,
-				3, 0, // replicas, replicasPerMaster
-				true,          // ephemeral
-				nil,           // resources
-				"",            // image
-				redisv1.Pdb{}, // pdb
-				redisv1.RedisClusterOverrideSpec{},
-				[]string{"ScalingDown", "Ready"}, // expected status
-			)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(rd.Name).To(Equal("scale-test"))
-			Expect(rd.Spec.Replicas).To(Equal(int32(3)))
-			Expect(rd.Status.Status).To(Equal("Ready"))
-
-			By("scaling the cluster down to 0 replicas")
-			rd, err = framework.ChangeConfiguration(ctx, k8sClient, key,
-				0, 0, // replicas, replicasPerMaster
-				true,          // ephemeral
-				nil,           // resources
-				"",            // image
-				redisv1.Pdb{}, // pdb
-				redisv1.RedisClusterOverrideSpec{},
-				[]string{"Ready"}, // expected status
-			)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(rd.Name).To(Equal("scale-test"))
-
-			By("waiting for initial Ready status")
-			rd, err = framework.WaitForReady(ctx, k8sClient, key)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(rd.Spec.Replicas).To(Equal(int32(0)))
-			Expect(rd.Status.Status).To(Equal("Ready"))
-		})
-	})
-
-	Context("Create a RedisCluster with override defined and update it", func() {
-		It("should apply podTemplate labels, tolerations and topologySpread from override", func() {
-			key := types.NamespacedName{Namespace: namespace.Name, Name: "override-test"}
-
-			override := redisv1.RedisClusterOverrideSpec{
-				StatefulSet: &appsv1.StatefulSet{
-					Spec: appsv1.StatefulSetSpec{
+		entries := []entry{
+			{
+				name: "apply-tolerations-topology",
+				initial: &redisv1.RedisClusterOverrideSpec{
+					StatefulSet: &appsv1.StatefulSet{Spec: appsv1.StatefulSetSpec{
 						Template: corev1.PodTemplateSpec{
 							ObjectMeta: metav1.ObjectMeta{
-								Labels: map[string]string{"testLabel": "testLabel"},
+								Labels: map[string]string{"testLabel": "true"},
 							},
 							Spec: corev1.PodSpec{
 								Tolerations: []corev1.Toleration{{
-									Key:      "testToleration",
-									Operator: corev1.TolerationOpExists,
-									Effect:   corev1.TaintEffectNoSchedule,
-								}},
-								TopologySpreadConstraints: []corev1.TopologySpreadConstraint{{
-									MaxSkew:           1,
-									TopologyKey:       "kubernetes.io/hostname",
-									WhenUnsatisfiable: corev1.DoNotSchedule,
-									LabelSelector:     &metav1.LabelSelector{MatchLabels: map[string]string{"testLabel": "testLabel"}},
+									Key: "testToleration", Operator: corev1.TolerationOpExists,
+									Effect: corev1.TaintEffectNoSchedule,
 								}},
 							},
 						},
-					},
+					}},
 				},
-			}
-
-			By("creating a RedisCluster with 1 replicas and overide")
-			Expect(framework.EnsureClusterExistsOrCreate(
-				ctx, k8sClient, key,
-				1,  // replicas
-				0,  // replicasPerMaster
-				"", // storage
-				true,
-				true,
-				redisv1.Pdb{},
-				override,
-			)).To(Succeed())
-
-			By("waiting for initial Ready status")
-			_, err := framework.WaitForReady(ctx, k8sClient, key)
-			Expect(err).NotTo(HaveOccurred())
-
-			// inspect the live StatefulSet
-			sts := &appsv1.StatefulSet{}
-			Expect(k8sClient.Get(ctx, key, sts)).To(Succeed())
-			Expect(framework.RedisStsContainsOverride(*sts, override)).To(BeTrue())
-
-			By("update override to add sidecar & new labels/topology")
-			// new override: add sidecar & extra label/topology
-			updated := redisv1.RedisClusterOverrideSpec{
-				StatefulSet: &appsv1.StatefulSet{
-					Spec: appsv1.StatefulSetSpec{
-						Template: corev1.PodTemplateSpec{
-							ObjectMeta: metav1.ObjectMeta{
-								Labels: map[string]string{"testLabel": "testLabel", "testLabel2": "testLabel2"},
-							},
-							Spec: corev1.PodSpec{
-								Containers: []corev1.Container{
-									{
-										Name:    "test-sidecar",
-										Image:   "axinregistry1.central.inditex.grp/ubi9/ubi:9.0.0",
-										Command: []string{"sleep", "infinity"},
-										SecurityContext: &corev1.SecurityContext{
-											RunAsNonRoot: ptr.To(true),
-											RunAsUser:    ptr.To(int64(1000)),
-										},
-									},
-								},
-								TopologySpreadConstraints: []corev1.TopologySpreadConstraint{{
-									MaxSkew:           1,
-									TopologyKey:       "kubernetes.io/hostname",
-									WhenUnsatisfiable: corev1.DoNotSchedule,
-									LabelSelector:     &metav1.LabelSelector{MatchLabels: map[string]string{"testLabel": "testLabel2"}},
-								}},
-								SecurityContext: &corev1.PodSecurityContext{
-									RunAsNonRoot: ptr.To(true),
-									RunAsUser:    ptr.To(int64(1000)),
-								},
-							},
-						},
-					},
+				validateSTS: func(sts *appsv1.StatefulSet) bool {
+					return framework.RedisStsContainsOverride(
+						*sts,
+						redisv1.RedisClusterOverrideSpec{
+							StatefulSet: &appsv1.StatefulSet{Spec: sts.Spec}, // only care it’s present
+						})
 				},
-			}
-
-			rd, err := framework.ChangeCluster(ctx, k8sClient, key, framework.ChangeClusterOptions{
-				CurrentStatus: "Ready",
-				NextStatuses:  []string{"Upgrading", "Ready"},
-				Mutate: func(rc *redisv1.RedisCluster) {
-					rc.Spec.Override = &updated
+			},
+			{
+				name:    "add-side-car",
+				initial: &redisv1.RedisClusterOverrideSpec{}, // start clean
+				update: &redisv1.RedisClusterOverrideSpec{
+					StatefulSet: &appsv1.StatefulSet{Spec: appsv1.StatefulSetSpec{
+						Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{
+								Name:    "test-sidecar",
+								Image:   getSidecarImage(),
+								Command: []string{"sleep", "infinity"},
+							}},
+						}},
+					}},
 				},
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(rd.Spec.Override).To(Equal(&updated))
-
-			Expect(k8sClient.Get(ctx, key, sts)).To(Succeed())
-			Expect(framework.RedisStsContainsOverride(*sts, updated)).To(BeTrue())
-
-			By("Remove the sidecar from the override")
-			// now remove the sidecar (empty PodTemplateSpec.Spec.Containers)
-			noSidecar := redisv1.RedisClusterOverrideSpec{
-				StatefulSet: &appsv1.StatefulSet{
-					Spec: appsv1.StatefulSetSpec{
-						Template: corev1.PodTemplateSpec{
-							Spec: corev1.PodSpec{
-								Containers: nil,
-								SecurityContext: &corev1.PodSecurityContext{
-									RunAsNonRoot: ptr.To(true),
-									RunAsUser:    ptr.To(int64(1000)),
-								},
-							},
-						},
-					},
+				validateSTS: wantContainers(2),
+			},
+			{
+				name: "remove-side-car",
+				initial: &redisv1.RedisClusterOverrideSpec{
+					StatefulSet: &appsv1.StatefulSet{Spec: appsv1.StatefulSetSpec{
+						Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+							Containers: []corev1.Container{{
+								Name:    "test-sidecar",
+								Image:   getSidecarImage(),
+								Command: []string{"sleep", "infinity"},
+							}},
+						}},
+					}},
 				},
-			}
-			rd, err = framework.ChangeCluster(ctx, k8sClient, key, framework.ChangeClusterOptions{
-				CurrentStatus: "Ready",
-				NextStatuses:  []string{"Upgrading", "Ready"},
-				Mutate: func(rc *redisv1.RedisCluster) {
-					rc.Spec.Override = &noSidecar
+				update: &redisv1.RedisClusterOverrideSpec{
+					StatefulSet: &appsv1.StatefulSet{Spec: appsv1.StatefulSetSpec{
+						Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: nil}},
+					}},
 				},
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(rd.Spec.Override.StatefulSet.Spec.Template.Spec.Containers).To(BeEmpty())
-		})
-	})
-	Context("when managing a RedisCluster Service ports", func() {
-		It("should manage service ports correctly", func() {
-			key := types.NamespacedName{Namespace: namespace.Name, Name: "service-ports-test"}
+				validateSTS: wantContainers(1),
+			},
+		}
 
-			// 1) Create & wait for Ready
-			Expect(framework.EnsureClusterExistsOrCreate(
-				ctx, k8sClient, key,
-				3, 0, "", true, true,
-				redisv1.Pdb{}, redisv1.RedisClusterOverrideSpec{},
-			)).To(Succeed())
-			_, err := framework.WaitForReady(ctx, k8sClient, key)
-			Expect(err).NotTo(HaveOccurred())
+		for _, e := range entries {
+			e := e // pin
+			It(fmt.Sprintf("handles %s", e.name), func() {
+				key = types.NamespacedName{Namespace: namespace.Name, Name: baseName + "-" + strings.ReplaceAll(e.name, " ", "-")}
 
-			// Helper to read the service's ports
-			getPorts := func() []int32 {
-				svc := &corev1.Service{}
-				if err := k8sClient.Get(ctx, key, svc); err != nil {
-					return nil
+				// Create the cluster in one shot with initial override
+				mustCreateAndReady(
+					key.Name,
+					1, 0, "", true, true,
+					redisv1.Pdb{},
+					*e.initial,
+				)
+
+				// If an update override is defined, apply it now
+				if e.update != nil {
+					_, trace, err := framework.ChangeCluster(ctx, k8sClient, key,
+						framework.ChangeClusterOptions{
+							Mutate: func(r *redisv1.RedisCluster) { r.Spec.Override = e.update },
+						})
+					Expect(err).NotTo(HaveOccurred())
+					Expect(trace).To(ContainElement(redisv1.StatusUpgrading))
+					Expect(trace[len(trace)-1]).To(Equal(redisv1.StatusReady))
 				}
+
+				// Final validation on the live StatefulSet
+				sts := &appsv1.StatefulSet{}
+				Expect(k8sClient.Get(ctx, key, sts)).To(Succeed())
+				Expect(e.validateSTS(sts)).To(BeTrue())
+			})
+		}
+	})
+
+	Context("Service-ports reconciliation", func() {
+		const baseName = "svc-ports"
+
+		var key types.NamespacedName
+		var getPorts func() []int32
+
+		BeforeEach(func() {
+			key = types.NamespacedName{Namespace: namespace.Name, Name: baseName}
+
+			// create cluster (3 replicas are enough)
+			mustCreateAndReady(baseName, 3, 0, "", true, true,
+				redisv1.Pdb{}, redisv1.RedisClusterOverrideSpec{})
+
+			// helper to read *sorted* ports from the cluster-IP Service
+			getPorts = func() []int32 {
+				svc := &corev1.Service{}
+				_ = k8sClient.Get(ctx, key, svc)
 				ports := make([]int32, len(svc.Spec.Ports))
 				for i, p := range svc.Spec.Ports {
 					ports[i] = p.Port
 				}
-				sort.Slice(ports, func(i, j int) bool { return ports[i] < ports[j] })
+				slices.Sort(ports)
 				return ports
 			}
 
-			// 2) Initially only the comm port should exist
+			// sanity-check: the operator always creates the comm port
 			Expect(getPorts()).To(Equal([]int32{redis.RedisCommPort}))
-
-			// 3) Remove all ports; Eventually we should see it restored to [commPort]
-			Expect(framework.RemoveServicePorts(ctx, k8sClient, key)).To(Succeed())
-			Eventually(getPorts, defaultWait*2, defaultPoll).
-				Should(Equal([]int32{redis.RedisCommPort}), "operator should restore the comm port")
-
-			// 4) Add extra ports; Eventually it should again correct back to [commPort]
-			Expect(framework.AddServicePorts(ctx, k8sClient, key)).To(Succeed())
-			Eventually(getPorts, defaultWait*2, defaultPoll).
-				Should(Equal([]int32{redis.RedisCommPort}), "operator should prune invalid ports back to comm")
 		})
+
+		// shared test-body: apply the mutator, then expect reconciliation
+		test := func(mutator func(context.Context, client.Client, types.NamespacedName) error) {
+			Expect(mutator(ctx, k8sClient, key)).To(Succeed())
+
+			// eventually we must be back to a single comm port
+			Eventually(getPorts, defaultWait*2, defaultPoll).
+				Should(Equal([]int32{redis.RedisCommPort}))
+		}
+
+		DescribeTable("prunes / restores the *only* comm port",
+			test,
+			Entry("remove all ports", framework.RemoveServicePorts),
+			Entry("add extra random ports", framework.AddServicePorts),
+		)
 	})
 
-	Context("when managing spec.labels", func() {
-		It("should add spec.labels to StatefulSet and Pods", func() {
-			key := types.NamespacedName{Namespace: namespace.Name, Name: "service-ports-test"}
+	Context("Spec.Labels propagation", func() {
+		const clusterName = "spec-labels"
+		var key types.NamespacedName
 
-			// 0) Create & wait for Ready
-			Expect(framework.EnsureClusterExistsOrCreate(
-				ctx, k8sClient, key,
-				3, 0, "", true, true,
-				redisv1.Pdb{}, redisv1.RedisClusterOverrideSpec{},
-			)).To(Succeed())
-			_, err := framework.WaitForReady(ctx, k8sClient, key)
-			Expect(err).NotTo(HaveOccurred())
+		BeforeEach(func() {
+			key = types.NamespacedName{Namespace: namespace.Name, Name: clusterName}
+			mustCreateAndReady(
+				clusterName,
+				3, 0, // replicas / per-master
+				"", true, true, // storage / purgeKeys / ephemeral
+				redisv1.Pdb{},                      // no-PDB
+				redisv1.RedisClusterOverrideSpec{}, // no override
+			)
+		})
 
-			// 1) Mutate Spec.Labels
-			specLabels := map[string]string{"team": "teamA", "testSpecLabel": "testSpec"}
-			rd, err := framework.ChangeCluster(ctx, k8sClient, key, framework.ChangeClusterOptions{
-				CurrentStatus: "Ready",
-				NextStatuses:  []string{"Upgrading", "Ready"},
-				Mutate: func(rc *redisv1.RedisCluster) {
-					rc.Spec.Labels = &specLabels
-				},
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(rd.Spec.Labels).To(Equal(&specLabels))
+		//-------------------------------------------------------------------- helpers
 
-			// expected on the STS/CM/Pods:
-			stsLabels := map[string]string{
-				"redis-cluster-name":                    key.Name,
-				"redis.rediscluster.operator/component": "redis",
-				"team":                                  "teamA",
-				"testSpecLabel":                         "testSpec",
-			}
+		checkRC := func(rc *redisv1.RedisCluster, applied map[string]string) {
+			Expect(rc).NotTo(BeNil())
+			Expect(rc.Status.Status).To(Equal(redisv1.StatusReady))
+			Expect(rc.Spec.Replicas).To(Equal(int32(3))) // never touched by this test
+			// .Spec.Labels must equal what we just applied
+			Expect(*rc.Spec.Labels).To(Equal(applied))
+		}
 
-			// 2) StatefulSet labels
+		checkChildren := func(expect map[string]string) {
+			// StatefulSet
 			sts := &appsv1.StatefulSet{}
 			Expect(k8sClient.Get(ctx, key, sts)).To(Succeed())
-			Expect(sts.Spec.Template.Labels).To(Equal(stsLabels))
+			Expect(sts.Spec.Template.Labels).To(Equal(expect))
 
-			// 3) ConfigMap labels
+			// ConfigMap
 			cm := &corev1.ConfigMap{}
 			Expect(k8sClient.Get(ctx, key, cm)).To(Succeed())
-			Expect(cm.Labels).To(Equal(stsLabels))
+			Expect(cm.Labels).To(Equal(expect))
 
-			// 4) Pod labels (first pod index 0)
-			podKey := types.NamespacedName{Name: key.Name + "-0", Namespace: key.Namespace}
+			// first Pod
 			pod := &corev1.Pod{}
+			podKey := types.NamespacedName{Name: clusterName + "-0", Namespace: key.Namespace}
 			Expect(k8sClient.Get(ctx, podKey, pod)).To(Succeed())
-			for k, v := range stsLabels {
+			for k, v := range expect {
 				Expect(pod.Labels[k]).To(Equal(v))
 			}
+		}
 
-			By("remove spec.labels from StatefulSet and Pods")
-			// 2) Now clear spec.labels
-			rd, err = framework.ChangeCluster(ctx, k8sClient, key, framework.ChangeClusterOptions{
-				CurrentStatus: "Ready",
-				NextStatuses:  []string{"Upgrading", "Ready"},
-				Mutate: func(rc *redisv1.RedisCluster) {
-					rc.Spec.Labels = &map[string]string{} // empty map
-				},
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(*rd.Spec.Labels).To(BeEmpty())
+		base := map[string]string{
+			"redis-cluster-name":                    clusterName,
+			"redis.rediscluster.operator/component": "redis",
+		}
+		with := map[string]string{
+			"redis-cluster-name":                    clusterName,
+			"redis.rediscluster.operator/component": "redis",
+			"team":                                  "teamA",
+			"foo":                                   "bar",
+		}
 
-			// base STS/CM labels (only operator ones)
-			baseLabels := map[string]string{
-				"redis-cluster-name":                    key.Name,
-				"redis.rediscluster.operator/component": "redis",
-			}
+		DescribeTable("adds / removes spec.labels",
+			func(apply, want map[string]string) {
+				rc, phases, err := framework.ChangeCluster(ctx, k8sClient, key,
+					framework.ChangeClusterOptions{
+						Mutate: func(r *redisv1.RedisCluster) { r.Spec.Labels = &apply },
+					})
+				Expect(err).NotTo(HaveOccurred())
 
-			// 3) StatefulSet labels reset
-			Expect(k8sClient.Get(ctx, key, sts)).To(Succeed())
-			Expect(sts.Spec.Template.Labels).To(Equal(baseLabels))
+				// the returned RC is sane
+				checkRC(rc, apply)
 
-			// 4) ConfigMap labels reset
-			Expect(k8sClient.Get(ctx, key, cm)).To(Succeed())
-			Expect(cm.Labels).To(Equal(baseLabels))
+				// controller went Upgrading → Ready
+				Expect(phases).To(ContainElements(redisv1.StatusUpgrading, redisv1.StatusReady))
+				Expect(phases[len(phases)-1]).To(Equal(redisv1.StatusReady))
 
-			// 5) Pod labels reset
-			podKey = types.NamespacedName{Name: key.Name + "-0", Namespace: key.Namespace}
-			Expect(k8sClient.Get(ctx, podKey, pod)).To(Succeed())
-			for k, v := range baseLabels {
-				Expect(pod.Labels[k]).To(Equal(v))
-			}
-		})
+				// all children carry the wanted labels
+				checkChildren(want)
+			},
+
+			Entry("set custom labels",
+				map[string]string{"team": "teamA", "foo": "bar"}, // apply
+				with, // wanted on children
+			),
+			Entry("clear labels",
+				map[string]string{}, // apply (empty map)
+				base,                // wanted on children
+			),
+		)
 	})
 
-	Context("when RedisCluster has storage", func() {
+	Context("Storage guard & scaling", func() {
 		const (
-			initialStorage = "500Mi"
-			desiredStorage = "1Gi"
-		)
-		var (
-			key             types.NamespacedName
-			initialReplicas int32 = 3
-		)
-
-		BeforeEach(func() {
-			key = types.NamespacedName{Name: "storage-management", Namespace: namespace.Name}
-			// create cluster with PVC-backed storage
-			Expect(framework.EnsureClusterExistsOrCreate(
-				ctx, k8sClient, key,
-				initialReplicas, 0,
-				initialStorage,
-				true,  // purgeKeys
-				false, // ephemeral
-				redisv1.Pdb{},
-				redisv1.RedisClusterOverrideSpec{},
-			)).To(Succeed())
-			// block until Ready
-			_, err := framework.WaitForReady(ctx, k8sClient, key)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("should forbid changing storage size and leave it unchanged", func() {
-			_, err := framework.ChangeStorage(ctx, k8sClient, key, desiredStorage, initialReplicas)
-			Expect(err).To(MatchError(ContainSubstring("Changing the storage size is not allowed")))
-
-			// cluster stays Ready with original storage
-			rd, err := framework.WaitForReady(ctx, k8sClient, key)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(rd.Spec.Storage).To(Equal(initialStorage))
-
-			// final health check
-			Eventually(func() (bool, error) {
-				return framework.CheckRedisCluster(k8sClient, ctx, rd)
-			}, defaultWait*2, defaultPoll).Should(BeTrue())
-		})
-
-		It("should scale up with storage in place", func() {
-			expected := int32(6)
-			rd, err := framework.ChangeConfiguration(
-				ctx, k8sClient, key,
-				expected, 0, // replicas, replicasPerMaster
-				false,         // ephemeral
-				nil,           // resources
-				"",            // image
-				redisv1.Pdb{}, // pdb
-				redisv1.RedisClusterOverrideSpec{},
-				[]string{"ScalingUp", "Ready"},
-			)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(rd.Spec.Replicas).To(Equal(expected))
-
-			// block until Ready again
-			rd, err = framework.WaitForReady(ctx, k8sClient, key)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(rd.Spec.Replicas).To(Equal(expected))
-
-			// final health check
-			Eventually(func() (bool, error) {
-				return framework.CheckRedisCluster(k8sClient, ctx, rd)
-			}, defaultWait*2, defaultPoll).Should(BeTrue())
-		})
-
-		It("should scale down with storage in place", func() {
-			expected := int32(1)
-			rd, err := framework.ChangeConfiguration(
-				ctx, k8sClient, key,
-				expected, 0,
-				false,
-				nil, "", redisv1.Pdb{}, redisv1.RedisClusterOverrideSpec{},
-				[]string{"ScalingDown", "Ready"},
-			)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(rd.Spec.Replicas).To(Equal(expected))
-
-			// block until Ready again
-			rd, err = framework.WaitForReady(ctx, k8sClient, key)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(rd.Spec.Replicas).To(Equal(expected))
-
-			// final health check
-			Eventually(func() (bool, error) {
-				return framework.CheckRedisCluster(k8sClient, ctx, rd)
-			}, defaultWait*2, defaultPoll).Should(BeTrue())
-		})
-	})
-	Context("when RedisCluster has master-replica configuration", func() {
-		const (
-			baseName         = "master-management"
-			initialReplicas  = int32(3)
-			initialPerMaster = int32(1)
+			name       = "storage-test"
+			initialPVC = "500Mi"
+			initialRep = int32(3)
 		)
 		var key types.NamespacedName
 
 		BeforeEach(func() {
-			key = types.NamespacedName{
-				Name:      baseName,
-				Namespace: namespace.Name,
-			}
-			// 1) create base master-replica cluster
-			Expect(framework.EnsureClusterExistsOrCreate(
-				ctx, k8sClient, key,
-				initialReplicas, initialPerMaster,
-				"",   // no storage
+			key = types.NamespacedName{Namespace: namespace.Name, Name: name}
+			mustCreateAndReady(
+				name,
+				initialRep, 0,
+				initialPVC, // with PVC
+				true,       /* purgeKeys */
+				false,      /* NOT ephemeral */
+				redisv1.Pdb{},
+				redisv1.RedisClusterOverrideSpec{},
+			)
+		})
+
+		checkRC := func(rc *redisv1.RedisCluster, wantReplicas int32) {
+			Expect(rc).NotTo(BeNil())
+			Expect(rc.Status.Status).To(Equal(redisv1.StatusReady))
+			Expect(rc.Spec.Storage).To(Equal(initialPVC))
+			Expect(rc.Spec.Replicas).To(Equal(wantReplicas))
+		}
+
+		// ---------------------------------------------------------------- table
+
+		type tc struct {
+			desc        string
+			mutate      func(*redisv1.RedisCluster)
+			wantRep     int32
+			wantPhases  []string
+			wantErrLike string
+		}
+
+		DescribeTable("PVC-backed cluster mutations",
+			func(t tc) {
+				rc, phases, err := framework.ChangeCluster(ctx, k8sClient, key,
+					framework.ChangeClusterOptions{Mutate: t.mutate})
+
+				if t.wantErrLike != "" {
+					// mutation must fail
+					Expect(err).To(MatchError(ContainSubstring(t.wantErrLike)))
+					// cluster should still be Ready with original spec
+					rc, _ = framework.WaitForStatus(ctx, k8sClient, key, redisv1.StatusReady)
+					checkRC(rc, initialRep)
+					return
+				}
+
+				// mutation expected to succeed
+				Expect(err).NotTo(HaveOccurred())
+				checkRC(rc, t.wantRep)
+				Expect(phases).To(ContainElements(t.wantPhases))
+			},
+
+			Entry("forbid storage resize",
+				tc{
+					desc: "resize PVC",
+					mutate: func(r *redisv1.RedisCluster) {
+						r.Spec.Storage = "1Gi"
+					},
+					wantRep:     initialRep,
+					wantPhases:  nil, // not checked we expect an error
+					wantErrLike: "Changing the storage size is not allowed",
+				},
+			),
+
+			Entry("scale up to 6 replicas",
+				tc{
+					desc: "scale-up",
+					mutate: func(r *redisv1.RedisCluster) {
+						r.Spec.Replicas = 6
+					},
+					wantRep:    6,
+					wantPhases: []string{redisv1.StatusScalingUp, redisv1.StatusReady},
+				},
+			),
+
+			Entry("scale down to 1 replica",
+				tc{
+					desc: "scale-down",
+					mutate: func(r *redisv1.RedisCluster) {
+						r.Spec.Replicas = 1
+					},
+					wantRep:    1,
+					wantPhases: []string{redisv1.StatusScalingDown, redisv1.StatusReady},
+				},
+			),
+		)
+	})
+
+	Context("Master-Replica layout", func() {
+		const (
+			clusterName   = "master-test"
+			initReplicas  = int32(5)
+			initPerMaster = int32(1)
+		)
+
+		var key types.NamespacedName
+		BeforeEach(func() {
+			key = types.NamespacedName{Namespace: namespace.Name, Name: clusterName}
+
+			// single bootstrap for every entry
+			mustCreateAndReady(
+				clusterName,
+				initReplicas, initPerMaster,
+				"",   // no PVC
 				true, // purgeKeys
 				true, // ephemeral
 				redisv1.Pdb{},
 				redisv1.RedisClusterOverrideSpec{},
-			)).To(Succeed())
-			// 2) wait for Ready
-			_, err := framework.WaitForReady(ctx, k8sClient, key)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("creates a new RedisCluster in master-slave mode correctly", func() {
-			// validate master-slave layout
-			Eventually(func() (bool, error) {
-				return framework.ValidateRedisClusterMasterSlave(
-					ctx, k8sClient, key,
-					initialReplicas, initialPerMaster,
-				)
-			}, defaultWait*2, defaultPoll).Should(BeTrue())
-
-			// final health check
-			rd, _ := framework.WaitForReady(ctx, k8sClient, key)
-			Eventually(func() (bool, error) {
-				return framework.CheckRedisCluster(k8sClient, ctx, rd)
-			}, defaultWait*2, defaultPoll).Should(BeTrue())
-		})
-
-		It("scales up a master-slave RedisCluster correctly", func() {
-			const (
-				upReplicas  = int32(4)
-				upPerMaster = int32(2)
 			)
-			rd, err := framework.ChangeCluster(ctx, k8sClient, key, framework.ChangeClusterOptions{
-				CurrentStatus: "Ready",
-				NextStatuses:  []string{"ScalingUp", "Ready"},
-				Mutate: func(rc *redisv1.RedisCluster) {
-					rc.Spec.Replicas = upReplicas
-					rc.Spec.ReplicasPerMaster = upPerMaster
-				},
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(rd.Spec.Replicas).To(Equal(upReplicas))
-			Expect(rd.Spec.ReplicasPerMaster).To(Equal(upPerMaster))
-
-			// validate new layout and health
-			Eventually(func() (bool, error) {
-				return framework.ValidateRedisClusterMasterSlave(
-					ctx, k8sClient, key,
-					upReplicas, upPerMaster,
-				)
-			}, defaultWait*2, defaultPoll).Should(BeTrue())
-			Eventually(func() (bool, error) {
-				return framework.CheckRedisCluster(k8sClient, ctx, rd)
-			}, defaultWait*2, defaultPoll).Should(BeTrue())
 		})
 
-		It("scales down a master-slave RedisCluster correctly", func() {
-			const (
-				downReplicas  = int32(3)
-				downPerMaster = int32(1)
-			)
-			rd, err := framework.ChangeCluster(ctx, k8sClient, key, framework.ChangeClusterOptions{
-				CurrentStatus: "Ready",
-				NextStatuses:  []string{"ScalingDown", "Ready"},
-				Mutate: func(rc *redisv1.RedisCluster) {
-					rc.Spec.Replicas = downReplicas
-					rc.Spec.ReplicasPerMaster = downPerMaster
-				},
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(rd.Spec.Replicas).To(Equal(downReplicas))
-			Expect(rd.Spec.ReplicasPerMaster).To(Equal(downPerMaster))
+		// ---------------------------------------------------------------- helpers
 
-			// validate new layout and health
+		checkLayout := func(rep, perMaster int32) {
 			Eventually(func() (bool, error) {
 				return framework.ValidateRedisClusterMasterSlave(
-					ctx, k8sClient, key,
-					downReplicas, downPerMaster,
-				)
+					ctx, k8sClient, key, rep, perMaster)
 			}, defaultWait*2, defaultPoll).Should(BeTrue())
-			Eventually(func() (bool, error) {
-				return framework.CheckRedisCluster(k8sClient, ctx, rd)
-			}, defaultWait*2, defaultPoll).Should(BeTrue())
+		}
 
-		})
+		type tc struct {
+			desc          string
+			mutate        func(*redisv1.RedisCluster)
+			wantRep       int32
+			wantPerMaster int32
+			wantPhases    []string
+		}
+
+		DescribeTable("master/replica mutations",
+			func(t tc) {
+				if t.mutate == nil {
+					checkLayout(t.wantRep, t.wantPerMaster)
+					return
+				}
+
+				rc, phases, err := framework.ChangeCluster(
+					ctx, k8sClient, key,
+					framework.ChangeClusterOptions{Mutate: t.mutate},
+				)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(rc.Spec.Replicas).To(Equal(t.wantRep))
+				Expect(rc.Spec.ReplicasPerMaster).To(Equal(t.wantPerMaster))
+				Expect(phases).To(ContainElements(t.wantPhases))
+
+				checkLayout(t.wantRep, t.wantPerMaster)
+			},
+
+			// ──────────────────────────────────────────────────────────
+			Entry("baseline distribution is correct",
+				tc{
+					desc:          "validateInitial",
+					mutate:        nil,
+					wantRep:       initReplicas,
+					wantPerMaster: initPerMaster,
+				},
+			),
+
+			Entry("scale up to 7/2",
+				tc{
+					desc: "scaleUp",
+					mutate: func(r *redisv1.RedisCluster) {
+						r.Spec.Replicas = 7
+						r.Spec.ReplicasPerMaster = 2
+					},
+					wantRep:       7,
+					wantPerMaster: 2,
+					wantPhases:    []string{redisv1.StatusScalingUp, redisv1.StatusReady},
+				},
+			),
+
+			Entry("scale down to 3/1",
+				tc{
+					desc: "scaleDown",
+					mutate: func(r *redisv1.RedisCluster) {
+						r.Spec.Replicas = 3
+						r.Spec.ReplicasPerMaster = 1
+					},
+					wantRep:       3,
+					wantPerMaster: 1,
+					wantPhases:    []string{redisv1.StatusScalingDown, redisv1.StatusReady},
+				},
+			),
+		)
 	})
 
-	Context("when RedisCluster has master-replica configuration", func() {
-		const (
-			baseName        = "data-management"
-			initialReplicas = int32(5)
-			upReplicas      = int32(7)
-			downReplicas    = int32(3)
-		)
+	Context("Data integrity across scale", func() {
+		const base = "data-test"
+
 		var (
 			key types.NamespacedName
-			rd  *redisv1.RedisCluster
+			rc  *redisv1.RedisCluster
 		)
 
 		BeforeEach(func() {
-			key = types.NamespacedName{
-				Name:      baseName,
-				Namespace: namespace.Name,
-			}
-			// 1) create & wait for Ready
-			Expect(framework.EnsureClusterExistsOrCreate(
-				ctx, k8sClient, key,
-				initialReplicas, 0,
-				"",    // storage
-				false, // purgeKeys
-				true,  // ephemeral
-				redisv1.Pdb{},
-				redisv1.RedisClusterOverrideSpec{},
-			)).To(Succeed())
-
-			var err error
-			rd, err = framework.WaitForReady(ctx, k8sClient, key)
-			Expect(err).NotTo(HaveOccurred())
+			key = types.NamespacedName{Namespace: namespace.Name, Name: base}
+			rc = mustCreateAndReady(base, 5, 0, "",
+				/*purge*/ false /*ephemeral*/, true,
+				redisv1.Pdb{}, redisv1.RedisClusterOverrideSpec{})
 		})
 
-		It("should insert data inside the cluster correctly", func() {
-			// insert some keys
+		insert := func() {
 			Eventually(func() error {
-				ok, err := framework.InsertDataIntoCluster(ctx, k8sClient, key, rd)
+				ok, err := framework.InsertDataIntoCluster(ctx, k8sClient, key, rc)
 				if !ok {
-					return fmt.Errorf("insert failed: %w", err)
+					return fmt.Errorf("insert error: %w", err)
 				}
 				return err
 			}, defaultWait*2, defaultPoll).Should(Succeed())
+		}
 
-			// verify data distribution
+		checkKeys := func() {
 			Eventually(func() (bool, error) {
-				return framework.CheckRedisCluster(k8sClient, ctx, rd)
+				return framework.CheckClusterKeys(framework.GetPods(k8sClient, ctx, rc))
 			}, defaultWait*2, defaultPoll).Should(BeTrue())
+		}
 
-			// verify data integrity
+		flush := func() {
 			Eventually(func() (bool, error) {
-				pods := framework.GetPods(k8sClient, ctx, rd)
-				return framework.CheckClusterKeys(pods)
+				return framework.FlushClusterKeys(framework.GetPods(k8sClient, ctx, rc))
 			}, defaultWait*2, defaultPoll).Should(BeTrue())
-			// flush keys
-			Eventually(func() (bool, error) {
-				pods := framework.GetPods(k8sClient, ctx, rd)
-				return framework.FlushClusterKeys(pods)
-			}, defaultWait*2, defaultPoll).Should(BeTrue())
-		})
+		}
 
-		It("should insert data & scale up correctly", func() {
-			// insert first
-			Eventually(func() error {
-				ok, err := framework.InsertDataIntoCluster(ctx, k8sClient, key, rd)
-				if !ok {
-					return fmt.Errorf("insert failed: %w", err)
+		type tc struct {
+			replicas   int32 // target after mutate; 0 == "no scale"
+			wantPhases []string
+		}
+
+		DescribeTable("insert data scales and check data persist",
+			func(t tc) {
+				insert()
+
+				// optional scale
+				if t.replicas > 0 {
+					var trace []string
+					var err error
+					rc, trace, err = framework.ChangeCluster(ctx, k8sClient, key,
+						framework.ChangeClusterOptions{
+							Mutate: func(r *redisv1.RedisCluster) { r.Spec.Replicas = t.replicas },
+						})
+					Expect(err).NotTo(HaveOccurred())
+					Expect(rc.Spec.Replicas).To(Equal(t.replicas))
+					Expect(trace).To(ContainElements(t.wantPhases))
 				}
-				return err
-			}, defaultWait*2, defaultPoll).Should(Succeed())
 
-			// scale up
-			rd2, err := framework.ChangeCluster(ctx, k8sClient, key, framework.ChangeClusterOptions{
-				CurrentStatus: "Ready",
-				NextStatuses:  []string{"ScalingUp", "Ready"},
-				Mutate: func(rc *redisv1.RedisCluster) {
-					rc.Spec.Replicas = upReplicas
+				checkKeys()
+				flush()
+			},
+
+			Entry("no scale",
+				tc{replicas: 0},
+			),
+
+			Entry("scale from 5 → 7",
+				tc{
+					replicas:   7,
+					wantPhases: []string{redisv1.StatusScalingUp, redisv1.StatusReady},
 				},
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(rd2.Spec.Replicas).To(Equal(upReplicas))
+			),
 
-			// verify data still there
-			Eventually(func() (bool, error) {
-				pods := framework.GetPods(k8sClient, ctx, rd2)
-				return framework.CheckClusterKeys(pods)
-			}, defaultWait*2, defaultPoll).Should(BeTrue())
-
-			// flush after scale
-			Eventually(func() (bool, error) {
-				pods := framework.GetPods(k8sClient, ctx, rd2)
-				return framework.FlushClusterKeys(pods)
-			}, defaultWait*2, defaultPoll).Should(BeTrue())
-		})
-
-		It("should insert data & scale down correctly", func() {
-			// insert first
-			Eventually(func() error {
-				ok, err := framework.InsertDataIntoCluster(ctx, k8sClient, key, rd)
-				if !ok {
-					return fmt.Errorf("insert failed: %w", err)
-				}
-				return err
-			}, defaultWait*2, defaultPoll).Should(Succeed())
-
-			// scale down
-			rd3, err := framework.ChangeCluster(ctx, k8sClient, key, framework.ChangeClusterOptions{
-				CurrentStatus: "Ready",
-				NextStatuses:  []string{"ScalingDown", "Ready"},
-				Mutate: func(rc *redisv1.RedisCluster) {
-					rc.Spec.Replicas = downReplicas
+			Entry("scale from 5 → 3",
+				tc{
+					replicas:   3,
+					wantPhases: []string{redisv1.StatusScalingDown, redisv1.StatusReady},
 				},
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(rd3.Spec.Replicas).To(Equal(downReplicas))
-
-			// verify data integrity on *current* pods
-			Eventually(func() (bool, error) {
-				pods := framework.GetPods(k8sClient, ctx, rd3)
-				return framework.CheckClusterKeys(pods)
-			}, defaultWait*2, defaultPoll).Should(BeTrue())
-
-			// flush keys on current pods
-			Eventually(func() (bool, error) {
-				pods := framework.GetPods(k8sClient, ctx, rd3)
-				return framework.FlushClusterKeys(pods)
-			}, defaultWait*2, defaultPoll).Should(BeTrue())
-		})
+			),
+		)
 	})
 
-	Context("when RedisCluster requires StatefulSet updates", func() {
-		const baseName = "resources-management"
-		var (
-			key types.NamespacedName
-		)
-
-		BeforeEach(func() {
-			key = types.NamespacedName{
-				Name:      baseName,
-				Namespace: namespace.Name,
-			}
-			// Create a 1-node cluster and wait for Ready
-			Expect(framework.EnsureClusterExistsOrCreate(
-				ctx, k8sClient, key,
-				1, 0, // replicas, perMaster
-				"",   // no storage
-				true, // purgeKeys
-				true, // ephemeral
-				redisv1.Pdb{},
-				redisv1.RedisClusterOverrideSpec{},
-			)).To(Succeed())
-			_, err := framework.WaitForReady(ctx, k8sClient, key)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("should propagate resource changes to the StatefulSet", func() {
-			expected := corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("51m"),
-					corev1.ResourceMemory: resource.MustParse("51Mi"),
-				},
-				Limits: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("51m"),
-					corev1.ResourceMemory: resource.MustParse("51Mi"),
-				},
-			}
-
-			// Mutate the CR’s Spec.Resources
-			_, err := framework.ChangeCluster(ctx, k8sClient, key, framework.ChangeClusterOptions{
-				CurrentStatus: "Ready",
-				NextStatuses:  []string{"Upgrading", "Ready"},
-				Mutate: func(rc *redisv1.RedisCluster) {
-					rc.Spec.Resources = &expected
-				},
-			})
-			Expect(err).NotTo(HaveOccurred())
-
-			// Wait for it to become Ready again
-			_, err = framework.WaitForReady(ctx, k8sClient, key)
-			Expect(err).NotTo(HaveOccurred())
-
-			// Fetch the live StatefulSet and verify its container’s resources
-			sts := &appsv1.StatefulSet{}
-			Expect(k8sClient.Get(ctx, key, sts)).To(Succeed())
-			actual := sts.Spec.Template.Spec.Containers[0].Resources
-			Expect(actual).To(Equal(expected))
-		})
-
-		It("should propagate image changes to the StatefulSet", func() {
-			expectedImage := "axinregistry1.central.inditex.grp/itxapps/redis.redis-stack-server:7.2.0-v10-coordinator"
-
-			// Mutate the CR’s Spec.Image
-			_, err := framework.ChangeCluster(ctx, k8sClient, key, framework.ChangeClusterOptions{
-				CurrentStatus: "Ready",
-				NextStatuses:  []string{"Upgrading", "Ready"},
-				Mutate: func(rc *redisv1.RedisCluster) {
-					rc.Spec.Image = expectedImage
-				},
-			})
-			Expect(err).NotTo(HaveOccurred())
-
-			// Wait for it to become Ready again
-			_, err = framework.WaitForReady(ctx, k8sClient, key)
-			Expect(err).NotTo(HaveOccurred())
-
-			// Fetch the live StatefulSet and verify its container’s image
-			sts := &appsv1.StatefulSet{}
-			Expect(k8sClient.Get(ctx, key, sts)).To(Succeed())
-			Expect(sts.Spec.Template.Spec.Containers[0].Image).To(Equal(expectedImage))
-		})
-	})
-	Context("when RedisCluster is ephemeral", func() {
-		const (
-			baseName        = "resources-management"
-			initialStorage  = "1Gi"
-			initialReplicas = int32(1)
-		)
+	Context("StatefulSet updates", func() {
+		const name = "resources-test"
 		var key types.NamespacedName
 
 		BeforeEach(func() {
-			key = types.NamespacedName{
-				Name:      fmt.Sprintf("%s-%s", baseName, RedisClusterName),
-				Namespace: namespace.Name,
-			}
-			// create an ephemeral cluster
-			Expect(framework.EnsureClusterExistsOrCreate(
-				ctx, k8sClient, key,
-				initialReplicas, 0,
-				"",   // no storage
-				true, // purgeKeys
-				true, // ephemeral
-				redisv1.Pdb{},
-				redisv1.RedisClusterOverrideSpec{},
-			)).To(Succeed())
-			// wait until it's Ready
-			_, err := framework.WaitForReady(ctx, k8sClient, key)
-			Expect(err).NotTo(HaveOccurred())
+			key = types.NamespacedName{Namespace: namespace.Name, Name: name}
+			mustCreateAndReady(name, 1, 0, "",
+				true, true, redisv1.Pdb{}, redisv1.RedisClusterOverrideSpec{})
 		})
 
-		It("should forbid switching from ephemeral to storage", func() {
-			// Attempt to flip ephemeral -> storage
-			_, err := framework.ChangeCluster(ctx, k8sClient, key, framework.ChangeClusterOptions{
-				CurrentStatus: "Ready",
-				// we expect the mutation to fail before any status change
-				NextStatuses: nil,
-				Mutate: func(rc *redisv1.RedisCluster) {
-					rc.Spec.Ephemeral = false
-					rc.Spec.Storage = initialStorage
+		type tc struct {
+			mutate     func(*redisv1.RedisCluster)
+			verify     func(*appsv1.StatefulSet)
+			wantPhases []string
+		}
+
+		DescribeTable("propagates to STS",
+			func(t tc) {
+				_, trace, err := framework.ChangeCluster(ctx, k8sClient, key,
+					framework.ChangeClusterOptions{Mutate: t.mutate})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(trace).To(ContainElements(t.wantPhases))
+
+				sts := &appsv1.StatefulSet{}
+				Expect(k8sClient.Get(ctx, key, sts)).To(Succeed())
+				t.verify(sts)
+			},
+
+			Entry("change resources",
+				tc{
+					mutate: func(r *redisv1.RedisCluster) {
+						req := corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("51m"),
+								corev1.ResourceMemory: resource.MustParse("51Mi")},
+							Limits: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("51m"),
+								corev1.ResourceMemory: resource.MustParse("51Mi")},
+						}
+						r.Spec.Resources = &req
+					},
+					verify: func(sts *appsv1.StatefulSet) {
+						Expect(sts.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().String()).To(Equal("51m"))
+						Expect(sts.Spec.Template.Spec.Containers[0].Resources.Requests.Memory().String()).To(Equal("51Mi"))
+						Expect(sts.Spec.Template.Spec.Containers[0].Resources.Limits.Cpu().String()).To(Equal("51m"))
+						Expect(sts.Spec.Template.Spec.Containers[0].Resources.Limits.Memory().String()).To(Equal("51Mi"))
+					},
+					wantPhases: []string{redisv1.StatusUpgrading, redisv1.StatusReady},
 				},
-			})
-			Expect(err).To(MatchError(ContainSubstring("Changing the ephemeral field is not allowed")))
+			),
 
-			// Ensure the cluster remained Ready and ephemeral=true
-			rd, err := framework.WaitForReady(ctx, k8sClient, key)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(rd.Spec.Ephemeral).To(BeTrue())
-			Expect(rd.Spec.Storage).To(BeEmpty())
-		})
+			Entry("change image",
+				tc{
+					mutate: func(r *redisv1.RedisCluster) { r.Spec.Image = getChangedRedisImage() },
+					verify: func(sts *appsv1.StatefulSet) {
+						Expect(sts.Spec.Template.Spec.Containers[0].Image).To(Equal(getChangedRedisImage()))
+					},
+					wantPhases: []string{redisv1.StatusUpgrading, redisv1.StatusReady},
+				},
+			),
+		)
 	})
 
-	Context("when RedisCluster PodDisruptionBudget is toggled", func() {
-		const (
-			baseName        = "poddisruptionbudget"
-			initialReplicas = int32(3)
-			pdbMinAvailable = int32(1)
+	Context("Ephemeral → PVC guard", func() {
+		const base = "ephemeral"
+
+		type tc struct {
+			desc      string
+			mutate    func(*redisv1.RedisCluster)
+			expectErr gomegatypes.GomegaMatcher
+			verify    func(*redisv1.RedisCluster) // always run
+		}
+
+		DescribeTable("mutation attempts",
+			func(t tc) {
+				name := fmt.Sprintf("%s-%s",
+					base, strings.ReplaceAll(strings.ToLower(t.desc), " ", "-"))
+				key := types.NamespacedName{Namespace: namespace.Name, Name: name}
+
+				mustCreateAndReady(name, 1, 0, "",
+					/*purge=*/ true /*ephemeral=*/, true,
+					redisv1.Pdb{}, redisv1.RedisClusterOverrideSpec{})
+
+				_, _, err := framework.ChangeCluster(
+					ctx, k8sClient, key,
+					framework.ChangeClusterOptions{Mutate: t.mutate},
+				)
+
+				Expect(err).To(t.expectErr)
+
+				rc, wErr := framework.WaitForStatus(ctx, k8sClient, key, redisv1.StatusReady)
+				Expect(wErr).NotTo(HaveOccurred())
+				t.verify(rc)
+			},
+
+			Entry("deny: flip to PVC (Ephemeral=false + Storage)",
+				tc{
+					desc: "flip-to-PVC",
+					mutate: func(r *redisv1.RedisCluster) {
+						r.Spec.Ephemeral = false
+						r.Spec.Storage = "1Gi"
+					},
+					expectErr: MatchError(ContainSubstring("Changing the ephemeral field is not allowed")),
+					verify: func(rc *redisv1.RedisCluster) {
+						Expect(rc.Spec.Ephemeral).To(BeTrue())
+						Expect(rc.Spec.Storage).To(BeEmpty())
+					},
+				},
+			),
+
+			Entry("deny: add Storage while Ephemeral=true",
+				tc{
+					desc: "add-storage",
+					mutate: func(r *redisv1.RedisCluster) {
+						r.Spec.Storage = "500Mi"
+					},
+					expectErr: MatchError(ContainSubstring("Ephemeral and storage cannot be combined")),
+					verify: func(rc *redisv1.RedisCluster) {
+						Expect(rc.Spec.Ephemeral).To(BeTrue())
+						Expect(rc.Spec.Storage).To(BeEmpty())
+					},
+				},
+			),
 		)
-		var (
-			rcKey  types.NamespacedName
-			pdbKey types.NamespacedName
-		)
-
-		BeforeEach(func() {
-			rcKey = types.NamespacedName{
-				Name:      fmt.Sprintf("%s-%s", baseName, RedisClusterName),
-				Namespace: namespace.Name,
-			}
-			pdbKey = types.NamespacedName{
-				Name:      rcKey.Name + "-pdb",
-				Namespace: rcKey.Namespace,
-			}
-
-			// create a 3-replica cluster with no PDB
-			Expect(framework.EnsureClusterExistsOrCreate(
-				ctx, k8sClient, rcKey,
-				initialReplicas, 0,
-				"",            // no storage
-				true,          // purgeKeys
-				true,          // ephemeral
-				redisv1.Pdb{}, // disabled
-				redisv1.RedisClusterOverrideSpec{},
-			)).To(Succeed())
-			// wait until RedisCluster is Ready
-			_, err := framework.WaitForReady(ctx, k8sClient, rcKey)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("creates, deletes and re-creates the PDB as spec.Pdb.Enabled toggles", func() {
-			pdb := &policyv1.PodDisruptionBudget{}
-
-			// 1) Enable PDB ⇒ it should appear
-			_, err := framework.ChangeCluster(ctx, k8sClient, rcKey, framework.ChangeClusterOptions{
-				CurrentStatus: "Ready",
-				NextStatuses:  []string{"Ready"},
-				Mutate: func(rc *redisv1.RedisCluster) {
-					rc.Spec.Pdb = redisv1.Pdb{
-						Enabled:          true,
-						PdbSizeAvailable: intstr.FromInt(int(pdbMinAvailable)),
-					}
-				},
-			})
-			Expect(err).NotTo(HaveOccurred())
-
-			Eventually(func() error {
-				return k8sClient.Get(ctx, pdbKey, pdb)
-			}, defaultWait*2, defaultPoll).Should(Succeed())
-			Expect(pdb.Spec.MinAvailable.IntVal).To(Equal(pdbMinAvailable))
-
-			// 2) Disable PDB ⇒ it should be deleted
-			_, err = framework.ChangeCluster(ctx, k8sClient, rcKey, framework.ChangeClusterOptions{
-				CurrentStatus: "Ready",
-				NextStatuses:  []string{"Ready"},
-				Mutate: func(rc *redisv1.RedisCluster) {
-					rc.Spec.Pdb.Enabled = false
-				},
-			})
-			Expect(err).NotTo(HaveOccurred())
-
-			Eventually(func() bool {
-				return k8sClient.Get(ctx, pdbKey, &policyv1.PodDisruptionBudget{}) != nil
-			}, defaultWait*2, defaultPoll).Should(BeTrue())
-
-			// 3) Re-enable PDB ⇒ it should reappear
-			_, err = framework.ChangeCluster(ctx, k8sClient, rcKey, framework.ChangeClusterOptions{
-				CurrentStatus: "Ready",
-				NextStatuses:  []string{"Ready"},
-				Mutate: func(rc *redisv1.RedisCluster) {
-					rc.Spec.Pdb.Enabled = true
-				},
-			})
-			Expect(err).NotTo(HaveOccurred())
-
-			Eventually(func() error {
-				return k8sClient.Get(ctx, pdbKey, pdb)
-			}, defaultWait*2, defaultPoll).Should(Succeed())
-			Expect(pdb.Spec.MinAvailable.IntVal).To(Equal(pdbMinAvailable))
-
-			// 4) Scale down to 0 ⇒ even though Enabled=true, PDB must be removed
-			_, err = framework.ChangeCluster(ctx, k8sClient, rcKey, framework.ChangeClusterOptions{
-				CurrentStatus: "Ready",
-				NextStatuses:  []string{"ScalingDown", "Ready"},
-				Mutate: func(rc *redisv1.RedisCluster) {
-					rc.Spec.Replicas = 0
-				},
-			})
-			Expect(err).NotTo(HaveOccurred())
-
-			Eventually(func() bool {
-				return k8sClient.Get(ctx, pdbKey, &policyv1.PodDisruptionBudget{}) != nil
-			}, defaultWait*2, defaultPoll).Should(BeTrue())
-
-			// 5) Scale back up ⇒ PDB returns
-			_, err = framework.ChangeCluster(ctx, k8sClient, rcKey, framework.ChangeClusterOptions{
-				CurrentStatus: "Ready",
-				NextStatuses:  []string{"ScalingUp", "Ready"},
-				Mutate: func(rc *redisv1.RedisCluster) {
-					rc.Spec.Replicas = initialReplicas
-				},
-			})
-			Expect(err).NotTo(HaveOccurred())
-
-			Eventually(func() error {
-				return k8sClient.Get(ctx, pdbKey, pdb)
-			}, defaultWait*2, defaultPoll).Should(Succeed())
-			Expect(pdb.Spec.MinAvailable.IntVal).To(Equal(pdbMinAvailable))
-		})
 	})
 
-	Context("when RedisCluster nodes are being reconfigured", func() {
-		const (
-			baseName = "cluster-meet"
-			replicas = int32(3)
-		)
-		var (
-			key types.NamespacedName
-		)
+	Context("PodDisruptionBudget toggle", func() {
+		const base = "pdb"
 
-		BeforeEach(func() {
-			key = types.NamespacedName{
-				Name:      fmt.Sprintf("%s-%s", baseName, RedisClusterName),
-				Namespace: namespace.Name,
-			}
-			// 1) Create & wait for Ready
-			Expect(framework.EnsureClusterExistsOrCreate(
-				ctx, k8sClient, key,
-				replicas, 0,
-				"",
-				true, // purgeKeys
-				true, // ephemeral
-				redisv1.Pdb{}, redisv1.RedisClusterOverrideSpec{},
-			)).To(Succeed())
-			_, err := framework.WaitForReady(ctx, k8sClient, key)
-			Expect(err).NotTo(HaveOccurred())
-		})
+		type step struct {
+			desc       string
+			mutate     func(*redisv1.RedisCluster)
+			wantPDB    bool
+			wantPhases []string
+		}
 
-		It("should allow forgetting one node and self-heal", func() {
-			// 2) Ensure cluster is healthy
+		type tc struct {
+			name  string
+			steps []step
+		}
+
+		getPDB := func(pdbKey types.NamespacedName) error {
+			return k8sClient.Get(ctx, pdbKey, &policyv1.PodDisruptionBudget{})
+		}
+		ensurePDBState := func(pdbKey types.NamespacedName, want bool) {
+			Eventually(func() bool {
+				err := getPDB(pdbKey)
+				return (err == nil) == want
+			}, defaultWait*2, defaultPoll).Should(BeTrue())
+		}
+
+		DescribeTable("reconciles PodDisruptionBudget according to .spec.pdb/enabled",
+			func(t tc) {
+				name := fmt.Sprintf("%s-%s", base, strings.ReplaceAll(t.name, "_", "-"))
+				key := types.NamespacedName{Namespace: namespace.Name, Name: name}
+				pdbKey := types.NamespacedName{Namespace: namespace.Name, Name: name + "-pdb"}
+
+				mustCreateAndReady(name, 3, 0, "", true, true,
+					redisv1.Pdb{}, redisv1.RedisClusterOverrideSpec{})
+
+				for i, s := range t.steps {
+					_, trace, err := framework.ChangeCluster(ctx, k8sClient, key,
+						framework.ChangeClusterOptions{Mutate: s.mutate})
+					Expect(err).NotTo(HaveOccurred(),
+						"step %d (%s) ChangeCluster failed", i, s.desc)
+
+					Expect(trace).To(ContainElements(s.wantPhases))
+
+					ensurePDBState(pdbKey, s.wantPDB)
+				}
+			},
+
+			Entry("enable → disable → re-enable",
+				tc{
+					name: "enable_disable_enable",
+					steps: []step{
+						{
+							desc: "enable PDB",
+							mutate: func(r *redisv1.RedisCluster) {
+								r.Spec.Pdb = redisv1.Pdb{Enabled: true, PdbSizeAvailable: intstr.FromInt(1)}
+							},
+							wantPDB:    true,
+							wantPhases: []string{redisv1.StatusReady},
+						},
+						{
+							desc:       "disable PDB",
+							mutate:     func(r *redisv1.RedisCluster) { r.Spec.Pdb.Enabled = false },
+							wantPDB:    false,
+							wantPhases: []string{redisv1.StatusReady},
+						},
+						{
+							desc:       "re-enable PDB",
+							mutate:     func(r *redisv1.RedisCluster) { r.Spec.Pdb.Enabled = true },
+							wantPDB:    true,
+							wantPhases: []string{redisv1.StatusReady},
+						},
+					},
+				},
+			),
+
+			Entry("enable → scale-to-zero → scale-up",
+				tc{
+					name: "enable_scale_zero_up",
+					steps: []step{
+						{
+							desc: "enable PDB",
+							mutate: func(r *redisv1.RedisCluster) {
+								r.Spec.Pdb = redisv1.Pdb{Enabled: true, PdbSizeAvailable: intstr.FromInt(1)}
+							},
+							wantPDB:    true,
+							wantPhases: []string{redisv1.StatusReady},
+						},
+						{
+							desc:       "scale to zero (PDB removed)",
+							mutate:     func(r *redisv1.RedisCluster) { r.Spec.Replicas = 0 },
+							wantPDB:    false,
+							wantPhases: []string{redisv1.StatusReady},
+						},
+						{
+							desc:       "scale up (PDB recreated)",
+							mutate:     func(r *redisv1.RedisCluster) { r.Spec.Replicas = 3 },
+							wantPDB:    true,
+							wantPhases: []string{redisv1.StatusScalingUp, redisv1.StatusReady},
+						},
+					},
+				},
+			),
+
+			Entry("enable → scale-to-zero → scale-up → disable",
+				tc{
+					name: "enable_scale_zero_up_disable",
+					steps: []step{
+						{
+							desc: "enable PDB",
+							mutate: func(r *redisv1.RedisCluster) {
+								r.Spec.Pdb = redisv1.Pdb{Enabled: true, PdbSizeAvailable: intstr.FromInt(1)}
+							},
+							wantPDB:    true,
+							wantPhases: []string{redisv1.StatusReady},
+						},
+						{
+							desc:       "scale to zero (PDB removed)",
+							mutate:     func(r *redisv1.RedisCluster) { r.Spec.Replicas = 0 },
+							wantPDB:    false,
+							wantPhases: []string{redisv1.StatusReady},
+						},
+						{
+							desc:       "scale up (PDB recreated)",
+							mutate:     func(r *redisv1.RedisCluster) { r.Spec.Replicas = 3 },
+							wantPDB:    true,
+							wantPhases: []string{redisv1.StatusScalingUp, redisv1.StatusReady},
+						},
+						{
+							desc:       "disable PDB again",
+							mutate:     func(r *redisv1.RedisCluster) { r.Spec.Pdb.Enabled = false },
+							wantPDB:    false,
+							wantPhases: []string{redisv1.StatusReady},
+						},
+					},
+				},
+			),
+		)
+	})
+
+	Context("Cluster healing", func() {
+		const base = "heal" // prefix for all clusters
+
+		scaleOperator := func(replicas int32) {
+			depKey := types.NamespacedName{Namespace: namespace.Name, Name: "redis-operator"}
+			dep := &appsv1.Deployment{}
+			Expect(k8sClient.Get(ctx, depKey, dep)).To(Succeed())
+
+			dep.Spec.Replicas = ptr.To(replicas)
+			Expect(k8sClient.Update(ctx, dep)).To(Succeed())
+
+			Eventually(func() bool {
+				var d appsv1.Deployment
+				if err := k8sClient.Get(ctx, depKey, &d); err != nil {
+					return false
+				}
+				if replicas == 0 {
+					return d.Status.AvailableReplicas == 0
+				}
+				return d.Status.AvailableReplicas >= replicas
+			}, defaultWait*2, defaultPoll).Should(BeTrue())
+		}
+
+		waitHealthy := func(key types.NamespacedName) {
 			Eventually(func() (bool, error) {
 				rc, err := framework.WaitForReady(ctx, k8sClient, key)
 				if err != nil {
@@ -1092,71 +1015,66 @@ var _ = Describe("Redis Operator & RedisCluster", Label("operator", "cluster"), 
 				}
 				return framework.CheckRedisCluster(k8sClient, ctx, rc)
 			}, defaultWait*3, defaultPoll).Should(BeTrue())
+		}
 
-			// 3) Forget the first node
-			rc, err := framework.WaitForReady(ctx, k8sClient, key)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(framework.ForgetANode(k8sClient, ctx, rc)).To(Succeed())
+		type tc struct {
+			desc     string                               // human-readable
+			operate  func(rc *redisv1.RedisCluster) error // action that "breaks" the cluster
+			preHook  func()                               // run before operate  (may be nil)
+			postHook func()                               // run after  operate  (may be nil)
+		}
 
-			// 4) Wait for the operator to reconcile and cluster to be Ready again
-			Eventually(func() error {
-				_, err := framework.WaitForReady(ctx, k8sClient, key)
-				return err
-			}, defaultWait*4, defaultPoll).Should(Succeed())
+		DescribeTable("self-heals after disruptive events",
+			func(t tc) {
+				// unique cluster name
+				name := fmt.Sprintf("%s-%s",
+					base, strings.ReplaceAll(strings.ToLower(t.desc), " ", "-"))
+				key := types.NamespacedName{Namespace: namespace.Name, Name: name}
 
-			// 5) Final health check
-			rc2, err := framework.WaitForReady(ctx, k8sClient, key)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(framework.CheckRedisCluster(k8sClient, ctx, rc2)).To(BeTrue())
-		})
+				// create a 3-master cluster
+				rc := mustCreateAndReady(name,
+					3 /*masters*/, 0, /*replicasPerMaster*/
+					"" /*storage*/, true /*purgeKeys*/, true, /*ephemeral*/
+					redisv1.Pdb{}, redisv1.RedisClusterOverrideSpec{})
 
-		It("should use fix/meet to rebalance after operator outage by scaling operator to zero", func() {
-			// 2) Ensure cluster is Ready and healthy
-			rc, err := framework.WaitForReady(ctx, k8sClient, key)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(framework.CheckRedisCluster(k8sClient, ctx, rc)).To(BeTrue())
-
-			// 3) Simulate operator outage by scaling its Deployment to 0
-			depKey := client.ObjectKey{Namespace: namespace.Name, Name: "redis-operator"}
-			opDep := &appsv1.Deployment{}
-			Expect(k8sClient.Get(ctx, depKey, opDep)).To(Succeed())
-
-			// Scale down
-			zero := int32(0)
-			opDep.Spec.Replicas = &zero
-			Expect(k8sClient.Update(ctx, opDep)).To(Succeed())
-			// Wait until no operator pods are running
-			Eventually(func() bool {
-				var d appsv1.Deployment
-				if err := k8sClient.Get(ctx, depKey, &d); err != nil {
-					return false
+				// optional scale operator
+				if t.preHook != nil {
+					t.preHook()
 				}
-				return d.Status.AvailableReplicas == 0
-			}, defaultWait*2, defaultPoll).Should(BeTrue())
 
-			// 4) Forget+fix+meet to rejoin nodes
-			Expect(framework.ForgetANodeFixAndMeet(k8sClient, ctx, rc)).To(Succeed())
+				// perform the disruptive operation
+				Expect(t.operate(rc)).To(Succeed())
 
-			// 5) Scale the operator back up to 1 replica
-			Expect(k8sClient.Get(ctx, depKey, opDep)).To(Succeed())
-			one := int32(1)
-			opDep.Spec.Replicas = &one
-			Expect(k8sClient.Update(ctx, opDep)).To(Succeed())
-			// Wait until operator is available again
-			Eventually(func() bool {
-				var d appsv1.Deployment
-				if err := k8sClient.Get(ctx, depKey, &d); err != nil {
-					return false
+				// optional return to previous phase operator
+				if t.postHook != nil {
+					t.postHook()
 				}
-				return d.Status.AvailableReplicas >= 1
-			}, defaultWait*2, defaultPoll).Should(BeTrue())
 
-			// 6) Finally wait for the cluster to return to Ready+healthy
-			_, err = framework.WaitForReady(ctx, k8sClient, key)
-			Expect(err).NotTo(HaveOccurred())
-			rc2, err := framework.WaitForReady(ctx, k8sClient, key)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(framework.CheckRedisCluster(k8sClient, ctx, rc2)).To(BeTrue())
-		})
+				// eventually the cluster must be healthy again
+				waitHealthy(key)
+			},
+
+			// ────────────────── ENTRY 1 ──────────────────
+			Entry("forget one node - operator running",
+				tc{
+					desc: "forget-node",
+					operate: func(rc *redisv1.RedisCluster) error {
+						return framework.ForgetANode(k8sClient, ctx, rc)
+					},
+				},
+			),
+
+			// ────────────────── ENTRY 2 ──────────────────
+			Entry("operator outage → forget/fix/meet → operator back",
+				tc{
+					desc:    "forget-fix-meet-without-operator",
+					preHook: func() { scaleOperator(0) }, // stop the operator
+					operate: func(rc *redisv1.RedisCluster) error {
+						return framework.ForgetANodeFixAndMeet(k8sClient, ctx, rc)
+					},
+					postHook: func() { scaleOperator(1) }, // start it again
+				},
+			),
+		)
 	})
 })

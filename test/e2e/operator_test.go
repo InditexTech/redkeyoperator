@@ -153,8 +153,21 @@ func newOperatorContainer(ns string) corev1.Container {
 
 func leaderElectionPolicyRules() []rbacv1.PolicyRule {
 	return []rbacv1.PolicyRule{
-		{APIGroups: []string{"", "coordination.k8s.io"}, Resources: []string{"configmaps", "leases"}, Verbs: []string{"get", "list", "watch", "create", "update", "patch", "delete"}},
-		{APIGroups: []string{""}, Resources: []string{"events"}, Verbs: []string{"create", "patch"}},
+		{
+			APIGroups: []string{"coordination.k8s.io"},
+			Resources: []string{"leases"},
+			Verbs:     []string{"get", "list", "watch", "create", "update", "patch"},
+		},
+		{
+			APIGroups: []string{""},
+			Resources: []string{"configmaps"},
+			Verbs:     []string{"get", "list", "watch", "create", "update", "patch"},
+		},
+		{
+			APIGroups: []string{""},
+			Resources: []string{"events"},
+			Verbs:     []string{"create", "patch"},
+		},
 	}
 }
 

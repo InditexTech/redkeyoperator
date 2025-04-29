@@ -543,14 +543,14 @@ test-e2e: process-manifests-crd ginkgo ## Execute e2e application test
 	$(eval TEST_COVERAGE_PROFILE_OUTPUT_DIRNAME=$(shell dirname $(TEST_COVERAGE_PROFILE_OUTPUT)))
 	$(eval TEST_REPORT_OUTPUT_DIRNAME=$(shell dirname $(TEST_REPORT_OUTPUT_E2E)))
 	mkdir -p $(TEST_COVERAGE_PROFILE_OUTPUT_DIRNAME) $(TEST_REPORT_OUTPUT_DIRNAME)
-	ginkgo -procs=$(TEST_PARALLEL_PROCESS) ./test/e2e -cover -coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT) -json > $(TEST_REPORT_OUTPUT_E2E)
+	ginkgo -procs=$(TEST_PARALLEL_PROCESS) ./test/e2e -cover -coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT) -json > $(TEST_REPORT_OUTPUT_E2E) OPERATOR_IMAGE=$(IMG_DEV)
 
 .PHONY: test-e2e-cov
 test-e2e-cov: process-manifests-crd ginkgo ## Execute e2e application test
 	$(info $(M) generating coverage report...)
 	$(eval TEST_REPORT_OUTPUT_DIRNAME=$(shell dirname $(TEST_REPORT_OUTPUT)))
 	mkdir -p $(TEST_REPORT_OUTPUT_DIRNAME)
-	ginkgo -procs=$(TEST_PARALLEL_PROCESS) ./test/e2e -vv -cover -coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT) -covermode=count OPERATOR_IMAGE=$(IMG_DEV)
+	ginkgo -procs=$(TEST_PARALLEL_PROCESS) ./test/e2e -vv -cover -coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT) -covermode=count OPERATOR_IMAGE=$(IMG_DEV) REDIS_IMAGE=$(REDIS_IMAGE) CHANGED_REDIS_IMAGE=$(CHANGED_REDIS_IMAGE) SIDECARD_IMAGE=$(SIDECARD_IMAGE)
 
 
 .PHONY: test-sonar 

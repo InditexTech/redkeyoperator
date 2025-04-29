@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"os"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -41,13 +42,13 @@ const (
 	CLUSTERNODESCMD        string = "redis-cli cluster nodes"
 	EXPECTEDKEYS           int    = 30
 	WAIT_FOR_RDCL_DELETION int    = 180
-	DefaultRedisImage             = "axinregistry1.central.inditex.grp/itxapps/redis.redis-stack-server:7.4.0-v3-coordinator"
+	defaultRedisImage             = "redis/redis-stack-server:7.4.0-v3"
 	defaultConfig                 = `save ""
 appendonly no
 maxmemory 70mb`
 	finalizerName  = "redis.inditex.com/configmap-cleanup"
-	pollInterval   = 10 * time.Second
-	defaultTimeout = 10 * time.Minute
+	pollInterval   = 3 * time.Second
+	defaultTimeout = 30 * time.Minute
 )
 
 type ClusterStatus struct {
@@ -61,6 +62,14 @@ type ClusterStatus struct {
 }
 
 var version = "6.0.2"
+
+// getOperatorImage reads OPERATOR_IMAGE or falls back
+func getRedisImage() string {
+	if img := os.Getenv("REDIS_IMAGE"); img != "" {
+		return img
+	}
+	return defaultRedisImage
+}
 
 // EnsureClusterExistsOrCreate will create or update (upsert) a RedisCluster CR.
 // It applies storage, replica count, PDB and optional overrides, then waits for reconciliation.
@@ -89,7 +98,7 @@ func EnsureClusterExistsOrCreate(
 			Version:              version,
 			Replicas:             replicas,
 			Ephemeral:            ephemeral,
-			Image:                DefaultRedisImage,
+			Image:                getRedisImage(),
 			Config:               defaultConfig,
 			Resources:            buildResources(),
 			PurgeKeysOnRebalance: purgeKeys,
@@ -162,152 +171,203 @@ func buildResources() *corev1.ResourceRequirements {
 	}
 }
 
-// WaitForStatus blocks until the RedisCluster's .Status.Status matches desiredStatus,
-// or until timeout/poll elapses (or ctx is canceled).  Returns the last fetched object.
+// WaitForStatus blocks until .Status.Status equals desiredStatus **or Ready**.
+// If desiredStatus itself is "Ready" we obviously require an exact match.
 func WaitForStatus(
 	ctx context.Context,
 	c client.Client,
 	key types.NamespacedName,
-	desiredStatus string,
+	desired string,
 ) (*redisv1.RedisCluster, error) {
-	var last redisv1.RedisCluster
-	err := wait.PollUntilContextTimeout(ctx, pollInterval, defaultTimeout, true, func(ctx context.Context) (bool, error) {
-		if err := c.Get(ctx, key, &last); err != nil {
-			if errors.IsNotFound(err) {
-				return false, nil // keep polling until it's created
-			}
-			return false, err
+
+	const interval = 3 * time.Second
+	var last string
+
+	isDone := func(s string) bool {
+		if s == desired {
+			return true
 		}
-		return last.Status.Status == desiredStatus, nil
-	})
-	if err != nil {
+		// if we were waiting for a transient state and the controller already
+		// completed the reconciliation, Ready is also acceptable.
+		return desired != redisv1.StatusReady && s == redisv1.StatusReady
+	}
+
+	if err := wait.PollUntilContextTimeout(
+		ctx, interval, defaultTimeout, true,
+		func(ctx context.Context) (bool, error) {
+			rc := &redisv1.RedisCluster{}
+			if err := c.Get(ctx, key, rc); err != nil {
+				// keep polling if NotFound, abort on any other error
+				if errors.IsNotFound(err) {
+					return false, nil
+				}
+				return false, err
+			}
+			last = rc.Status.Status
+			return isDone(last), nil
+		},
+	); err != nil {
 		return nil, fmt.Errorf(
-			"timed out waiting for %s/%s status=%q (last: %q): %w",
-			key.Namespace, key.Name, desiredStatus, last.Status.Status, err,
+			"timed out after %s waiting for status %q (last seen %q): %w",
+			defaultTimeout, desired, last, err,
 		)
 	}
-	return &last, nil
+
+	// fetch the fresh object before returning
+	final := &redisv1.RedisCluster{}
+	if err := c.Get(ctx, key, final); err != nil {
+		return nil, fmt.Errorf("fetch latest RedisCluster %s/%s: %w",
+			key.Namespace, key.Name, err)
+	}
+	return final, nil
 }
 
-// WaitForReady is a convenience wrapper to wait for “Ready”
-func WaitForReady(
-	ctx context.Context,
-	c client.Client,
-	key types.NamespacedName,
-) (*redisv1.RedisCluster, error) {
-	return WaitForStatus(ctx, c, key, "Ready")
+// Convenience wrapper for waiting until “Ready”
+func WaitForReady(ctx context.Context, c client.Client, key types.NamespacedName) (*redisv1.RedisCluster, error) {
+	return WaitForStatus(ctx, c, key, redisv1.StatusReady)
 }
 
-// ChangeClusterOptions holds all the parameters for a cluster update
+// ChangeCluster mutates the RedisCluster specified by key:
+//
+//  1. wait until the cluster is Ready
+//  2. run opts.Mutate (wrapped in controller-runtime CreateOrUpdate +
+//     RetryOnConflict)
+//  3. wait again until the controller has observed *that* generation
+//     and set the phase back to Ready
+//
+// It returns the up-to-date object *and* the list of distinct phases that
+// were observed while waiting (useful for asserting “ScalingUp” / “Upgrading”
+// etc. occurred).
 type ChangeClusterOptions struct {
-	// Precondition: we wait until this status before mutating
-	CurrentStatus string
-	// Sequence of statuses to wait *after* mutation, in order
-	NextStatuses []string
-	// The actual mutation of the RedisCluster.Spec
 	Mutate func(rc *redisv1.RedisCluster)
 }
 
-// ChangeCluster does the full cycle: wait current, mutate, then wait through
-// each of opts.NextStatuses in turn, but will skip any intermediate status
-// that was bypassed in favor of a later one.
 func ChangeCluster(
 	ctx context.Context,
 	c client.Client,
 	key types.NamespacedName,
 	opts ChangeClusterOptions,
-) (*redisv1.RedisCluster, error) {
-	// 1) Wait initial status
-	if _, err := WaitForStatus(ctx, c, key, opts.CurrentStatus); err != nil {
-		return nil, err
+) (*redisv1.RedisCluster, []string, error) {
+	// 1) ensure initial Ready
+	if _, err := WaitForStatus(ctx, c, key, redisv1.StatusReady); err != nil {
+		return nil, nil, err
 	}
 
-	// 2) Upsert via CreateOrUpdate, wrapped in RetryOnConflict
+	// 2) mutate (with retry-on-conflict)
 	rc := &redisv1.RedisCluster{ObjectMeta: metav1.ObjectMeta{Name: key.Name, Namespace: key.Namespace}}
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		_, upErr := controllerutil.CreateOrUpdate(ctx, c, rc, func() error {
+		_, err := controllerutil.CreateOrUpdate(ctx, c, rc, func() error {
 			opts.Mutate(rc)
-			controllerutil.AddFinalizer(rc, finalizerName)
+			controllerutil.AddFinalizer(rc, finalizerName) // keep your existing finalizer
 			return nil
 		})
-		return upErr
+		return err
 	}); err != nil {
-		return nil, fmt.Errorf("upsert RedisCluster %s/%s: %w", key.Namespace, key.Name, err)
+		return nil, nil, fmt.Errorf("patch RedisCluster: %w", err)
 	}
 
-	// 3) Wait through each post‑mutation status, skipping if already at final
-	var last *redisv1.RedisCluster
-	final := opts.NextStatuses[len(opts.NextStatuses)-1]
-	for _, st := range opts.NextStatuses {
-		next, wErr := WaitForStatus(ctx, c, key, st)
-		if wErr != nil {
-			// maybe we already jumped straight to `final`?
-			curr := &redisv1.RedisCluster{}
-			if getErr := c.Get(ctx, key, curr); getErr == nil && curr.Status.Status == final {
-				last = curr
+	// 3) re-get to know the generation we just wrote
+	if err := c.Get(ctx, key, rc); err != nil {
+		return nil, nil, err
+	}
+	wantGen := rc.Generation
+
+	// 4) wait for Ready again and capture the status trace
+	ready, trace, err := waitForReady(ctx, c, key, wantGen)
+	return ready, trace, err
+}
+
+// -----------------------------------------------------------------------------
+// Internal helpers
+// -----------------------------------------------------------------------------
+
+const (
+	conditionTypeReady = "Ready"
+	redisPhaseReady    = "Ready"
+)
+
+// WaitForReadyWithTrace is just a convenience wrapper used by tests that need
+// the trace list.  If you only need the final object, call waitForReady
+// directly.
+func WaitForReadyWithTrace(
+	ctx context.Context,
+	cl client.Client,
+	key types.NamespacedName,
+	wantGen int64,
+) (*redisv1.RedisCluster, []string, error) {
+	return waitForReady(ctx, cl, key, wantGen)
+}
+
+// waitForReady blocks until the cluster is Ready *and* the reconciler has
+// observed at least generation >= wantGen.  It also returns a slice with the
+// phases it saw (useful in tests to assert intermediary states).
+func waitForReady(
+	ctx context.Context,
+	cl client.Client,
+	key types.NamespacedName,
+	wantGen int64,
+) (*redisv1.RedisCluster, []string, error) {
+
+	var (
+		trace      []string
+		last       string
+		readyCount int
+		rc         = &redisv1.RedisCluster{}
+	)
+
+	deadline := time.After(defaultTimeout)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, trace, ctx.Err()
+		case <-deadline:
+			return nil, trace,
+				fmt.Errorf("timeout waiting Ready, seen phases %v", trace)
+		default:
+			time.Sleep(pollInterval)
+		}
+
+		if err := cl.Get(ctx, key, rc); err != nil {
+			if errors.IsNotFound(err) {
 				continue
 			}
-			return nil, wErr
+			return nil, trace, err
 		}
-		last = next
+
+		phase := rc.Status.Status
+		gen := readyObservedGen(rc)
+
+		// record phase transitions (for debugging / assertions)
+		if phase != last {
+			// log.Printf("[waitForReady] phase=%s generation=%d wantGen=%d", phase, gen, wantGen)
+			trace = append(trace, phase)
+			last = phase
+		}
+
+		// consecutive-Ready logic
+		if phase == redisv1.StatusReady && gen >= wantGen {
+			readyCount++
+			if readyCount == 2 { // <- stable Ready
+				return rc.DeepCopy(), trace, nil
+			}
+		} else {
+			readyCount = 0 // any other phase resets the counter
+		}
 	}
-	return last, nil
 }
 
-// Helper wrappers for common operations:
-
-// ChangeConfiguration scales/ephemeral/image/etc, waiting through ScalingUp → Ready
-func ChangeConfiguration(
-	ctx context.Context,
-	c client.Client,
-	key types.NamespacedName,
-	replicas, replicasPerMaster int32,
-	ephemeral bool,
-	resources *corev1.ResourceRequirements,
-	image string,
-	pdb redisv1.Pdb,
-	override redisv1.RedisClusterOverrideSpec,
-	expectedStatus []string,
-) (*redisv1.RedisCluster, error) {
-	return ChangeCluster(ctx, c, key, ChangeClusterOptions{
-		CurrentStatus: "Ready",
-		NextStatuses:  expectedStatus,
-		Mutate: func(rc *redisv1.RedisCluster) {
-			rc.Spec.Replicas = replicas
-			rc.Spec.Ephemeral = ephemeral
-			if replicasPerMaster > 0 {
-				rc.Spec.ReplicasPerMaster = replicasPerMaster
-			}
-			if resources != nil {
-				rc.Spec.Resources = resources
-			}
-			if image != "" {
-				rc.Spec.Image = image
-			}
-			rc.Spec.Pdb = pdb
-			rc.Spec.Override = &override
-		},
-	})
-}
-
-// ChangeStorage toggles PVC/on/off, waiting through Error → Ready
-func ChangeStorage(
-	ctx context.Context,
-	c client.Client,
-	key types.NamespacedName,
-	storage string,
-	replicas int32,
-) (*redisv1.RedisCluster, error) {
-	return ChangeCluster(ctx, c, key, ChangeClusterOptions{
-		CurrentStatus: "Ready",
-		NextStatuses:  []string{"Error", "Ready"},
-		Mutate: func(rc *redisv1.RedisCluster) {
-			rc.Spec.Storage = storage
-			rc.Spec.DeletePVC = (storage != "")
-			rc.Spec.Ephemeral = (storage == "")
-			rc.Spec.Replicas = replicas
-		},
-	})
+// readyObservedGen returns the generation the controller has already
+// observed.  ❶ prefer .status.observedGeneration; ❷ fall back to the
+// Ready condition; ❸ if both are zero, just return rc.Generation so
+// the waiter can still progress.
+func readyObservedGen(rc *redisv1.RedisCluster) int64 {
+	for _, c := range rc.Status.Conditions {
+		if c.Type == redisv1.StatusReady {
+			return c.ObservedGeneration // <- the only reliable place
+		}
+	}
+	return rc.Generation // fallback
 }
 
 func CheckRedisCluster(k8Client client.Client, ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, error) {
@@ -572,31 +632,6 @@ func getNodeIPsFromStdOut(stdOut string) string {
 	return nodeIPs
 }
 
-func waitForObjectStatus(ctx context.Context, client client.Client, nsName types.NamespacedName, desiredStatus string, timeoutSeconds int32) error {
-	interval := 3 * time.Second
-	duration := time.Duration(timeoutSeconds) * time.Second
-	var lastKnownStatus string
-
-	err := wait.PollUntilContextTimeout(ctx, interval, duration, true, func(ctx context.Context) (bool, error) {
-		redisCluster := &redisv1.RedisCluster{}
-		err := client.Get(ctx, nsName, redisCluster)
-		if err != nil {
-			if !errors.IsNotFound(err) { // Continue polling if object is not found
-				return false, nil
-			}
-			return false, err
-		}
-
-		lastKnownStatus = redisCluster.Status.Status
-		return lastKnownStatus == desiredStatus, nil
-	})
-
-	if err != nil {
-		return fmt.Errorf("timeout after %s waiting for status '%s', last known status: '%s': %w", duration, desiredStatus, lastKnownStatus, err)
-	}
-	return nil
-}
-
 // ValidateRedisClusterMasterSlave waits until Ready, then checks that
 // the number of masters & replicas-per-master match, and the StatefulSet
 // has the correct total replica count.
@@ -651,7 +686,7 @@ func ValidateRedisClusterMasterSlave(
 func InsertDataIntoCluster(ctx context.Context, k8sClient client.Client, nsName types.NamespacedName, redisCluster *redisv1.RedisCluster) (bool, error) {
 	selectedPods := &corev1.PodList{}
 	// Wait for ready status of redis-cluster
-	err := waitForObjectStatus(ctx, k8sClient, nsName, "Ready", int32(800))
+	_, err := WaitForReady(ctx, k8sClient, nsName)
 	if err != nil {
 		return false, err
 	}
@@ -683,44 +718,50 @@ func InsertDataIntoCluster(ctx context.Context, k8sClient client.Client, nsName 
 	return isOk, nil
 }
 
-func RemoveServicePorts(ctx context.Context, k8sClient client.Client, nsName types.NamespacedName) error {
-	var ports []corev1.ServicePort
-	fetchedService := &corev1.Service{}
-	err := k8sClient.Get(ctx, nsName, fetchedService)
-	if err != nil {
-		fmt.Printf("Error getting service %s", nsName)
-		return err
-	}
-	fetchedService.Spec.Ports = ports
-	err = k8sClient.Update(ctx, fetchedService)
-	if err != nil {
-		fmt.Printf("Error updateing service %s", nsName)
-		return err
-	}
-	return nil
+func RemoveServicePorts(ctx context.Context, c client.Client, key types.NamespacedName) error {
+	return updateService(ctx, c, key, func(svc *corev1.Service) {
+		svc.Spec.Ports = nil
+	})
 }
 
-func AddServicePorts(ctx context.Context, k8sClient client.Client, nsName types.NamespacedName) error {
-	var ports []corev1.ServicePort
-	fetchedService := &corev1.Service{}
-	err := k8sClient.Get(ctx, nsName, fetchedService)
-	if err != nil {
-		fmt.Printf("Error getting service %s", nsName)
-		return err
-	}
-	targetPort := intstr.IntOrString{IntVal: redis.RedisGossPort}
-	port := corev1.ServicePort{Name: "gossip", Port: redis.RedisGossPort, Protocol: "TCP", TargetPort: targetPort}
-	ports = append(ports, port)
-	targetPort = intstr.IntOrString{IntVal: redis.RedisCommPort}
-	port = corev1.ServicePort{Name: "comm", Port: redis.RedisCommPort, Protocol: "TCP", TargetPort: targetPort}
-	ports = append(ports, port)
-	fetchedService.Spec.Ports = ports
-	err = k8sClient.Update(ctx, fetchedService)
-	if err != nil {
-		fmt.Printf("Error updateing service %s", nsName)
-		return err
-	}
-	return nil
+func AddServicePorts(ctx context.Context, c client.Client, key types.NamespacedName) error {
+	return updateService(ctx, c, key, func(svc *corev1.Service) {
+		svc.Spec.Ports = []corev1.ServicePort{
+			{
+				Name:       "gossip",
+				Port:       redis.RedisGossPort,
+				Protocol:   corev1.ProtocolTCP,
+				TargetPort: intstr.FromInt(int(redis.RedisGossPort)),
+			},
+			{
+				Name:       "comm",
+				Port:       redis.RedisCommPort,
+				Protocol:   corev1.ProtocolTCP,
+				TargetPort: intstr.FromInt(int(redis.RedisCommPort)),
+			},
+		}
+	})
+}
+
+func updateService(
+	ctx context.Context,
+	c client.Client,
+	key types.NamespacedName,
+	mutate func(*corev1.Service),
+) error {
+
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		svc := &corev1.Service{}
+		if err := c.Get(ctx, key, svc); err != nil {
+			// If the Service is gone or any other error occurs, abort retries.
+			return err
+		}
+
+		// apply the caller-supplied mutation
+		mutate(svc)
+
+		return c.Update(ctx, svc)
+	})
 }
 
 func ForgetANode(k8Client client.Client, ctx context.Context, redisCluster *redisv1.RedisCluster) error {

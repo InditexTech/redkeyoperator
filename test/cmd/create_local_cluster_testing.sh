@@ -94,13 +94,19 @@ push_operator_image_local_registry() {
 
 }
 add_images_for_testing() {
-  docker pull redislabs/redisgraph:2.8.9
-  echo "Image pulled redislabs/redisgraph:2.8.9."
-  kind load docker-image redislabs/redisgraph:2.8.9 --name "${cluster_name}"
-  echo "Image loaded redislab image into Kind cluster."
-  docker pull redis/redis-stack-server:7.2.0-v6
-  echo "Image pulled redis/redis-stack-server:7.2.0-v6."
-  kind load docker-image redis/redis-stack-server:7.2.0-v6 --name "${cluster_name}"
+  docker pull redis/redis-stack-server:7.2.0-v10
+  echo "Image pulled redis/redis-stack-server:7.2.0-v10."
+  kind load docker-image redis/redis-stack-server:7.2.0-v10 --name "${cluster_name}"
+  echo "Image loaded redis-stack-server image into Kind cluster."
+
+  docker pull redis/redis-stack-server:7.4.0-v3
+  echo "Image pulled redis/redis-stack-server:7.4.0-v3."
+  kind load docker-image redis/redis-stack-server:7.4.0-v3 --name "${cluster_name}"
+  echo "Image loaded redis-stack-server image into Kind cluster."
+
+  docker pull redis/alpine:3.1.2
+  echo "Image pulled redis/alpine:3.1.2."
+  kind load docker-image redis/alpine:3.1.2 --name "${cluster_name}"
   echo "Image loaded redis-stack-server image into Kind cluster."
 }
 
