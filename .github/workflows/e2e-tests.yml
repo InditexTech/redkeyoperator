@@ -27,6 +27,9 @@ env:
   OPERATOR_NAME: redis-operator
   OPERATOR_VERSION: 0.1.0
   KUBECONFIG: ${{ github.workspace }}/.kube/config
+  LOCAL_CLUSTER_NAME: local-cluster-test
+  LOCAL_REGISTRY: local-registry-hosting
+  LOCAL_REGISTRY_PORT: 5001
 
 jobs:
   e2e:
@@ -76,10 +79,10 @@ jobs:
       id: kind
       uses: helm/kind-action@v1
       with:
-        cluster_name: local-cluster-test
+        cluster_name: ${{ env.LOCAL_CLUSTER_NAME }}
         registry: true
-        registry_name: local-registry-hosting
-        registry_port: 5001
+        registry_name: ${{ env.LOCAL_REGISTRY }}
+        registry_port: ${{ env.LOCAL_REGISTRY_PORT }}
         registry_enable_delete: true
 
     # ───────────────────────────── build & load images ─────────────────────────
@@ -94,7 +97,7 @@ jobs:
         cache-to:   type=local,dest=/tmp/.buildx-cache,mode=max
 
     - name: 📥 Load operator image into KinD
-      run: kind load docker-image --name local-cluster-test redis-operator:0.1.0
+      run: kind load docker-image --name ${{ env.LOCAL_CLUSTER_NAME }} ${{ env.OPERATOR_NAME }}:${{ env.OPERATOR_VERSION }}
 
     - name: 📦  Pull dependency images & load into KinD
       run: |
@@ -104,7 +107,41 @@ jobs:
           alpine:3.21.3
         do
           docker pull --quiet "$img"
-          kind load docker-image --name local-cluster-test "$img"
+          kind load docker-image --name ${{ env.LOCAL_CLUSTER_NAME }} "$img"
+        done
+
+    - name: 🛂  Validate images are present & runnable inside KinD
+      run: |
+        set -euo pipefail
+        images=(
+          "${{ env.OPERATOR_NAME }}:${{ env.OPERATOR_VERSION }}"
+          "redis/redis-stack-server:7.2.0-v10"
+          "redis/redis-stack-server:7.4.0-v3"
+          "alpine:3.21.3"
+        )
+
+        for img in "${images[@]}"; do
+          # Kubernetes object names must be DNS-1123 compliant and ≤63 chars
+          pod_name=$(echo "$img" | tr '/:.' '-' | cut -c1-63)
+
+          echo "::group::Testing $img (pod: $pod_name)"
+          # Launch a one-shot pod that exits immediately if the image can start
+          kubectl run "$pod_name" \
+            --image="$img" \
+            --image-pull-policy=Never \
+            --restart=Never \
+            --command -- sh -c 'echo ok'
+
+          # Wait until the container reaches Completed or Error
+          kubectl wait --for=condition=Ready pod/"$pod_name" --timeout=60s || {
+            echo "❌ Image $img is not available inside the cluster."
+            kubectl describe pod "$pod_name" || true
+            exit 1
+          }
+
+          echo "✅ Image $img is present and starts successfully."
+          kubectl delete pod "$pod_name" --ignore-not-found
+          echo "::endgroup::"
         done
 
     # ───────────────────────────── tests ────────────────────────────────────────
@@ -124,4 +161,4 @@ jobs:
 
     - name: 🧹  Delete KinD cluster (always)
       if: always()
-      run: kind delete cluster --name local-cluster-test
+      run: kind delete cluster --name ${{ env.LOCAL_CLUSTER_NAME }}
