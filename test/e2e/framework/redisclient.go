@@ -277,15 +277,6 @@ func ChangeCluster(
 	return ready, trace, err
 }
 
-// -----------------------------------------------------------------------------
-// Internal helpers
-// -----------------------------------------------------------------------------
-
-const (
-	conditionTypeReady = "Ready"
-	redisPhaseReady    = "Ready"
-)
-
 // WaitForReadyWithTrace is just a convenience wrapper used by tests that need
 // the trace list.  If you only need the final object, call waitForReady
 // directly.

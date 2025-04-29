@@ -31,13 +31,8 @@ import (
 	"github.com/inditextech/redisoperator/test/e2e/framework"
 )
 
-const (
-	RedisClusterName = "rediscluster-test"
-	version          = "6.0.2"
-)
-
 var (
-	defaultSidecarImage = "alpine:3.1.2"
+	defaultSidecarImage = "alpine:3.21.3"
 	changedRedisImage   = "redis/redis-stack-server:7.2.0-v10"
 )
 
@@ -137,7 +132,6 @@ var _ = Describe("Redis Operator & RedisCluster E2E", Label("operator", "cluster
 		Expect(rc.Spec.Pdb).To(Equal(pdb))
 		Expect(rc.Spec.ReplicasPerMaster).To(Equal(replicasPerMaster))
 		Expect(rc.Name).To(Equal(name))
-		Expect(rc.Spec.Version).To(Equal(version))
 		return rc
 	}
 

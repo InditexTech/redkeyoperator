@@ -104,9 +104,9 @@ add_images_for_testing() {
   kind load docker-image redis/redis-stack-server:7.4.0-v3 --name "${cluster_name}"
   echo "Image loaded redis-stack-server image into Kind cluster."
 
-  docker pull alpine:3.1.2
-  echo "Image pulled alpine:3.1.2."
-  kind load docker-image alpine:3.1.2 --name "${cluster_name}"
+  docker pull alpine:3.21.3
+  echo "Image pulled alpine:3.21.3."
+  kind load docker-image alpine:3.21.3 --name "${cluster_name}"
   echo "Image loaded redis-stack-server image into Kind cluster."
 }
 
