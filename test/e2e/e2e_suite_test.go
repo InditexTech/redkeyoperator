@@ -74,8 +74,11 @@ var _ = BeforeSuite(func() {
 	}
 
 	cfg, err := testEnv.Start()
-	if !errors.IsAlreadyExists(err) {
-		Fail(fmt.Sprintf("failed to start test environment: %v", err))
+	if err != nil {
+		if !errors.IsAlreadyExists(err) {
+			Fail(fmt.Sprintf("failed to start test environment: %v", err))
+		}
+		GinkgoWriter.Printf("warning: CRD already existed, continuing: %v\n", err)
 	}
 	Expect(cfg).NotTo(BeNil())
 	Expect(err).NotTo(HaveOccurred())

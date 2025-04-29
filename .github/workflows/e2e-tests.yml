@@ -1,49 +1,125 @@
-# Runs E2E tests on a Kind cluster building and deploying on it.
-name: Run E2E tests
+name: E2E tests
 
 on:
+  # Run on every PR that touches anything except docs/*
   pull_request:
-    branches:
-      - 'main*'
-    paths-ignore: 
-      - 'docs/**'
+    branches: [main]
+    paths-ignore: ['docs/**']
+
+  # Keep the main branch green every night (02:00 UTC)
+  schedule:
+    - cron: '0 2 * * *'
+
+  # Manual trigger with an optional override for test parallelism
   workflow_dispatch:
     inputs:
       test_parallel_process:
-        description: 'Number of parallel processes for E2E tests'
-        required: false
+        description: Number of parallel processes for the E2E test suite
         default: '4'
-    
+        required: false
+
+# Cancel stale runs on the same head commit / PR
+concurrency:
+  group: e2e-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
 
 env:
-  KUBECONFIG: /tmp/kubeconfig.yaml
   OPERATOR_NAME: redis-operator
+  OPERATOR_VERSION: 0.1.0
+  KUBECONFIG: ${{ github.workspace }}/.kube/config
 
 jobs:
-  e2e-tests:
+  e2e:
     runs-on: ubuntu-22.04
+    timeout-minutes: 60
+
+    defaults:
+      run:
+        shell: bash -eu -o pipefail {0}   # strict mode for every Bash step
+
     steps:
-      - uses: actions/checkout@v4
+    # ───────────────────────────── git / go / caching ──────────────────────────
+    - name: 📥  Checkout code
+      uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
+    - name: 🏗️  Set up Go (module cache enabled)
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: go.mod
+        cache: true                 # built-in cache for $GOMODCACHE
 
-      - name: Setup kubectl
-        run: |
-          curl -sLO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" -o kubectl
-          chmod +x kubectl
-          sudo mv kubectl /usr/local/bin/kubectl
-      
-      - name: Setup e2e environment
-        run: chmod +x ${GITHUB_WORKSPACE}/test/cmd/create_local_cluster_testing.sh && ${GITHUB_WORKSPACE}/test/cmd/create_local_cluster_testing.sh ${{ env.OPERATOR_NAME }}
-      
-      - name: Install ginkgo
-        run: go install github.com/onsi/ginkgo/v2/ginkgo
+    # Cache Docker layers to avoid rebuilding unchanged layers on each run
+    - name: ♻️  Restore BuildKit layer cache
+      uses: actions/cache@v4
+      with:
+        path: /tmp/.buildx-cache
+        key: ${{ runner.os }}-buildx-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-buildx-
 
-      - name: Run tests for Kubernetes
-        run: |
-          make test-e2e-cov \
-            OPERATOR_IMAGE=${{ env.OPERATOR_NAME }}:0.1.0 \
-            TEST_PARALLEL_PROCESS=${{ inputs.test_parallel_process }} \
-            GOMAXPROCS=${{ inputs.test_parallel_process }} \
+    - name: 🐳  Prepare Buildx builder
+      uses: docker/setup-buildx-action@v3
+      with:
+        install: true
+        driver-opts: |
+          image=moby/buildkit:stable
+        # wire the cache directories
+        cache-from: type=local,src=/tmp/.buildx-cache
+        cache-to:   type=local,dest=/tmp/.buildx-cache,mode=max
+
+    # ───────────────────────────── kubernetes / kind ───────────────────────────
+    - name: 🔧  Install kubectl (CLI version aligned with cluster)
+      uses: azure/setup-kubectl@v3
+      with:
+        version: v1.30.0
+
+    - name: 🌱 Kubernetes KinD Cluster
+      id: kind
+      uses: helm/kind-action@v1
+      with:
+        cluster_name: local-cluster-test
+        registry: true
+        registry_name: local-registry-hosting
+        registry_port: 5001
+        registry_enable_delete: true
+
+    # ───────────────────────────── build & load images ─────────────────────────
+    - name: 🏗️  Build operator image and load into KinD
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        tags: ${{ env.OPERATOR_NAME }}:${{ env.OPERATOR_VERSION }}
+        load: true                 # makes the image directly visible to docker-d
+        push: false
+        cache-from: type=local,src=/tmp/.buildx-cache
+        cache-to:   type=local,dest=/tmp/.buildx-cache,mode=max
+
+    - name: 📦  Pull dependency images & load into KinD
+      run: |
+        for img in \
+          redis/redis-stack-server:7.2.0-v10 \
+          redis/redis-stack-server:7.4.0-v3 \
+          alpine:3.21.3
+        do
+          docker pull --quiet "$img"
+          kind load docker-image --name local-cluster-test "$img"
+        done
+
+    # ───────────────────────────── tests ────────────────────────────────────────
+    - name: 📚  Install Ginkgo CLI
+      run: go install github.com/onsi/ginkgo/v2/ginkgo@latest
+
+    - name: ✅  Run E2E test suite
+      env:
+        TEST_PARALLEL_PROCESSES: ${{ github.event.inputs.test_parallel_process || 4 }}
+      run: |
+        make test-e2e-cov \
+          OPERATOR_IMAGE=${{ env.OPERATOR_NAME }}:${{ env.OPERATOR_VERSION }} \
+          TEST_PARALLEL_PROCESS=${TEST_PARALLEL_PROCESSES} \
+          GOMAXPROCS=${TEST_PARALLEL_PROCESSES}
+
+    # ───────────────────────────── clean-up ────────────────────────
+
+    - name: 🧹  Delete KinD cluster (always)
+      if: always()
+      run: kind delete cluster --name local-cluster-test
