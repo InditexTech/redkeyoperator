@@ -24,6 +24,10 @@ COPY internal/ internal/
 # Build
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -o manager ./cmd/
 
+
+FROM redis/redis-stack-server:7.4.0-v3 AS redis-cli
+
+
 # Use Red Hat Universal Base Image 9 Minimal to package the manager binary.
 # Refer to https://www.redhat.com/en/blog/introducing-red-hat-universal-base-image for more details.
 FROM redhat/ubi9-minimal:9.1.0
@@ -34,5 +38,6 @@ RUN microdnf update -y && microdnf install procps -y
 
 WORKDIR /
 COPY --from=builder /workspace/manager .
+COPY --from=redis-cli /usr/bin/redis-cli /usr/bin/redis-cli
 USER 65532:65532
 ENTRYPOINT ["/manager"]

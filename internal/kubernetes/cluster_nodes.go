@@ -5,12 +5,14 @@
 package kubernetes
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"net"
+	"os/exec"
 	"sort"
 	"strconv"
 	"strings"
@@ -99,6 +101,10 @@ func (clusterNode *ClusterNode) String() string {
 		"role":    clusterNode.Role(),
 	})
 	return string(out)
+}
+
+func (clusterNode *ClusterNode) GetIp() string {
+	return clusterNode.Pod.Status.PodIP
 }
 
 func GetKubernetesClusterNodes(ctx context.Context, client ctrlClient.Client, redisCluster *redisv1.RedisCluster) (ClusterNodeList, error) {
@@ -468,10 +474,81 @@ func slotsInMigratingButNoNodeImporting(ctx context.Context, node *ClusterNode, 
 	return nil
 }
 
-// RebalanceCluster rebalances the cluster based on given weights and options.
-func (nodeList *ClusterNodeList) RebalanceCluster(ctx context.Context, weights map[string]int, options MoveSlotOption, log logr.Logger) error {
-	if nodeList == nil {
-		return fmt.Errorf("nodeList is nil")
+func (nodeList *ClusterNodeList) ReshardNode(ctx context.Context, source, target *ClusterNode, slots int, log logr.Logger) error {
+	if slots == 0 {
+		log.Info("No slots to reshard")
+		return nil
+	}
+
+	log.Info("Resharding node", "source", source.Name(), "target", target.Name(), "slots", slots)
+
+	var buf bytes.Buffer
+	_, err := fmt.Fprintf(&buf, "/usr/bin/redis-cli --cluster reshard %s:6379 --cluster-from %s --cluster-to %s --cluster-slots %v --cluster-yes", source.GetIp(), source.ClusterNode.Name(), target.ClusterNode.Name(), slots)
+	if err != nil {
+		return err
+	}
+
+	command := buf.String()
+
+	log.Info("Running command", "command", command)
+
+	var stdout, stderr bytes.Buffer
+	cmd := exec.Command("bash", "-c", command)
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		log.Error(err, "Error running command", "command", command, "stderr", stderr.String(), "stdout", stdout.String())
+
+		if strings.Contains(stderr.String(), "Please fix your cluster problems") {
+			log.Info("Cluster is down, trying to fix it")
+			err = nodeList.FixCluster(ctx, target, log)
+			if err != nil {
+				return err
+			}
+			log.Info("Cluster fixed, retrying reshard")
+			return nodeList.ReshardNode(ctx, source, target, slots, log)
+		}
+
+		return err
+	}
+
+	log.Info("Command executed successfully", "command", command, "output", stdout.String())
+
+	return nil
+}
+
+func (nodeList *ClusterNodeList) FixCluster(ctx context.Context, node *ClusterNode, log logr.Logger) error {
+	log.Info("Fixing cluster", "node", node.Name())
+
+	var buf bytes.Buffer
+	_, err := fmt.Fprintf(&buf, "/usr/bin/redis-cli --cluster fix %s:6379", node.GetIp())
+	if err != nil {
+		return err
+	}
+
+	command := buf.String()
+
+	log.Info("Running command", "command", command)
+
+	var stdout, stderr bytes.Buffer
+	cmd := exec.Command("bash", "-c", command)
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		log.Error(err, "Error running command", "command", command, "stderr", stderr.String(), "stdout", stdout.String())
+
+		return err
+	}
+
+	log.Info("Command executed successfully", "command", command, "output", stdout.String())
+
+	return nil
+}
+
+func (nodeList *ClusterNodeList) ClearNodes(ctx context.Context, nodes []*ClusterNode, log logr.Logger, forgetNodes bool) error {
+	weights := map[string]int{}
+	for _, deletable := range nodes {
+		weights[deletable.ClusterNode.Name()] = 0
 	}
 
 	slotMap, err := nodeList.buildSlotMap()
@@ -492,38 +569,116 @@ func (nodeList *ClusterNodeList) RebalanceCluster(ctx context.Context, weights m
 
 	slotMoveSequence := CalculateMoveSequence(slotMap, slotMoveMap, moveMapOptions)
 
-	executeMoveSequence := func(waitGroup *sync.WaitGroup, moveSequence MoveSequence) error {
-		defer waitGroup.Done()
-		for _, slot := range moveSequence.Slots {
-			err := nodeList.MoveSlot(ctx, moveSequence.FromNode, moveSequence.ToNode, slot, options)
+	for _, moveSequence := range slotMoveSequence {
+		err := nodeList.ReshardNode(ctx, moveSequence.FromNode, moveSequence.ToNode, len(moveSequence.Slots), log)
+		if err != nil {
+			return err
+		}
+		if forgetNodes {
+			err = nodeList.ForgetNode(moveSequence.FromNode.Name())
 			if err != nil {
-				log.Error(err, "Cannot move slot", "slot", slot, "source", moveSequence.FromNode.Name(), "target", moveSequence.ToNode.Name())
 				return err
 			}
 		}
-		return nil
 	}
 
-	var waitGroup sync.WaitGroup
-	errChan := make(chan error, len(slotMoveSequence))
+	return nil
+}
 
-	for _, moveSequence := range slotMoveSequence {
-		waitGroup.Add(1)
-		go func(moveSequence MoveSequence) {
-			// errChan
-			errChan <- executeMoveSequence(&waitGroup, moveSequence)
-		}(moveSequence) // Doing more than one node's slot moves at the same time causes a panic in Redis Client.
+// RebalanceCluster rebalances the cluster based on given weights and options.
+func (nodeList *ClusterNodeList) RebalanceCluster(ctx context.Context, weights map[string]int, options MoveSlotOption, log logr.Logger) error {
+	if nodeList == nil {
+		return fmt.Errorf("nodeList is nil")
 	}
 
-	waitGroup.Wait()
-	close(errChan)
-	var errors []error
+	masters, err := nodeList.GetMasters()
+	if err != nil {
+		return err
+	}
 
-	for err := range errChan {
-		if err != nil {
-			errors = append(errors, err)
+	if len(masters) < 1 {
+		return fmt.Errorf("no masters in node list")
+	}
+
+	node := masters[0]
+	log.Info("Rebalancing cluster", "node", node.Name())
+
+	var buf bytes.Buffer
+	_, err = fmt.Fprintf(&buf, "/usr/bin/redis-cli --cluster rebalance %s:6379 --cluster-use-empty-masters", node.GetIp())
+
+	if len(weights) > 0 {
+		fmt.Fprintf(&buf, " --cluster-weight")
+
+		for nodeId, weight := range weights {
+			fmt.Fprintf(&buf, " %s=%v", nodeId, weight)
 		}
 	}
+
+	command := buf.String()
+
+	log.Info("Running command", "command", command)
+
+	var stdout, stderr bytes.Buffer
+	cmd := exec.Command("bash", "-c", command)
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		log.Error(err, "Error running command", "command", command, "stderr", stderr.String(), "stdout", stdout.String())
+		return err
+	}
+
+	log.Info("Command executed successfully", "command", command, "output", stdout.String())
+
+	// slotMap, err := nodeList.buildSlotMap()
+	// if err != nil {
+	// 	return err
+	// }
+
+	// moveMapOptions := NewMoveMapOptions()
+	// moveMapOptions.weights = weights
+	// slotMoveMap, err := CalculateSlotMoveMap(slotMap, moveMapOptions)
+	// if err != nil {
+	// 	log.Error(err, "Error calculating SlotMoveMap")
+	// 	if errors.Is(err, ErrAllWeightsZero) {
+	// 		return nil
+	// 	}
+	// 	return err
+	// }
+
+	// slotMoveSequence := CalculateMoveSequence(slotMap, slotMoveMap, moveMapOptions)
+
+	// executeMoveSequence := func(waitGroup *sync.WaitGroup, moveSequence MoveSequence) error {
+	// 	defer waitGroup.Done()
+	// 	for _, slot := range moveSequence.Slots {
+	// 		err := nodeList.MoveSlot(ctx, moveSequence.FromNode, moveSequence.ToNode, slot, options)
+	// 		if err != nil {
+	// 			log.Error(err, "Cannot move slot", "slot", slot, "source", moveSequence.FromNode.Name(), "target", moveSequence.ToNode.Name())
+	// 			return err
+	// 		}
+	// 	}
+	// 	return nil
+	// }
+
+	// var waitGroup sync.WaitGroup
+	// errChan := make(chan error, len(slotMoveSequence))
+
+	// for _, moveSequence := range slotMoveSequence {
+	// 	waitGroup.Add(1)
+	// 	go func(moveSequence MoveSequence) {
+	// 		// errChan
+	// 		errChan <- executeMoveSequence(&waitGroup, moveSequence)
+	// 	}(moveSequence) // Doing more than one node's slot moves at the same time causes a panic in Redis Client.
+	// }
+
+	// waitGroup.Wait()
+	// close(errChan)
+	// var errors []error
+
+	// for err := range errChan {
+	// 	if err != nil {
+	// 		errors = append(errors, err)
+	// 	}
+	// }
 
 	// Firstly, fix the slots broken while migratin
 	err = nodeList.EnsureClusterSlotsStable(ctx, log)
@@ -531,9 +686,9 @@ func (nodeList *ClusterNodeList) RebalanceCluster(ctx context.Context, weights m
 		return err
 	}
 	// Secondly, if there are errors when moving slots the cluster is not well Rebalanced, then, return error
-	if len(errors) > 0 {
-		return fmt.Errorf("moving slots errors: %v", errors)
-	}
+	// if len(errors) > 0 {
+	// 	return fmt.Errorf("moving slots errors: %v", errors)
+	// }
 
 	return nil
 }

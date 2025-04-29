@@ -689,26 +689,33 @@ func (r *RedisClusterReconciler) UpgradePartition(ctx context.Context, redisClus
 		return err
 	}
 
-	// Empty the node by moving its slots to another node.
-	// If any slot cannot be moved, it will be retried.
-	for retry := 3; retry >= 0; retry-- {
-		r.LogInfo(redisCluster.NamespacedName(), "Moving slots away from partition", "partition", partition, "node", node.ClusterNode.Name())
-		err = clusterNodes.RebalanceCluster(ctx, map[string]int{
-			node.ClusterNode.Name(): 0,
-		}, kubernetes.MoveSlotOption{
-			PurgeKeys: redisCluster.Spec.PurgeKeysOnRebalance,
-		}, logger)
-		if err != nil {
-			if retry >= 0 {
-				r.LogInfo(redisCluster.NamespacedName(), "Retrying moving remaining slots...")
+	target, err := clusterNodes.GetNodeByPodName(fmt.Sprintf("%s-%d", existingStateFulSet.Name, partition+1))
+	if err == nil {
+		// Empty the node by moving its slots to another node.
+		// If any slot cannot be moved, it will be retried.
+		for retry := 3; retry >= 0; retry-- {
+			r.LogInfo(redisCluster.NamespacedName(), "Moving slots away from partition", "partition", partition, "node", node.ClusterNode.Name())
+			err = clusterNodes.ReshardNode(ctx, node, target, len(node.ClusterNode.Slots()), logger)
+
+			// err = clusterNodes.RebalanceCluster(ctx, map[string]int{
+			// 	node.ClusterNode.Name(): 0,
+			// }, kubernetes.MoveSlotOption{
+			// 	PurgeKeys: redisCluster.Spec.PurgeKeysOnRebalance,
+			// }, logger)
+			if err != nil {
+				if retry >= 0 {
+					r.LogInfo(redisCluster.NamespacedName(), "Retrying moving remaining slots...")
+				}
+			} else {
+				break
 			}
-		} else {
-			break
 		}
-	}
-	if err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Could not move slots away from node")
-		return err
+		if err != nil {
+			r.LogError(redisCluster.NamespacedName(), err, "Could not move slots away from node")
+			return err
+		}
+	} else {
+		r.LogInfo(redisCluster.NamespacedName(), "Target node not found, skipping node", "node", node.GetName(), "target", fmt.Sprintf("%s-%d", existingStateFulSet.Name, partition+1))
 	}
 
 	// We need to give the cluster a chance to reach quorum, after all the slots have been moved.
@@ -1141,14 +1148,15 @@ func (r *RedisClusterReconciler) ReOrientClusterForScaleDown(ctx context.Context
 		}
 
 		// Now rebalance to the masters which will remain after we remove some pods.
-		weights := map[string]int{}
+		// weights := map[string]int{}
 		deleteMasters := activeMasters[int(redisCluster.Spec.Replicas):]
-		for _, deletable := range deleteMasters {
-			weights[deletable.ClusterNode.Name()] = 0
-		}
-		err = clusterNodes.RebalanceCluster(ctx, weights, kubernetes.MoveSlotOption{
-			PurgeKeys: redisCluster.Spec.PurgeKeysOnRebalance,
-		}, logger)
+		// for _, deletable := range deleteMasters {
+		// 	weights[deletable.ClusterNode.Name()] = 0
+		// }
+		err = clusterNodes.ClearNodes(ctx, deleteMasters, logger, true)
+		// err = clusterNodes.RebalanceCluster(ctx, weights, kubernetes.MoveSlotOption{
+		// 	PurgeKeys: redisCluster.Spec.PurgeKeysOnRebalance,
+		// }, logger)
 		if err != nil {
 			return err
 		}
@@ -1429,6 +1437,8 @@ func (r *RedisClusterReconciler) ScaleCluster(ctx context.Context, redisCluster 
 				return err
 			}
 		}
+
+		return nil
 	}
 
 	// Scaling up and all pods became ready
