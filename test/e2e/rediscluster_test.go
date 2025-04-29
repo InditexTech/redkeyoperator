@@ -34,6 +34,7 @@ import (
 var (
 	defaultSidecarImage = "alpine:3.21.3"
 	changedRedisImage   = "redis/redis-stack-server:7.2.0-v10"
+	defaultRedisImage   = "redis/redis-stack-server:7.4.0-v3"
 )
 
 func getSidecarImage() string {
@@ -48,6 +49,14 @@ func getChangedRedisImage() string {
 		return img
 	}
 	return changedRedisImage
+}
+
+// getOperatorImage reads OPERATOR_IMAGE or falls back
+func getRedisImage() string {
+	if img := os.Getenv("REDIS_IMAGE"); img != "" {
+		return img
+	}
+	return defaultRedisImage
 }
 
 // helper: creates a namespace with a GenerateName prefix and waits for it to be ready
@@ -109,12 +118,12 @@ var _ = Describe("Redis Operator & RedisCluster E2E", Label("operator", "cluster
 	)
 
 	// mustCreateAndReady creates a cluster and blocks until it's Ready
-	mustCreateAndReady := func(name string, replicas, replicasPerMaster int32, storage string, purgeKeys, ephemeral bool, pdb redisv1.Pdb, userOverride redisv1.RedisClusterOverrideSpec) *redisv1.RedisCluster {
+	mustCreateAndReady := func(name string, replicas, replicasPerMaster int32, storage, image string, purgeKeys, ephemeral bool, pdb redisv1.Pdb, userOverride redisv1.RedisClusterOverrideSpec) *redisv1.RedisCluster {
 		key := types.NamespacedName{Namespace: namespace.Name, Name: name}
 		Expect(framework.EnsureClusterExistsOrCreate(
 			ctx, k8sClient, key,
 			replicas, replicasPerMaster,
-			storage, purgeKeys, ephemeral,
+			storage, image, purgeKeys, ephemeral,
 			pdb, userOverride,
 		)).To(Succeed())
 
@@ -128,7 +137,7 @@ var _ = Describe("Redis Operator & RedisCluster E2E", Label("operator", "cluster
 		Expect(rc.Kind).To(Equal("RedisCluster"))
 		Expect(rc.APIVersion).To(Equal("redis.inditex.com/v1"))
 		Expect(rc.Spec.Auth).To(Equal(redisv1.RedisAuth{}))
-		Expect(rc.Spec.Image).To(Equal(os.Getenv("REDIS_IMAGE")))
+		Expect(rc.Spec.Image).To(Equal(getRedisImage()))
 		Expect(rc.Spec.Pdb).To(Equal(pdb))
 		Expect(rc.Spec.ReplicasPerMaster).To(Equal(replicasPerMaster))
 		Expect(rc.Name).To(Equal(name))
@@ -170,7 +179,7 @@ var _ = Describe("Redis Operator & RedisCluster E2E", Label("operator", "cluster
 				name := fmt.Sprintf("%s-%d-%d", base, initial, target)
 				key := types.NamespacedName{Namespace: namespace.Name, Name: name}
 
-				mustCreateAndReady(name, initial, 0, "", true, true, redisv1.Pdb{}, redisv1.RedisClusterOverrideSpec{})
+				mustCreateAndReady(name, initial, 0, "", getRedisImage(), true, true, redisv1.Pdb{}, redisv1.RedisClusterOverrideSpec{})
 
 				// change replicas → wait Ready again
 				rc, trace, err := framework.ChangeCluster(ctx, k8sClient, key,
@@ -285,7 +294,7 @@ var _ = Describe("Redis Operator & RedisCluster E2E", Label("operator", "cluster
 				// Create the cluster in one shot with initial override
 				mustCreateAndReady(
 					key.Name,
-					1, 0, "", true, true,
+					1, 0, "", getRedisImage(), true, true,
 					redisv1.Pdb{},
 					*e.initial,
 				)
@@ -319,7 +328,7 @@ var _ = Describe("Redis Operator & RedisCluster E2E", Label("operator", "cluster
 			key = types.NamespacedName{Namespace: namespace.Name, Name: baseName}
 
 			// create cluster (3 replicas are enough)
-			mustCreateAndReady(baseName, 3, 0, "", true, true,
+			mustCreateAndReady(baseName, 3, 0, "", getRedisImage(), true, true,
 				redisv1.Pdb{}, redisv1.RedisClusterOverrideSpec{})
 
 			// helper to read *sorted* ports from the cluster-IP Service
@@ -363,7 +372,7 @@ var _ = Describe("Redis Operator & RedisCluster E2E", Label("operator", "cluster
 			mustCreateAndReady(
 				clusterName,
 				3, 0, // replicas / per-master
-				"", true, true, // storage / purgeKeys / ephemeral
+				"", getRedisImage(), true, true, // storage / image / purgeKeys / ephemeral
 				redisv1.Pdb{},                      // no-PDB
 				redisv1.RedisClusterOverrideSpec{}, // no override
 			)
@@ -454,8 +463,9 @@ var _ = Describe("Redis Operator & RedisCluster E2E", Label("operator", "cluster
 				name,
 				initialRep, 0,
 				initialPVC, // with PVC
-				true,       /* purgeKeys */
-				false,      /* NOT ephemeral */
+				getRedisImage(),
+				true,  /* purgeKeys */
+				false, /* NOT ephemeral */
 				redisv1.Pdb{},
 				redisv1.RedisClusterOverrideSpec{},
 			)
@@ -549,7 +559,8 @@ var _ = Describe("Redis Operator & RedisCluster E2E", Label("operator", "cluster
 			mustCreateAndReady(
 				clusterName,
 				initReplicas, initPerMaster,
-				"",   // no PVC
+				"", // no PVC
+				getRedisImage(),
 				true, // purgeKeys
 				true, // ephemeral
 				redisv1.Pdb{},
@@ -641,7 +652,7 @@ var _ = Describe("Redis Operator & RedisCluster E2E", Label("operator", "cluster
 
 		BeforeEach(func() {
 			key = types.NamespacedName{Namespace: namespace.Name, Name: base}
-			rc = mustCreateAndReady(base, 5, 0, "",
+			rc = mustCreateAndReady(base, 5, 0, "", getRedisImage(),
 				/*purge*/ false /*ephemeral*/, true,
 				redisv1.Pdb{}, redisv1.RedisClusterOverrideSpec{})
 		})
@@ -720,7 +731,7 @@ var _ = Describe("Redis Operator & RedisCluster E2E", Label("operator", "cluster
 
 		BeforeEach(func() {
 			key = types.NamespacedName{Namespace: namespace.Name, Name: name}
-			mustCreateAndReady(name, 1, 0, "",
+			mustCreateAndReady(name, 1, 0, "", getRedisImage(),
 				true, true, redisv1.Pdb{}, redisv1.RedisClusterOverrideSpec{})
 		})
 
@@ -793,7 +804,7 @@ var _ = Describe("Redis Operator & RedisCluster E2E", Label("operator", "cluster
 					base, strings.ReplaceAll(strings.ToLower(t.desc), " ", "-"))
 				key := types.NamespacedName{Namespace: namespace.Name, Name: name}
 
-				mustCreateAndReady(name, 1, 0, "",
+				mustCreateAndReady(name, 1, 0, "", getRedisImage(),
 					/*purge=*/ true /*ephemeral=*/, true,
 					redisv1.Pdb{}, redisv1.RedisClusterOverrideSpec{})
 
@@ -871,7 +882,7 @@ var _ = Describe("Redis Operator & RedisCluster E2E", Label("operator", "cluster
 				key := types.NamespacedName{Namespace: namespace.Name, Name: name}
 				pdbKey := types.NamespacedName{Namespace: namespace.Name, Name: name + "-pdb"}
 
-				mustCreateAndReady(name, 3, 0, "", true, true,
+				mustCreateAndReady(name, 3, 0, "", getRedisImage(), true, true,
 					redisv1.Pdb{}, redisv1.RedisClusterOverrideSpec{})
 
 				for i, s := range t.steps {
@@ -1028,7 +1039,7 @@ var _ = Describe("Redis Operator & RedisCluster E2E", Label("operator", "cluster
 				// create a 3-master cluster
 				rc := mustCreateAndReady(name,
 					3 /*masters*/, 0, /*replicasPerMaster*/
-					"" /*storage*/, true /*purgeKeys*/, true, /*ephemeral*/
+					"" /*storage*/, getRedisImage(), true /*purgeKeys*/, true, /*ephemeral*/
 					redisv1.Pdb{}, redisv1.RedisClusterOverrideSpec{})
 
 				// optional scale operator

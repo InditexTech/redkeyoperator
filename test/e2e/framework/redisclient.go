@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"os"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -42,7 +41,6 @@ const (
 	CLUSTERNODESCMD        string = "redis-cli cluster nodes"
 	EXPECTEDKEYS           int    = 30
 	WAIT_FOR_RDCL_DELETION int    = 180
-	defaultRedisImage             = "redis/redis-stack-server:7.4.0-v3"
 	defaultConfig                 = `save ""
 appendonly no
 maxmemory 70mb`
@@ -63,14 +61,6 @@ type ClusterStatus struct {
 
 var version = "6.0.2"
 
-// getOperatorImage reads OPERATOR_IMAGE or falls back
-func getRedisImage() string {
-	if img := os.Getenv("REDIS_IMAGE"); img != "" {
-		return img
-	}
-	return defaultRedisImage
-}
-
 // EnsureClusterExistsOrCreate will create or update (upsert) a RedisCluster CR.
 // It applies storage, replica count, PDB and optional overrides, then waits for reconciliation.
 func EnsureClusterExistsOrCreate(
@@ -78,7 +68,7 @@ func EnsureClusterExistsOrCreate(
 	c client.Client,
 	key types.NamespacedName,
 	replicas, replicasPerMaster int32,
-	storage string,
+	storage, image string,
 	purgeKeys, ephemeral bool,
 	pdb redisv1.Pdb,
 	userOverride redisv1.RedisClusterOverrideSpec,
@@ -98,7 +88,7 @@ func EnsureClusterExistsOrCreate(
 			Version:              version,
 			Replicas:             replicas,
 			Ephemeral:            ephemeral,
-			Image:                getRedisImage(),
+			Image:                image,
 			Config:               defaultConfig,
 			Resources:            buildResources(),
 			PurgeKeysOnRebalance: purgeKeys,
