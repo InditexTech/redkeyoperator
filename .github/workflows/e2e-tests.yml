@@ -45,5 +45,5 @@ jobs:
         run: |
           make test-e2e-cov \
             OPERATOR_IMAGE=${{ env.OPERATOR_NAME }}:0.1.0 \
-            TEST_PARALLEL_PROCESS=${{ env.TEST_PARALLEL_PROCESS }} \
-            GOMAXPROCS=${{ env.TEST_PARALLEL_PROCESS }} \
+            TEST_PARALLEL_PROCESS=${{ inputs.test_parallel_process }} \
+            GOMAXPROCS=${{ inputs.test_parallel_process }} \
