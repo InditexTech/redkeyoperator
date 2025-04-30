@@ -4,10 +4,11 @@ on:
   pull_request:
     branches: [main]
     paths-ignore: ['docs/**']
+
   workflow_dispatch:
     inputs:
       test_parallel_process:
-        description: 'Ginkgo parallel processes'
+        description: Number of parallel processes for the E2E test suite
         default: '2'
         required: false
 
@@ -16,23 +17,21 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  OPERATOR_NAME:          redis-operator
-  OPERATOR_VERSION:       0.1.0
-  NODE_IMAGE:             kindest/node:v1.30.0
-  KUBECONFIG:             ${{ github.workspace }}/.kube/config
-  LOCAL_CLUSTER_NAME:     local-cluster-test
-  LOCAL_REGISTRY:         local-registry-hosting
-  LOCAL_REGISTRY_PORT:    5001
-  DEP_IMAGES: |
-    redis/redis-stack-server:7.2.0-v10
-    redis/redis-stack-server:7.4.0-v3
-    alpine:3.21.3
+  OPERATOR_NAME: redis-operator
+  OPERATOR_VERSION: 0.1.0
+  KUBECONFIG: ${{ github.workspace }}/.kube/config
+  LOCAL_CLUSTER_NAME: local-cluster-test
+  LOCAL_REGISTRY: local-registry-hosting
+  LOCAL_REGISTRY_PORT: 5001
+  REDIS_STACK_SERVER: redis/redis-stack-server
+  REDIS_STACK_SERVER_VERSION: 7.4.0-v3
+
+  
 
 jobs:
   e2e:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
-
     defaults:
       run:
         shell: bash -eu -o pipefail {0}
@@ -47,14 +46,6 @@ jobs:
         go-version-file: go.mod
         cache: true
 
-    - name: ♻️  Restore BuildKit layer cache
-      uses: actions/cache@v4
-      with:
-        path: /tmp/.buildx-cache
-        key: buildx-${{ runner.os }}-${{ github.sha }}
-        restore-keys: |
-          buildx-${{ runner.os }}-
-
     - name: 🐳  Prepare Buildx builder
       uses: docker/setup-buildx-action@v3
       with:
@@ -63,50 +54,19 @@ jobs:
         cache-from: type=local,src=/tmp/.buildx-cache
         cache-to:   type=local,dest=/tmp/.buildx-cache,mode=max
 
-    - name: ♻️  Restore KinD node image
-      id: node-cache
-      uses: actions/cache@v4
-      with:
-        path: /tmp/kind-node.tar.gz
-        key: kind-node-${{ env.NODE_IMAGE }}
-
-    - name: 🔄 Load node image (cache-hit)
-      if: steps.node-cache.outputs.cache-hit == 'true'
-      run: gunzip -c /tmp/kind-node.tar.gz | docker load --quiet
-
-    - name: 🐳 Pull node image (cache miss)
-      if: steps.node-cache.outputs.cache-hit != 'true'
-      run: docker pull ${{ env.NODE_IMAGE }}
-
-    - name: ♻️  Restore dependency image cache
-      id: deps-cache
-      uses: actions/cache@v4
-      with:
-        path: /tmp/kind-deps.tar.gz
-        key: kind-deps-${{ runner.os }}-v1
-
-    - name: 🔄  Load dependency images from cache
-      if: steps.deps-cache.outputs.cache-hit == 'true'
-      run: gunzip -c /tmp/kind-deps.tar.gz | docker load --quiet
-
     - name: 🔧  Install kubectl
       uses: azure/setup-kubectl@v3
       with:
         version: v1.30.0
 
-    - name: 🌱  Create KinD cluster
+    - name: 🌱 Kubernetes KinD Cluster
+      id: kind
       uses: helm/kind-action@v1
       with:
         cluster_name: ${{ env.LOCAL_CLUSTER_NAME }}
-        image: ${{ env.NODE_IMAGE }}
         registry: true
         registry_name: ${{ env.LOCAL_REGISTRY }}
         registry_port: ${{ env.LOCAL_REGISTRY_PORT }}
-
-    # If node image wasn’t cached previously, export & save it now (one-time)
-    - name: 💾  Save node image to cache
-      if: steps.node-cache.outputs.cache-hit != 'true'
-      run: docker save ${{ env.NODE_IMAGE }} | gzip -1 > /tmp/kind-node.tar.gz
 
     - name: 🏗️  Build operator image and load into KinD
       uses: docker/build-push-action@v5
@@ -122,17 +82,15 @@ jobs:
       run: kind load docker-image --name ${{ env.LOCAL_CLUSTER_NAME }} ${{ env.OPERATOR_NAME }}:${{ env.OPERATOR_VERSION }}
 
     - name: 📦  Pull dependency images & load into KinD
-      if: steps.deps-cache.outputs.cache-hit != 'true'
       run: |
-        for img in ${{ env.DEP_IMAGES }}; do docker pull "$img"; done
-
-    - name: 📥  Load dependency images into KinD
-      run: |
-        for img in ${{ env.DEP_IMAGES }}; do kind load docker-image --name ${{ env.LOCAL_CLUSTER_NAME }} "$img"; done
-
-    - name: 💾  Save dependency images to cache
-      if: steps.deps-cache.outputs.cache-hit != 'true'
-      run: docker save ${{ env.DEP_IMAGES }} | gzip -1 > /tmp/kind-deps.tar.gz
+        for img in \
+          ${{ env.REDIS_STACK_SERVER }}:7.2.0-v10 \
+          ${{ env.REDIS_STACK_SERVER }}:${{ env.REDIS_STACK_SERVER_VERSION }} \
+          alpine:3.21.3
+        do
+          docker pull "$img"
+          kind load docker-image --name ${{ env.LOCAL_CLUSTER_NAME }} "$img"
+        done
 
     - name: 📚  Install Ginkgo CLI
       run: go install github.com/onsi/ginkgo/v2/ginkgo@latest
@@ -145,8 +103,6 @@ jobs:
           OPERATOR_IMAGE=${{ env.OPERATOR_NAME }}:${{ env.OPERATOR_VERSION }} \
           TEST_PARALLEL_PROCESS=${TEST_PARALLEL_PROCESSES} \
           GOMAXPROCS=${TEST_PARALLEL_PROCESSES}
-
-    # ───────────────────────────── clean-up ────────────────────────
 
     - name: 🧹  Delete KinD cluster (always)
       if: always()
