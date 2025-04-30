@@ -42,3 +42,17 @@ func ParseFloat(value string) float64 {
 	}
 	return num
 }
+
+// MapToString converts a map[string]string to a string.
+func MapToString(m map[string]string) string {
+	var b strings.Builder
+	b.WriteString("{")
+	for k, v := range m {
+		b.WriteString(k)
+		b.WriteString(": ")
+		b.WriteString(v)
+		b.WriteString(", ")
+	}
+	b.WriteString("}")
+	return b.String()
+}

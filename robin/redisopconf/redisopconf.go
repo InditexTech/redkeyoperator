@@ -11,20 +11,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/inditextech/redisoperator/robin/util"
 	"gopkg.in/yaml.v3"
 )
-
-// MetadataConfig holds metadata configuration.
-type MetadataConfig struct {
-	Tenant      string `yaml:"tenant"`
-	Domain      string `yaml:"domain"`
-	Environment string `yaml:"environment"`
-	Namespace   string `yaml:"openshiftproject"`
-	Slot        string `yaml:"slot"`
-	Platformid  string `yaml:"platformid"`
-	Service     string `yaml:"service"`
-	JiraKey     string `yaml:"jirakey"`
-}
 
 // RedisOperatorConfig holds operator-level Redis configuration.
 type RedisOperatorConfig struct {
@@ -33,6 +22,7 @@ type RedisOperatorConfig struct {
 
 // RedisClusterConfig holds cluster-level Redis configuration.
 type RedisClusterConfig struct {
+	Namespace                string        `yaml:"namespace"`
 	ServiceName              string        `yaml:"service_name"`
 	Replicas                 int           `yaml:"replicas"`
 	HealthProbePeriodSeconds int           `yaml:"health_probe_interval_seconds"`
@@ -56,36 +46,22 @@ type RedisConfig struct {
 
 // Configuration is the top-level configuration struct.
 type Configuration struct {
-	Metadata MetadataConfig `yaml:"metadata"`
-	Redis    RedisConfig    `yaml:"redis"`
+	Metadata map[string]string `yaml:"metadata"`
+	Redis    RedisConfig       `yaml:"redis"`
 }
 
 // String returns a formatted string of the configuration.
 func (c *Configuration) String() string {
 	return fmt.Sprintf(`Configuration properties:
-Tenant: %s
-Domain: %s
-Environment: %s
-Namespace: %s
-Slot: %s
+Metadata: %s
 CollectionPeriodSeconds: %d
 ClusterHealthProbePeriodSeconds: %d
 ClusterHealingTimeSeconds: %d
-Platformid: %s
-Service: %s
-JiraKey: %s
 RedisInfoKeys: %v`,
-		c.Metadata.Tenant,
-		c.Metadata.Domain,
-		c.Metadata.Environment,
-		c.Metadata.Namespace,
-		c.Metadata.Slot,
+		util.MapToString(c.Metadata),
 		c.Redis.Operator.CollectionPeriodSeconds,
 		c.Redis.Cluster.HealthProbePeriodSeconds,
 		c.Redis.Cluster.HealingTimeSeconds,
-		c.Metadata.Platformid,
-		c.Metadata.Service,
-		c.Metadata.JiraKey,
 		c.Redis.Metrics.RedisInfoKeys)
 }
 
@@ -117,32 +93,14 @@ func (y *YAMLConfigLoader) LoadConfig(path string) (*Configuration, error) {
 func validateConfiguration(cfg *Configuration) []string {
 	var missing []string
 
-	if cfg.Metadata.Tenant == "" {
-		missing = append(missing, "metadata.tenant")
-	}
-	if cfg.Metadata.Domain == "" {
-		missing = append(missing, "metadata.domain")
-	}
-	if cfg.Metadata.Environment == "" {
-		missing = append(missing, "metadata.environment")
-	}
-	if cfg.Metadata.Namespace == "" {
-		missing = append(missing, "metadata.openshiftproject")
-	}
-	if cfg.Metadata.Slot == "" {
-		missing = append(missing, "metadata.slot")
-	}
-	if cfg.Metadata.Platformid == "" {
-		missing = append(missing, "metadata.platformid")
-	}
-	if cfg.Metadata.Service == "" {
-		missing = append(missing, "metadata.service")
-	}
-	if cfg.Metadata.JiraKey == "" {
-		missing = append(missing, "metadata.jirakey")
+	if len(cfg.Metadata) == 0 {
+		missing = append(missing, "metadata")
 	}
 	if cfg.Redis.Operator.CollectionPeriodSeconds == 0 {
 		missing = append(missing, "redis.operator.collection_interval_seconds")
+	}
+	if cfg.Redis.Cluster.Namespace == "" {
+		missing = append(missing, "redis.cluster.namespace")
 	}
 	if cfg.Redis.Cluster.ServiceName == "" {
 		missing = append(missing, "redis.cluster.service_name")

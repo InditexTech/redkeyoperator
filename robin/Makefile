@@ -10,6 +10,7 @@ ifeq ($(NAMESPACE), )
 endif
 
 REDIS_MONITORING=$(shell kubectl -n ${NAMESPACE} get po -l='redis.rediscluster.operator/component=monitoring' -o=jsonpath='{.items[0].metadata.name}')
+IMG_DEV ?= redis-robin:0.0.1
 
 debug:
 	# Build the binary with debugging flags
@@ -39,3 +40,9 @@ port-forward-metrics: ##		Port forwarding of port 8080 for debugging the manager
 
 delete: ##		Delete the operator pod (redis-operator) in order to have a new clean pod created.
 	kubectl delete pod $(REDIS_MONITORING) -n ${NAMESPACE}
+
+dev-docker-build:  ##	Build docker image with the monitoring for development (uses `${IMG_DEV}` image name).
+	docker build -t ${IMG_DEV} .
+
+dev-docker-push: ##	Push docker image with the monitoring for development (uses `${IMG_DEV}` image name).
+	docker push ${IMG_DEV}

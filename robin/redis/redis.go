@@ -20,8 +20,6 @@ import (
 	"github.com/inditextech/redisoperator/robin/k8s"
 	"github.com/inditextech/redisoperator/robin/metrics"
 	"github.com/inditextech/redisoperator/robin/redisopconf"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -71,8 +69,8 @@ func (p *RedisPollMetrics) Start(ctx context.Context) {
 	}
 }
 
-// pollRedisMetrics retrieves all Pods in the configured namespace and labelSelector, then
-// polls both cluster-level metrics and Redis INFO per Pod.
+// pollRedisMetrics retrieves all nodes in the configured namespace and labelSelector, then
+// polls both cluster-level metrics and Redis INFO per node.
 func (p *RedisPollMetrics) pollRedisMetrics(ctx context.Context) error {
 	// cluster-level info (GetNodesInfo, GetClusterInfo)
 	if err := p.pollRedisClusterMetrics(ctx); err != nil {
@@ -84,8 +82,8 @@ func (p *RedisPollMetrics) pollRedisMetrics(ctx context.Context) error {
 		return err
 	}
 
-	// pod-level info (GetInfo)
-	if err := p.pollRedisPodLevelMetrics(ctx); err != nil {
+	// node-level info (GetInfo)
+	if err := p.pollRedisNodeLevelMetrics(ctx); err != nil {
 		return err
 	}
 
@@ -191,30 +189,25 @@ func (p *RedisPollMetrics) pollClusterInfo(redisClient *api.RedisClient) error {
 	return nil
 }
 
-// pollRedisPodLevelMetrics orchestrates Pod-level metric polling by fetching "info all"
-// from each Pod in the configured Redis Cluster.
-func (p *RedisPollMetrics) pollRedisPodLevelMetrics(ctx context.Context) error {
-	pods, err := p.clientSet.CoreV1().Pods(p.conf.Metadata.Namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: p.conf.Redis.Cluster.LabelSelector,
-	})
-	if err != nil {
-		return fmt.Errorf("error listing Pods: %w", err)
-	}
+// pollRedisNodeLevelMetrics orchestrates node-level metric polling by fetching "info all"
+// from each node in the configured Redis Cluster.
+func (p *RedisPollMetrics) pollRedisNodeLevelMetrics(ctx context.Context) error {
+	for i := range p.conf.Redis.Cluster.Replicas {
+		nodeName := fmt.Sprintf("%s-%d", p.conf.Redis.Cluster.ServiceName, i)
+		nodeAddr := fmt.Sprintf("%s.%s", nodeName, p.conf.Redis.Cluster.ServiceName)
 
-	for _, pod := range pods.Items {
-		if err := p.pollRedisInfoAllMetrics(ctx, pod); err != nil {
-			log.Printf("Error polling Redis metrics for Pod %s: %v", pod.Name, err)
+		if err := p.pollRedisInfoAllMetrics(ctx, nodeAddr, nodeName); err != nil {
+			log.Printf("Error polling Redis metrics for node %s: %v", nodeName, err)
 		}
 	}
-
 	return nil
 }
 
-// pollRedisInfoAllMetrics fetches the Redis "info all" from an individual Pod.
-func (p *RedisPollMetrics) pollRedisInfoAllMetrics(ctx context.Context, pod v1.Pod) error {
-	redisClient := p.createRedisClient(ctx, pod.Status.PodIP)
+// pollRedisInfoAllMetrics fetches the Redis "info all" from an individual node.
+func (p *RedisPollMetrics) pollRedisInfoAllMetrics(ctx context.Context, nodeAddr, nodeName string) error {
+	redisClient := p.createRedisClient(ctx, nodeAddr)
 	defer p.closeRedisClient(redisClient)
-	tags := p.buildPodTags(pod)
+	tags := p.buildNodeTags(nodeName)
 
 	redisInfo, err := p.fetchRedisInfo(redisClient)
 	if err != nil {
@@ -225,26 +218,21 @@ func (p *RedisPollMetrics) pollRedisInfoAllMetrics(ctx context.Context, pod v1.P
 	return nil
 }
 
-// buildPodTags constructs a map of standard config tags plus an instance ID derived from the Pod.
-func (p *RedisPollMetrics) buildPodTags(pod v1.Pod) map[string]string {
+// buildNodeTags constructs a map of standard config tags plus an instance ID derived from the node.
+func (p *RedisPollMetrics) buildNodeTags(nodeName string) map[string]string {
 	tags := p.buildCommonMetadataTags()
-	tags[metrics.InstanceId] = pod.Name
+	tags[metrics.InstanceId] = nodeName
 	return tags
 }
 
 // buildCommonMetadataTags returns a shared map of metadata from p.conf.
 func (p *RedisPollMetrics) buildCommonMetadataTags() map[string]string {
-	return map[string]string{
-		metrics.Cluster:     p.conf.Redis.Cluster.ServiceName,
-		metrics.Slot:        p.conf.Metadata.Slot,
-		metrics.Tenant:      p.conf.Metadata.Tenant,
-		metrics.Domain:      p.conf.Metadata.Domain,
-		metrics.Environment: p.conf.Metadata.Environment,
-		metrics.Namespace:   p.conf.Metadata.Namespace,
-		metrics.PlatformID:  p.conf.Metadata.Platformid,
-		metrics.Service:     p.conf.Metadata.Service,
-		metrics.JiraKey:     p.conf.Metadata.JiraKey,
+	tags := map[string]string{
+		metrics.Cluster:   p.conf.Redis.Cluster.ServiceName,
+		metrics.Namespace: p.conf.Redis.Cluster.Namespace,
 	}
+	maps.Copy(tags, p.conf.Metadata)
+	return tags
 }
 
 // createRedisClusterClient abstracts out creating a Redis client for the cluster service address.
