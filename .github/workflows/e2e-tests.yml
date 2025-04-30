@@ -70,9 +70,13 @@ jobs:
         path: /tmp/kind-node.tar.gz
         key: kind-node-${{ env.NODE_IMAGE }}
 
-    - name: 🔄  Load node image from cache
+    - name: 🔄 Load node image (cache-hit)
       if: steps.node-cache.outputs.cache-hit == 'true'
       run: gunzip -c /tmp/kind-node.tar.gz | docker load --quiet
+
+    - name: 🐳 Pull node image (cache miss)
+      if: steps.node-cache.outputs.cache-hit != 'true'
+      run: docker pull ${{ env.NODE_IMAGE }}
 
     - name: ♻️  Restore dependency image cache
       id: deps-cache
