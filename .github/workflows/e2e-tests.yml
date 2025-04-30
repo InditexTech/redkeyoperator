@@ -106,11 +106,13 @@ jobs:
           redis/redis-stack-server:7.4.0-v3 \
           alpine:3.21.3
         do
-          docker pull --quiet "$img"
+          docker pull "$img"
           kind load docker-image --name ${{ env.LOCAL_CLUSTER_NAME }} "$img"
         done
 
     - name: 🛂  Validate images are present & runnable inside KinD
+      env:
+        CLUSTER: ${{ env.LOCAL_CLUSTER_NAME || 'local-cluster-test' }}
       run: |
         set -euo pipefail
         images=(
@@ -121,28 +123,43 @@ jobs:
         )
 
         for img in "${images[@]}"; do
-          # Kubernetes object names must be DNS-1123 compliant and ≤63 chars
+          # turn repo/tag into a DNS-safe Pod name (≤63 chars)
           pod_name=$(echo "$img" | tr '/:.' '-' | cut -c1-63)
 
           echo "::group::Testing $img (pod: $pod_name)"
-          # Launch a one-shot pod that exits immediately if the image can start
           kubectl run "$pod_name" \
             --image="$img" \
             --image-pull-policy=Never \
             --restart=Never \
             --command -- sh -c 'echo ok'
 
-          # Wait until the container reaches Completed or Error
-          kubectl wait --for=condition=Ready pod/"$pod_name" --timeout=60s || {
-            echo "❌ Image $img is not available inside the cluster."
+          # Give the kubelet up to 60s to unpack & start the container
+          for i in {1..30}; do
+            phase=$(kubectl get pod "$pod_name" -o jsonpath='{.status.phase}')
+            case "$phase" in
+              Running|Succeeded)
+                echo "✅  $img is present and started (phase=$phase)"
+                kubectl delete pod "$pod_name" --ignore-not-found
+                echo "::endgroup::"
+                break
+                ;;
+              Failed)
+                echo "❌  $img failed to start (phase=Failed)"
+                kubectl describe pod "$pod_name" || true
+                exit 1
+                ;;
+            esac
+            sleep 2
+          done
+
+          # Timeout guard
+          if [[ "$phase" != "Running" && "$phase" != "Succeeded" ]]; then
+            echo "❌  $img did not reach Running/Succeeded within 60 s (phase=$phase)"
             kubectl describe pod "$pod_name" || true
             exit 1
-          }
-
-          echo "✅ Image $img is present and starts successfully."
-          kubectl delete pod "$pod_name" --ignore-not-found
-          echo "::endgroup::"
+          fi
         done
+
 
     # ───────────────────────────── tests ────────────────────────────────────────
     - name: 📚  Install Ginkgo CLI
