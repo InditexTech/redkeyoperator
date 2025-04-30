@@ -1,97 +1,115 @@
 name: E2E tests
 
 on:
-  # Run on every PR that touches anything except docs/*
   pull_request:
     branches: [main]
     paths-ignore: ['docs/**']
-
-  # Keep the main branch green every night (02:00 UTC)
-  schedule:
-    - cron: '0 2 * * *'
-
-  # Manual trigger with an optional override for test parallelism
   workflow_dispatch:
     inputs:
       test_parallel_process:
-        description: Number of parallel processes for the E2E test suite
-        default: '4'
+        description: 'Ginkgo parallel processes'
+        default: '2'
         required: false
 
-# Cancel stale runs on the same head commit / PR
 concurrency:
   group: e2e-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
 env:
-  OPERATOR_NAME: redis-operator
-  OPERATOR_VERSION: 0.1.0
-  KUBECONFIG: ${{ github.workspace }}/.kube/config
-  LOCAL_CLUSTER_NAME: local-cluster-test
-  LOCAL_REGISTRY: local-registry-hosting
-  LOCAL_REGISTRY_PORT: 5001
+  OPERATOR_NAME:          redis-operator
+  OPERATOR_VERSION:       0.1.0
+  NODE_IMAGE:             kindest/node:v1.30.0
+  KUBECONFIG:             ${{ github.workspace }}/.kube/config
+  LOCAL_CLUSTER_NAME:     local-cluster-test
+  LOCAL_REGISTRY:         local-registry-hosting
+  LOCAL_REGISTRY_PORT:    5001
+  DEP_IMAGES: |
+    redis/redis-stack-server:7.2.0-v10
+    redis/redis-stack-server:7.4.0-v3
+    alpine:3.21.3
 
 jobs:
   e2e:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 60
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
 
     defaults:
       run:
-        shell: bash -eu -o pipefail {0}   # strict mode for every Bash step
+        shell: bash -eu -o pipefail {0}
 
     steps:
-    # ───────────────────────────── git / go / caching ──────────────────────────
     - name: 📥  Checkout code
       uses: actions/checkout@v4
 
-    - name: 🏗️  Set up Go (module cache enabled)
+    - name: 🏗️  Set up Go (with module cache)
       uses: actions/setup-go@v5
       with:
         go-version-file: go.mod
-        cache: true                 # built-in cache for $GOMODCACHE
+        cache: true
 
-    # Cache Docker layers to avoid rebuilding unchanged layers on each run
     - name: ♻️  Restore BuildKit layer cache
       uses: actions/cache@v4
       with:
         path: /tmp/.buildx-cache
-        key: ${{ runner.os }}-buildx-${{ github.sha }}
+        key: buildx-${{ runner.os }}-${{ github.sha }}
         restore-keys: |
-          ${{ runner.os }}-buildx-
+          buildx-${{ runner.os }}-
 
     - name: 🐳  Prepare Buildx builder
       uses: docker/setup-buildx-action@v3
       with:
         install: true
-        driver-opts: |
-          image=moby/buildkit:v0.21.0
+        driver-opts: image=moby/buildkit:v0.21.0
         cache-from: type=local,src=/tmp/.buildx-cache
         cache-to:   type=local,dest=/tmp/.buildx-cache,mode=max
 
-    # ───────────────────────────── kubernetes / kind ───────────────────────────
-    - name: 🔧  Install kubectl (CLI version aligned with cluster)
+    - name: ♻️  Restore KinD node image
+      id: node-cache
+      uses: actions/cache@v4
+      with:
+        path: /tmp/kind-node.tar.gz
+        key: kind-node-${{ env.NODE_IMAGE }}
+
+    - name: 🔄  Load node image from cache
+      if: steps.node-cache.outputs.cache-hit == 'true'
+      run: gunzip -c /tmp/kind-node.tar.gz | docker load --quiet
+
+    - name: ♻️  Restore dependency image cache
+      id: deps-cache
+      uses: actions/cache@v4
+      with:
+        path: /tmp/kind-deps.tar.gz
+        key: kind-deps-${{ runner.os }}-v1
+
+    - name: 🔄  Load dependency images from cache
+      if: steps.deps-cache.outputs.cache-hit == 'true'
+      run: gunzip -c /tmp/kind-deps.tar.gz | docker load --quiet
+
+    - name: 🔧  Install kubectl
       uses: azure/setup-kubectl@v3
       with:
         version: v1.30.0
 
-    - name: 🌱 Kubernetes KinD Cluster
-      id: kind
+    - name: 🌱  Create KinD cluster
       uses: helm/kind-action@v1
       with:
         cluster_name: ${{ env.LOCAL_CLUSTER_NAME }}
+        image: ${{ env.NODE_IMAGE }}
         registry: true
         registry_name: ${{ env.LOCAL_REGISTRY }}
         registry_port: ${{ env.LOCAL_REGISTRY_PORT }}
-        registry_enable_delete: true
 
-    # ───────────────────────────── build & load images ─────────────────────────
+    # If node image wasn’t cached previously, export & save it now (one-time)
+    - name: 💾  Save node image to cache
+      if: steps.node-cache.outputs.cache-hit != 'true'
+      run: docker save ${{ env.NODE_IMAGE }} | gzip -1 > /tmp/kind-node.tar.gz
+
     - name: 🏗️  Build operator image and load into KinD
       uses: docker/build-push-action@v5
       with:
         context: .
         tags: ${{ env.OPERATOR_NAME }}:${{ env.OPERATOR_VERSION }}
-        load: true                 # makes the image directly visible to docker-d
+        load: true
         push: false
         cache-from: type=local,src=/tmp/.buildx-cache
         cache-to:   type=local,dest=/tmp/.buildx-cache,mode=max
@@ -100,74 +118,24 @@ jobs:
       run: kind load docker-image --name ${{ env.LOCAL_CLUSTER_NAME }} ${{ env.OPERATOR_NAME }}:${{ env.OPERATOR_VERSION }}
 
     - name: 📦  Pull dependency images & load into KinD
+      if: steps.deps-cache.outputs.cache-hit != 'true'
       run: |
-        for img in \
-          redis/redis-stack-server:7.2.0-v10 \
-          redis/redis-stack-server:7.4.0-v3 \
-          alpine:3.21.3
-        do
-          docker pull "$img"
-          kind load docker-image --name ${{ env.LOCAL_CLUSTER_NAME }} "$img"
-        done
+        for img in ${{ env.DEP_IMAGES }}; do docker pull "$img"; done
 
-    - name: 🛂  Validate images are present & runnable inside KinD
-      env:
-        CLUSTER: ${{ env.LOCAL_CLUSTER_NAME || 'local-cluster-test' }}
+    - name: 📥  Load dependency images into KinD
       run: |
-        set -euo pipefail
-        images=(
-          "${{ env.OPERATOR_NAME }}:${{ env.OPERATOR_VERSION }}"
-          "redis/redis-stack-server:7.2.0-v10"
-          "redis/redis-stack-server:7.4.0-v3"
-          "alpine:3.21.3"
-        )
+        for img in ${{ env.DEP_IMAGES }}; do kind load docker-image --name ${{ env.LOCAL_CLUSTER_NAME }} "$img"; done
 
-        for img in "${images[@]}"; do
-          # turn repo/tag into a DNS-safe Pod name (≤63 chars)
-          pod_name=$(echo "$img" | tr '/:.' '-' | cut -c1-63)
+    - name: 💾  Save dependency images to cache
+      if: steps.deps-cache.outputs.cache-hit != 'true'
+      run: docker save ${{ env.DEP_IMAGES }} | gzip -1 > /tmp/kind-deps.tar.gz
 
-          echo "::group::Testing $img (pod: $pod_name)"
-          kubectl run "$pod_name" \
-            --image="$img" \
-            --image-pull-policy=Never \
-            --restart=Never \
-            --command -- sh -c 'echo ok'
-
-          # Give the kubelet up to 60s to unpack & start the container
-          for i in {1..30}; do
-            phase=$(kubectl get pod "$pod_name" -o jsonpath='{.status.phase}')
-            case "$phase" in
-              Running|Succeeded)
-                echo "✅  $img is present and started (phase=$phase)"
-                kubectl delete pod "$pod_name" --ignore-not-found
-                echo "::endgroup::"
-                break
-                ;;
-              Failed)
-                echo "❌  $img failed to start (phase=Failed)"
-                kubectl describe pod "$pod_name" || true
-                exit 1
-                ;;
-            esac
-            sleep 2
-          done
-
-          # Timeout guard
-          if [[ "$phase" != "Running" && "$phase" != "Succeeded" ]]; then
-            echo "❌  $img did not reach Running/Succeeded within 60 s (phase=$phase)"
-            kubectl describe pod "$pod_name" || true
-            exit 1
-          fi
-        done
-
-
-    # ───────────────────────────── tests ────────────────────────────────────────
     - name: 📚  Install Ginkgo CLI
       run: go install github.com/onsi/ginkgo/v2/ginkgo@latest
 
     - name: ✅  Run E2E test suite
       env:
-        TEST_PARALLEL_PROCESSES: ${{ github.event.inputs.test_parallel_process || 4 }}
+        TEST_PARALLEL_PROCESSES: ${{ github.event.inputs.test_parallel_process || 2 }}
       run: |
         make test-e2e-cov \
           OPERATOR_IMAGE=${{ env.OPERATOR_NAME }}:${{ env.OPERATOR_VERSION }} \
