@@ -45,8 +45,8 @@ const (
 appendonly no
 maxmemory 70mb`
 	finalizerName  = "redis.inditex.com/configmap-cleanup"
-	pollInterval   = 3 * time.Second
-	defaultTimeout = 30 * time.Minute
+	pollInterval   = 1 * time.Minute
+	defaultTimeout = 60 * time.Minute
 )
 
 type ClusterStatus struct {
