@@ -1,5 +1,5 @@
 # Use an official Golang image with a specific version
-ARG GO_VERSION=1.23.5
+ARG GO_VERSION=1.24.0
 FROM golang:${GO_VERSION} AS builder
 
 # Set environment variables

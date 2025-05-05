@@ -24,7 +24,72 @@ spec:
     appendonly no
     save ""
     protected-mode no
-    loadmodule /usr/lib/redis/modules/redisgraph.so
+  monitoring:
+    config: |
+      metadata:
+        application: showpaas
+        version: "7.2.4"
+        environment: des
+        tenant: global
+        domain: swdelivery
+        slot: sample
+        layer: middleware-redis
+        namespace: redis-operator
+        platformid: "meccanoarteixo2"
+        service: "showpaas"
+      redis:
+        operator:
+          collection_interval_seconds: 60
+        cluster:
+          replicas: 3
+          namespace: redis-operator
+          health_probe_interval_seconds: 60
+          healing_time_seconds: 60
+          service_name: "rediscluster-sample"
+          max_retries: 2
+          back_off: 10s
+          label_selector: "redis.rediscluster.operator/component=redis,redis-cluster-name=rediscluster-sample"
+        metrics:
+          version: 0.10.2.0
+          redis_info_keys:
+            - keyspace_hits
+            - evicted_keys
+            - connected_clients
+            - total_commands_processed
+            - keyspace_misses
+            - expired_keys
+            - redis_version
+            - used_memory_rss
+            - maxmemory
+            - used_cpu_sys
+            - used_cpu_sys_children
+            - used_cpu_user
+            - used_cpu_user_children
+            - total_net_input_bytes
+            - total_net_output_bytes
+            - aof_base_size
+            - aof_current_size
+            - mem_aof_buffer
+    template:
+      spec:
+        containers:
+          - image: 'localhost:5001/redis-robin:0.0.3'
+            name: robin
+            imagePullPolicy: Always
+            ports:
+              - containerPort: 8080
+                name: prometheus
+                protocol: TCP
+            volumeMounts:
+              - mountPath: /opt/conf/configmap
+                name: rediscluster-sample-robin-config
+        volumes:
+          - configMap:
+              defaultMode: 420
+              name: rediscluster-sample-monitoring
+            name: rediscluster-sample-robin-config
+
+
   # override:
   #   service:
   #     metadata:

@@ -9,7 +9,7 @@ ifeq ($(NAMESPACE), )
 	NAMESPACE := redis-operator
 endif
 
-REDIS_MONITORING=$(shell kubectl -n ${NAMESPACE} get po -l='redis.rediscluster.operator/component=monitoring' -o=jsonpath='{.items[0].metadata.name}')
+REDIS_ROBIN=$(shell kubectl -n ${NAMESPACE} get po -l='redis.rediscluster.operator/component=monitoring' -o=jsonpath='{.items[0].metadata.name}')
 IMG_DEV ?= redis-robin:0.0.1
 
 debug:
@@ -20,10 +20,10 @@ debug:
 	kubectl wait -n ${NAMESPACE} --for=condition=ready pod -l redis.rediscluster.operator/component=monitoring
 	
 	# Copy the newly built binary into the operator pod
-	kubectl cp ./bin/manager $(REDIS_MONITORING):/manager -n ${NAMESPACE}
+	kubectl cp ./bin/manager $(REDIS_ROBIN):/manager -n ${NAMESPACE}
 	
 	# Execute Delve inside the pod so it listens for remote debug connections on port 40001
-	kubectl exec -it po/$(REDIS_MONITORING) -n ${NAMESPACE} -- \
+	kubectl exec -it po/$(REDIS_ROBIN) -n ${NAMESPACE} -- \
 		dlv exec /manager \
 			--headless \
 			--listen=127.0.0.1:40001 \
@@ -32,17 +32,17 @@ debug:
 			--continue
 
 port-forward: ##		Port forwarding of port 40000 for debugging the manager with Delve.
-	kubectl port-forward pod/$(REDIS_MONITORING) 40001:40001 -n ${NAMESPACE}
+	kubectl port-forward pod/$(REDIS_ROBIN) 40001:40001 -n ${NAMESPACE}
 
 
 port-forward-metrics: ##		Port forwarding of port 8080 for debugging the manager with Delve.
-	kubectl port-forward pod/$(REDIS_MONITORING) 8080:8080 -n ${NAMESPACE}
+	kubectl port-forward pod/$(REDIS_ROBIN) 8080:8080 -n ${NAMESPACE}
 
 delete: ##		Delete the operator pod (redis-operator) in order to have a new clean pod created.
-	kubectl delete pod $(REDIS_MONITORING) -n ${NAMESPACE}
+	kubectl delete pod $(REDIS_ROBIN) -n ${NAMESPACE}
 
-dev-docker-build:  ##	Build docker image with the monitoring for development (uses `${IMG_DEV}` image name).
+dev-docker-build:  ##	Build docker image with the robin for development (uses `${IMG_DEV}` image name).
 	docker build -t ${IMG_DEV} .
 
-dev-docker-push: ##	Push docker image with the monitoring for development (uses `${IMG_DEV}` image name).
+dev-docker-push: ##	Push docker image with the robin for development (uses `${IMG_DEV}` image name).
 	docker push ${IMG_DEV}
