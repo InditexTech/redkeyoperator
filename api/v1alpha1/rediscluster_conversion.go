@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/inditextech/redisoperator/api/v1"
+	v1 "github.com/inditextech/redisoperator/api/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,7 +71,7 @@ func (src *RedisCluster) copySpectoV1(dst *v1.RedisCluster) {
 	dst.Spec.Ephemeral = src.Spec.Ephemeral
 	dst.Spec.Backup = src.Spec.Backup
 	dst.Spec.Storage = src.Spec.Storage
-	dst.Spec.Monitoring = &v1.MonitoringSpec{
+	dst.Spec.Robin = &v1.RobinSpec{
 		Template: src.Spec.Monitoring,
 	}
 	dst.Spec.PurgeKeysOnRebalance = src.Spec.PurgeKeysOnRebalance
@@ -208,8 +208,8 @@ func (dst *RedisCluster) copySpecFromV1(src *v1.RedisCluster) {
 	dst.Spec.DeletePVC = src.Spec.DeletePVC
 	dst.Spec.AccessModes = src.Spec.AccessModes
 
-	if src.Spec.Monitoring != nil && src.Spec.Monitoring.Template != nil {
-		dst.Spec.Monitoring = src.Spec.Monitoring.Template
+	if src.Spec.Robin != nil && src.Spec.Robin.Template != nil {
+		dst.Spec.Monitoring = src.Spec.Robin.Template
 	}
 }
 

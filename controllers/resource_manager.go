@@ -135,7 +135,7 @@ func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req
 		r.LogInfo(redisCluster.NamespacedName(), "RedisCluster.Spec.Labels populated from RedisCluster.Metadata.Labels")
 	}
 
-	// Checks the existance of the ConfigMap, StatefulSet, Pods, Monitoring Deployment, PDB and Service,
+	// Checks the existance of the ConfigMap, StatefulSet, Pods, Robin, Deployment, PDB and Service,
 	// creating the objects not created yet.
 	// Coherence and configuration details are also checked and fixed.
 	immediateRequeue, err := r.CheckAndCreateK8sObjects(ctx, req, redisCluster, auth)
@@ -1273,18 +1273,18 @@ func (r *RedisClusterReconciler) CreateConfigMap(req ctrl.Request, spec redisv1.
 	return &cm
 }
 
-func (r *RedisClusterReconciler) CreateMonitoringDeployment(ctx context.Context, req ctrl.Request, rediscluster *redisv1.RedisCluster, labels map[string]string) *v1.Deployment {
+func (r *RedisClusterReconciler) CreateRobinDeployment(ctx context.Context, req ctrl.Request, rediscluster *redisv1.RedisCluster, labels map[string]string) *v1.Deployment {
 	var replicas = int32(1)
 	d := &v1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      req.Name + "-monitoring",
+			Name:      req.Name + "-robin",
 			Namespace: req.Namespace,
 			Labels:    labels,
 		},
 		Spec: v1.DeploymentSpec{
-			Template: *rediscluster.Spec.Monitoring.Template,
+			Template: *rediscluster.Spec.Robin.Template,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{redis.RedisClusterLabel: req.Name, r.GetStatefulSetSelectorLabel(rediscluster): "monitoring"},
+				MatchLabels: map[string]string{redis.RedisClusterLabel: req.Name, r.GetStatefulSetSelectorLabel(rediscluster): "robin"},
 			},
 			Replicas: &replicas,
 		},
@@ -1294,8 +1294,8 @@ func (r *RedisClusterReconciler) CreateMonitoringDeployment(ctx context.Context,
 		d.Spec.Template.Labels[k] = v
 	}
 	d.Spec.Template.Labels[redis.RedisClusterLabel] = req.Name
-	d.Spec.Template.Labels[redis.RedisClusterComponentLabel] = "monitoring"
-	for k, v := range rediscluster.Spec.Monitoring.Template.Labels {
+	d.Spec.Template.Labels[redis.RedisClusterComponentLabel] = "robin"
+	for k, v := range rediscluster.Spec.Robin.Template.Labels {
 		d.Spec.Template.Labels[k] = v
 	}
 
@@ -1317,17 +1317,17 @@ func (r *RedisClusterReconciler) CreateMonitoringDeployment(ctx context.Context,
 	return d
 }
 
-func (r *RedisClusterReconciler) CreateMonitoringConfigMap(req ctrl.Request, spec redisv1.RedisClusterSpec, labels map[string]string) *corev1.ConfigMap {
+func (r *RedisClusterReconciler) CreateRobinConfigMap(req ctrl.Request, spec redisv1.RedisClusterSpec, labels map[string]string) *corev1.ConfigMap {
 	cm := corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      req.Name + "-monitoring",
+			Name:      req.Name + "-robin",
 			Namespace: req.Namespace,
 			Labels:    labels,
 		},
-		Data: map[string]string{"application-configmap.yml": *spec.Monitoring.Config},
+		Data: map[string]string{"application-configmap.yml": *spec.Robin.Config},
 	}
 
-	r.LogInfo(req.NamespacedName, "Generated monitoring configmap")
+	r.LogInfo(req.NamespacedName, "Generated robin configmap")
 	return &cm
 }
 
@@ -1727,8 +1727,8 @@ func (r *RedisClusterReconciler) CheckAndCreateK8sObjects(ctx context.Context, r
 		}
 	}
 
-	// Monitoring deployment check
-	r.CheckAndCreateMonitoring(ctx, req, redisCluster)
+	// Robin deployment check
+	r.CheckAndCreateRobin(ctx, req, redisCluster)
 
 	// Service check
 	immediateRequeue, err = r.checkAndCreateService(ctx, req, redisCluster)
@@ -1736,156 +1736,156 @@ func (r *RedisClusterReconciler) CheckAndCreateK8sObjects(ctx context.Context, r
 	return immediateRequeue, err
 }
 
-func (r *RedisClusterReconciler) CheckAndCreateMonitoring(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) {
-	// Populate monitoring spec if not provided. This to handle the case where the user removes the monitoring spec of an existing cluster. The monitoring objects will be deleted.
-	if redisCluster.Spec.Monitoring == nil {
-		redisCluster.Spec.Monitoring = &redisv1.MonitoringSpec{
+func (r *RedisClusterReconciler) CheckAndCreateRobin(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) {
+	// Populate robin spec if not provided. This to handle the case where the user removes the robin spec of an existing cluster. The Robin objects will be deleted.
+	if redisCluster.Spec.Robin == nil {
+		redisCluster.Spec.Robin = &redisv1.RobinSpec{
 			Config:   nil,
 			Template: nil,
 		}
 	}
 
-	// Monitoring configmap
-	r.handleMonitoringConfig(ctx, req, redisCluster)
+	// Robin configmap
+	r.handleRobinConfig(ctx, req, redisCluster)
 
-	// Monitoring deployment
-	r.handleMonitoringDeployment(ctx, req, redisCluster)
+	// Robin deployment
+	r.handleRobinDeployment(ctx, req, redisCluster)
 }
 
-func (r *RedisClusterReconciler) handleMonitoringConfig(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) {
-	// Get monitoring configmap
-	configmap, err := r.FindExistingConfigMapFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-monitoring", Namespace: redisCluster.Namespace}})
+func (r *RedisClusterReconciler) handleRobinConfig(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) {
+	// Get robin configmap
+	configmap, err := r.FindExistingConfigMapFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}})
 
-	// Monitoring configmap not provided: delete configmap if exists
-	if redisCluster.Spec.Monitoring.Config == nil {
-		r.deleteMonitoringObject(ctx, configmap, redisCluster, "configmap")
+	// Robin configmap not provided: delete configmap if exists
+	if redisCluster.Spec.Robin.Config == nil {
+		r.deleteRobinObject(ctx, configmap, redisCluster, "configmap")
 		return
 	}
 
-	// Monitoring configmap not found: create configmap
+	// Robin configmap not found: create configmap
 	if err != nil {
 		// Return if the error is not a NotFound error
 		if !errors.IsNotFound(err) {
-			r.LogError(redisCluster.NamespacedName(), err, "Getting monitoring configmap failed")
+			r.LogError(redisCluster.NamespacedName(), err, "Getting Robin configmap failed")
 			return
 		}
 
-		// Create Monitoring ConfigMap
-		mcm := r.CreateMonitoringConfigMap(req, redisCluster.Spec, *redisCluster.Spec.Labels)
-		r.createMonitoringObject(ctx, mcm, redisCluster, "configmap")
+		// Create Robin ConfigMap
+		mcm := r.CreateRobinConfigMap(req, redisCluster.Spec, *redisCluster.Spec.Labels)
+		r.createRobinObject(ctx, mcm, redisCluster, "configmap")
 		return
 	}
 
-	// Monitoring configmap found: check if it needs to be updated
-	if *redisCluster.Spec.Monitoring.Config == configmap.Data["application-configmap.yml"] {
+	// Robin configmap found: check if it needs to be updated
+	if *redisCluster.Spec.Robin.Config == configmap.Data["application-configmap.yml"] {
 		return
 	}
 
-	// Monitoring configmap changed: update configmap
-	configmap.Data["application-configmap.yml"] = *redisCluster.Spec.Monitoring.Config
-	r.updateMonitoringObject(ctx, configmap, redisCluster, "configmap")
+	// Robin configmap changed: update configmap
+	configmap.Data["application-configmap.yml"] = *redisCluster.Spec.Robin.Config
+	r.updateRobinObject(ctx, configmap, redisCluster, "configmap")
 
 	// Add checksum to the deployment annotations to force the deployment rollout
-	if redisCluster.Spec.Monitoring.Template != nil {
-		if redisCluster.Spec.Monitoring.Template.Annotations == nil {
-			redisCluster.Spec.Monitoring.Template.Annotations = make(map[string]string)
+	if redisCluster.Spec.Robin.Template != nil {
+		if redisCluster.Spec.Robin.Template.Annotations == nil {
+			redisCluster.Spec.Robin.Template.Annotations = make(map[string]string)
 		}
-		redisCluster.Spec.Monitoring.Template.Annotations["checksum/config"] = fmt.Sprintf("%x", md5.Sum([]byte(*redisCluster.Spec.Monitoring.Config)))
+		redisCluster.Spec.Robin.Template.Annotations["checksum/config"] = fmt.Sprintf("%x", md5.Sum([]byte(*redisCluster.Spec.Robin.Config)))
 	}
 }
 
-func (r *RedisClusterReconciler) handleMonitoringDeployment(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) {
-	// Get monitoring deployment
-	deployment, err := r.FindExistingDeployment(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-monitoring", Namespace: redisCluster.Namespace}})
+func (r *RedisClusterReconciler) handleRobinDeployment(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) {
+	// Get robin deployment
+	deployment, err := r.FindExistingDeployment(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}})
 
-	// Monitoring deployment template not provided: delete deployment if exists
-	if redisCluster.Spec.Monitoring.Template == nil {
-		r.deleteMonitoringObject(ctx, deployment, redisCluster, "deployment")
+	// Robin deployment template not provided: delete deployment if exists
+	if redisCluster.Spec.Robin.Template == nil {
+		r.deleteRobinObject(ctx, deployment, redisCluster, "deployment")
 		return
 	}
 
-	// Monitoring deployment not found: create deployment
+	// Robin deployment not found: create deployment
 	if err != nil {
 		// Return if the error is not a NotFound error
 		if !errors.IsNotFound(err) {
-			r.LogError(redisCluster.NamespacedName(), err, "Getting monitoring deployment failed")
+			r.LogError(redisCluster.NamespacedName(), err, "Getting robin deployment failed")
 			return
 		}
 
-		// Create Monitoring Deployment
-		mdep := r.CreateMonitoringDeployment(ctx, req, redisCluster, *redisCluster.Spec.Labels)
-		r.createMonitoringObject(ctx, mdep, redisCluster, "deployment")
+		// Create Robin Deployment
+		mdep := r.CreateRobinDeployment(ctx, req, redisCluster, *redisCluster.Spec.Labels)
+		r.createRobinObject(ctx, mdep, redisCluster, "deployment")
 		return
 	}
 
-	// Monitoring deployment found: check if it needs to be updated
-	patchedPodTemplateSpec, changed := r.OverrideMonitoringDeployment(ctx, req, redisCluster, deployment.Spec.Template)
+	// Robin deployment found: check if it needs to be updated
+	patchedPodTemplateSpec, changed := r.OverrideRobinDeployment(ctx, req, redisCluster, deployment.Spec.Template)
 	if !changed {
 		return
 	}
 
-	// Monitoring deployment changed: update deployment
+	// Robin deployment changed: update deployment
 	deployment.Spec.Template = patchedPodTemplateSpec
-	r.updateMonitoringObject(ctx, deployment, redisCluster, "deployment")
+	r.updateRobinObject(ctx, deployment, redisCluster, "deployment")
 }
 
-func (r *RedisClusterReconciler) createMonitoringObject(ctx context.Context, obj client.Object, redisCluster *redisv1.RedisCluster, kind string) error {
+func (r *RedisClusterReconciler) createRobinObject(ctx context.Context, obj client.Object, redisCluster *redisv1.RedisCluster, kind string) error {
 	if obj.DeepCopyObject() == nil {
 		return nil
 	}
 
 	ctrl.SetControllerReference(redisCluster, obj, r.Scheme)
 
-	r.LogInfo(redisCluster.NamespacedName(), "Creating monitoring "+kind)
+	r.LogInfo(redisCluster.NamespacedName(), "Creating Robin "+kind)
 	err := r.Client.Create(ctx, obj)
 	if err != nil {
 		if !errors.IsAlreadyExists(err) {
-			r.LogError(redisCluster.NamespacedName(), err, "Error creating monitoring "+kind)
+			r.LogError(redisCluster.NamespacedName(), err, "Error creating Robin "+kind)
 			return err
 		}
-		r.LogInfo(redisCluster.NamespacedName(), "Monitoring "+kind+" already exists")
+		r.LogInfo(redisCluster.NamespacedName(), "Robin "+kind+" already exists")
 		return nil
 	}
 
-	r.LogInfo(redisCluster.NamespacedName(), "Successfully created monitoring "+kind, kind, redisCluster.Name+"-monitoring")
+	r.LogInfo(redisCluster.NamespacedName(), "Successfully created Robin "+kind, kind, redisCluster.Name+"-robin")
 	return nil
 }
 
-func (r *RedisClusterReconciler) updateMonitoringObject(ctx context.Context, obj client.Object, redisCluster *redisv1.RedisCluster, kind string) error {
+func (r *RedisClusterReconciler) updateRobinObject(ctx context.Context, obj client.Object, redisCluster *redisv1.RedisCluster, kind string) error {
 	if obj.DeepCopyObject() == nil {
 		return nil
 	}
 
-	r.LogInfo(redisCluster.NamespacedName(), "Updating monitoring "+kind)
+	r.LogInfo(redisCluster.NamespacedName(), "Updating Robin "+kind)
 	err := r.Client.Update(ctx, obj)
 	if err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Error updating monitoring "+kind)
+		r.LogError(redisCluster.NamespacedName(), err, "Error updating Robin "+kind)
 		return err
 	}
 
-	r.LogInfo(redisCluster.NamespacedName(), "Successfully updated monitoring "+kind, kind, redisCluster.Name+"-monitoring")
+	r.LogInfo(redisCluster.NamespacedName(), "Successfully updated Robin "+kind, kind, redisCluster.Name+"-robin")
 	return nil
 }
 
-func (r *RedisClusterReconciler) deleteMonitoringObject(ctx context.Context, obj client.Object, redisCluster *redisv1.RedisCluster, kind string) error {
+func (r *RedisClusterReconciler) deleteRobinObject(ctx context.Context, obj client.Object, redisCluster *redisv1.RedisCluster, kind string) error {
 	if obj.DeepCopyObject() == nil {
 		return nil
 	}
 
-	r.LogInfo(redisCluster.NamespacedName(), "Deleting monitoring "+kind)
+	r.LogInfo(redisCluster.NamespacedName(), "Deleting Robin "+kind)
 	err := r.Client.Delete(ctx, obj)
 	if err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Error deleting monitoring "+kind)
+		r.LogError(redisCluster.NamespacedName(), err, "Error deleting Robin "+kind)
 		return err
 	}
 
-	r.LogInfo(redisCluster.NamespacedName(), "Successfully deleted monitoring "+kind, kind, redisCluster.Name+"-monitoring")
+	r.LogInfo(redisCluster.NamespacedName(), "Successfully deleted Robin "+kind, kind, redisCluster.Name+"-robin")
 	return nil
 }
 
-func (r *RedisClusterReconciler) OverrideMonitoringDeployment(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster, podTemplateSpec corev1.PodTemplateSpec) (corev1.PodTemplateSpec, bool) {
+func (r *RedisClusterReconciler) OverrideRobinDeployment(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster, podTemplateSpec corev1.PodTemplateSpec) (corev1.PodTemplateSpec, bool) {
 	// Apply the override
-	patchedPodTemplateSpec, err := redis.ApplyPodTemplateSpecOverride(podTemplateSpec, *redisCluster.Spec.Monitoring.Template)
+	patchedPodTemplateSpec, err := redis.ApplyPodTemplateSpecOverride(podTemplateSpec, *redisCluster.Spec.Robin.Template)
 	if err != nil {
 		ctrl.Log.Error(err, "Error applying pod template spec override")
 		return podTemplateSpec, false
@@ -1895,9 +1895,9 @@ func (r *RedisClusterReconciler) OverrideMonitoringDeployment(ctx context.Contex
 	changed := !reflect.DeepEqual(podTemplateSpec.Labels, patchedPodTemplateSpec.Labels) || !reflect.DeepEqual(podTemplateSpec.Annotations, patchedPodTemplateSpec.Annotations) || !reflect.DeepEqual(podTemplateSpec.Spec, patchedPodTemplateSpec.Spec)
 
 	if changed {
-		r.LogInfo(req.NamespacedName, "Detected monitoring deployment change")
+		r.LogInfo(req.NamespacedName, "Detected Robin deployment change")
 	} else {
-		r.LogInfo(req.NamespacedName, "No monitoring deployment change detected")
+		r.LogInfo(req.NamespacedName, "No Robin deployment change detected")
 	}
 
 	return *patchedPodTemplateSpec, changed
@@ -1971,7 +1971,7 @@ func (r *RedisClusterReconciler) CheckAndUpdateRDCL(ctx context.Context, redisNa
 // Redis cluster is set to 0 replicas
 //
 //	 -> terminate all cluster pods (StatefulSet replicas set to 0)
-//	 -> terminate monitoring pod (Deployment replicas set to 0)
+//	 -> terminate Robin pod (Deployment replicas set to 0)
 //	 -> delete pdb
 //	 -> Redis cluster status set to 'Ready'
 //		-> All conditions set to false
@@ -1994,20 +1994,20 @@ func (r *RedisClusterReconciler) clusterScaledToZeroReplicas(ctx context.Context
 		r.LogInfo(redisCluster.NamespacedName(), "StatefulSet updated", "Replicas", sset.Spec.Replicas)
 	}
 
-	// Monitoring deployment update
-	if redisCluster.Spec.Monitoring != nil {
-		if redisCluster.Spec.Monitoring.Template != nil {
-			mdep, err := r.FindExistingDeployment(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-monitoring", Namespace: redisCluster.Namespace}})
+	// Robin deployment update
+	if redisCluster.Spec.Robin != nil {
+		if redisCluster.Spec.Robin.Template != nil {
+			mdep, err := r.FindExistingDeployment(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}})
 			if err != nil {
-				r.LogError(redisCluster.NamespacedName(), err, "Cannot find existing monitoring deployment", "deployment", redisCluster.Name+"-monitoring")
+				r.LogError(redisCluster.NamespacedName(), err, "Cannot find existing Robin deployment", "deployment", redisCluster.Name+"-robin")
 			} else {
 				// Scaledown
 				*mdep.Spec.Replicas = 0
 				mdep, err = r.UpdateDeployment(ctx, mdep, redisCluster)
 				if err != nil {
-					r.LogError(redisCluster.NamespacedName(), err, "Failed to update Deployment replicas")
+					r.LogError(redisCluster.NamespacedName(), err, "Failed to update Robin Deployment replicas")
 				} else {
-					r.LogInfo(redisCluster.NamespacedName(), "Monitoring Deployment updated", "Replicas", mdep.Spec.Replicas)
+					r.LogInfo(redisCluster.NamespacedName(), "Robin Deployment updated", "Replicas", mdep.Spec.Replicas)
 				}
 			}
 		}

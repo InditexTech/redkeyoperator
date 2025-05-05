@@ -7,7 +7,7 @@ package v1alpha1
 import (
 	"testing"
 
-	"github.com/inditextech/redisoperator/api/v1"
+	v1 "github.com/inditextech/redisoperator/api/v1"
 	"github.com/stretchr/testify/assert"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -92,7 +92,7 @@ func Test_toV1(t *testing.T) {
 					StorageClassName:     "storage",
 					DeletePVC:            false,
 					AccessModes:          []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-					Monitoring:           &v1.MonitoringSpec{},
+					Robin:                &v1.RobinSpec{},
 					Override:             &v1.RedisClusterOverrideSpec{},
 				},
 				Status: v1.RedisClusterStatus{
@@ -183,7 +183,7 @@ func Test_toV1(t *testing.T) {
 					StorageClassName:     "storage",
 					DeletePVC:            false,
 					AccessModes:          []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-					Monitoring:           &v1.MonitoringSpec{},
+					Robin:                &v1.RobinSpec{},
 					Override: &v1.RedisClusterOverrideSpec{
 						StatefulSet: &appsv1.StatefulSet{
 							Spec: appsv1.StatefulSetSpec{
@@ -286,7 +286,7 @@ func Test_toV1(t *testing.T) {
 					StorageClassName:     "storage",
 					DeletePVC:            false,
 					AccessModes:          []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-					Monitoring:           &v1.MonitoringSpec{},
+					Robin:                &v1.RobinSpec{},
 					Override: &v1.RedisClusterOverrideSpec{
 						StatefulSet: &appsv1.StatefulSet{
 							Spec: appsv1.StatefulSetSpec{

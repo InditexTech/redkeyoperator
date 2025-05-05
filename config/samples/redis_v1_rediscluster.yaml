@@ -24,7 +24,7 @@ spec:
     appendonly no
     save ""
     protected-mode no
-  monitoring:
+  robin:
     config: |
       metadata:
         application: showpaas
@@ -86,7 +86,7 @@ spec:
         volumes:
           - configMap:
               defaultMode: 420
-              name: rediscluster-sample-monitoring
+              name: rediscluster-sample-robin
             name: rediscluster-sample-robin-config
 
 

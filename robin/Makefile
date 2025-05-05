@@ -9,7 +9,7 @@ ifeq ($(NAMESPACE), )
 	NAMESPACE := redis-operator
 endif
 
-REDIS_ROBIN=$(shell kubectl -n ${NAMESPACE} get po -l='redis.rediscluster.operator/component=monitoring' -o=jsonpath='{.items[0].metadata.name}')
+REDIS_ROBIN=$(shell kubectl -n ${NAMESPACE} get po -l='redis.rediscluster.operator/component=robin' -o=jsonpath='{.items[0].metadata.name}')
 IMG_DEV ?= redis-robin:0.0.1
 
 debug:
@@ -17,7 +17,7 @@ debug:
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -gcflags="all=-N -l" -o bin/manager ./main.go
 	
 	# Wait for the operator pod to be ready (ensure your labels/names are correct)
-	kubectl wait -n ${NAMESPACE} --for=condition=ready pod -l redis.rediscluster.operator/component=monitoring
+	kubectl wait -n ${NAMESPACE} --for=condition=ready pod -l redis.rediscluster.operator/component=robin
 	
 	# Copy the newly built binary into the operator pod
 	kubectl cp ./bin/manager $(REDIS_ROBIN):/manager -n ${NAMESPACE}

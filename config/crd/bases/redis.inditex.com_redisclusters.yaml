@@ -3485,7 +3485,7 @@ spec:
                 additionalProperties:
                   type: string
                 type: object
-              monitoring:
+              robin:
                 properties:
                   config:
                     type: string
