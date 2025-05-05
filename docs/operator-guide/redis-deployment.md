@@ -31,33 +31,29 @@ spec:
     appendonly no
     maxmemory 1400mb
   robin:
-    spec:
-      containers:
-      - name: robin
-        image: redis-metrics:1.0.0
-        ports:
-        - containerPort: 8080
-          name: prometheus
-          protocol: TCP
-        volumeMounts:
-        - mountPath: /opt/conf/configmap
+    template:
+      spec:
+        containers:
+        - name: robin
+          image: redis-metrics:1.0.0
+          ports:
+          - containerPort: 8080
+            name: prometheus
+            protocol: TCP
+          volumeMounts:
+          - mountPath: /opt/conf/configmap
+            name: rediscluster-sample-robin-config
+        volumes:
+        - configMap:
+            defaultMode: 420
+            name: rediscluster-sample-robin
           name: rediscluster-sample-robin-config
-      volumes:
-      - configMap:
-          defaultMode: 420
-          name: rediscluster-sample-robin
-        name: rediscluster-sample-robin-config
 ```
 
 ### Redis configuration
 
 The `config` item contains the Redis specific configuration attributes that are usually set in the `redis.conf` Redis configuration file (you'll find a complete self-documented [redis.conf](https://redis.io/docs/management/config-file/) file in Redis documentation).
 
-## Monitoring
-
-Redis operator will create a Deployment from the `spec.monitoring` section. Within your monitoring stack you can select Redis node pods filtering by the labels set by the Operator to the StatefulSet and, therefore, to the pods.
-
-The Operator will populate the StatefulSet labels with those specified in `spec.labels`.
 
 ## Redis cluster vs Standalone
 

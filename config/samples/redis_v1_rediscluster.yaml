@@ -48,7 +48,6 @@ spec:
           service_name: "rediscluster-sample"
           max_retries: 2
           back_off: 10s
-          label_selector: "redis.rediscluster.operator/component=redis,redis-cluster-name=rediscluster-sample"
         metrics:
           version: 0.10.2.0
           redis_info_keys:

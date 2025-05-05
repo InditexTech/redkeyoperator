@@ -23,11 +23,10 @@ type RedisOperatorConfig struct {
 // RedisClusterConfig holds cluster-level Redis configuration.
 type RedisClusterConfig struct {
 	Namespace                string        `yaml:"namespace"`
-	ServiceName              string        `yaml:"service_name"`
+	Name                     string        `yaml:"service_name"`
 	Replicas                 int           `yaml:"replicas"`
 	HealthProbePeriodSeconds int           `yaml:"health_probe_interval_seconds"`
 	HealingTimeSeconds       int           `yaml:"healing_time_seconds"`
-	LabelSelector            string        `yaml:"label_selector"`
 	MaxRetries               int           `yaml:"max_retries"`
 	BackOff                  time.Duration `yaml:"back_off"`
 }
@@ -102,8 +101,8 @@ func validateConfiguration(cfg *Configuration) []string {
 	if cfg.Redis.Cluster.Namespace == "" {
 		missing = append(missing, "redis.cluster.namespace")
 	}
-	if cfg.Redis.Cluster.ServiceName == "" {
-		missing = append(missing, "redis.cluster.service_name")
+	if cfg.Redis.Cluster.Name == "" {
+		missing = append(missing, "redis.cluster.name")
 	}
 	if cfg.Redis.Cluster.Replicas == 0 {
 		missing = append(missing, "redis.cluster.replicas")
@@ -113,9 +112,6 @@ func validateConfiguration(cfg *Configuration) []string {
 	}
 	if cfg.Redis.Cluster.HealingTimeSeconds == 0 {
 		missing = append(missing, "redis.cluster.healing_time_seconds")
-	}
-	if cfg.Redis.Cluster.LabelSelector == "" {
-		missing = append(missing, "redis.cluster.label_selector")
 	}
 	return missing
 }

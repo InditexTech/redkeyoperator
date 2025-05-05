@@ -59,7 +59,7 @@ func NewRedisPollMetrics(conf *redisopconf.Configuration, metricsManager *metric
 // Start begins the polling loop.
 func (p *RedisPollMetrics) Start(ctx context.Context) {
 	for {
-		log.Printf("Polling metrics %s.", p.conf.Redis.Cluster.ServiceName)
+		log.Printf("Polling metrics %s.", p.conf.Redis.Cluster.Name)
 
 		err := p.pollRedisMetrics(ctx)
 		if err != nil {
@@ -193,8 +193,8 @@ func (p *RedisPollMetrics) pollClusterInfo(redisClient *api.RedisClient) error {
 // from each node in the configured Redis Cluster.
 func (p *RedisPollMetrics) pollRedisNodeLevelMetrics(ctx context.Context) error {
 	for i := range p.conf.Redis.Cluster.Replicas {
-		nodeName := fmt.Sprintf("%s-%d", p.conf.Redis.Cluster.ServiceName, i)
-		nodeAddr := fmt.Sprintf("%s.%s", nodeName, p.conf.Redis.Cluster.ServiceName)
+		nodeName := fmt.Sprintf("%s-%d", p.conf.Redis.Cluster.Name, i)
+		nodeAddr := fmt.Sprintf("%s.%s", nodeName, p.conf.Redis.Cluster.Name)
 
 		if err := p.pollRedisInfoAllMetrics(ctx, nodeAddr, nodeName); err != nil {
 			log.Printf("Error polling Redis metrics for node %s: %v", nodeName, err)
@@ -228,7 +228,7 @@ func (p *RedisPollMetrics) buildNodeTags(nodeName string) map[string]string {
 // buildCommonMetadataTags returns a shared map of metadata from p.conf.
 func (p *RedisPollMetrics) buildCommonMetadataTags() map[string]string {
 	tags := map[string]string{
-		metrics.Cluster:   p.conf.Redis.Cluster.ServiceName,
+		metrics.Cluster:   p.conf.Redis.Cluster.Name,
 		metrics.Namespace: p.conf.Redis.Cluster.Namespace,
 	}
 	maps.Copy(tags, p.conf.Metadata)
@@ -237,7 +237,7 @@ func (p *RedisPollMetrics) buildCommonMetadataTags() map[string]string {
 
 // createRedisClusterClient abstracts out creating a Redis client for the cluster service address.
 func (p *RedisPollMetrics) createRedisClusterClient(ctx context.Context) *api.RedisClient {
-	return api.NewRedisClient(ctx, p.conf.Redis.Cluster.ServiceName, os.Getenv("REDISAUTH"), 0)
+	return api.NewRedisClient(ctx, p.conf.Redis.Cluster.Name, os.Getenv("REDISAUTH"), 0)
 }
 
 // createRedisClient abstracts Redis client creation for arbitrary addresses.
