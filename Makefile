@@ -349,10 +349,12 @@ process-manifests-webhook: kustomize manifests ##		Generate the kustomized yamls
 	if [ ${PROFILE} == "dev" ]; then \
 		(cd config/webhook && \
 			$(KUSTOMIZE) edit set image redis-operator-webhook=${IMG_DEV_WEBHOOK};) \
+	elif [ ${PROFILE} == "debug" ]; then \
+		(cd config/deploy-profiles/${PROFILE} && \
+			$(KUSTOMIZE) edit set image /redis-operator-webhook=${IMG_DEBUG}); \
 	elif [ ${PROFILE} == "pro" ]; then \
 		(cd config/webhook && \
 			$(KUSTOMIZE) edit set image redis-operator-webhook=${IMG_WEBHOOK}); \
-		$(KUSTOMIZE) build config/deploy-profiles/pro > deployment/deployment.yaml; \
 	fi
 	$(KUSTOMIZE) build config/webhook > deployment/webhook.yaml
 	rm config/webhook/kustomization.yaml
@@ -395,21 +397,46 @@ debug: ##		Build a new manager binary, copy the file to the operator pod and run
 port-forward: ##		Port forwarding of port 40000 for debugging the manager with Delve.
 	kubectl port-forward pods/$(OPERATOR) 40000:40000 -n ${NAMESPACE}
 
+delete-operator: ##		Delete the operator pod (redis-operator) in order to have a new clean pod created.
+	kubectl delete pod $(OPERATOR) -n ${NAMESPACE}
+
+WEBHOOK=$(shell kubectl -n ${WEBHOOK_NAMESPACE} get po -l='control-plane=redis-operator-webhook' -o=jsonpath='{.items[0].metadata.name}')
+dev-deploy-webhook: ## 		Build a new webhook binary, copy the file to the webhook pod and run it.
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -gcflags="all=-N -l" -C webhook -o ../bin/webhook  main.go
+	kubectl wait -n ${WEBHOOK_NAMESPACE} --for=condition=ready pod -l control-plane=redis-operator-webhook
+	kubectl cp ./bin/webhook $(WEBHOOK):/webhook -n ${WEBHOOK_NAMESPACE}
+	kubectl exec -it po/$(WEBHOOK) -n ${WEBHOOK_NAMESPACE} exec /webhook
+
+debug-webhook: ##		Build a new webhook binary, copy the file to the webhhok pod and run it in debug mode (listening on port 40000 for Delve connections).
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -gcflags="all=-N -l" -C webhook -o ../bin/webhook  main.go
+	kubectl wait -n ${WEBHOOK_NAMESPACE} --for=condition=ready pod -l control-plane=redis-operator-webhook
+	kubectl cp ./bin/webhook $(WEBHOOK):/webhook -n ${WEBHOOK_NAMESPACE}
+	kubectl exec -it po/$(WEBHOOK) -n ${WEBHOOK_NAMESPACE} -- dlv --listen=:40000 --headless=true --api-version=2 --accept-multiclient exec /webhook --continue
+
+port-forward-webhook: ##		Port forwarding of port 40001 for debugging the manager with Delve.
+	kubectl port-forward pods/$(WEBHOOK) 40001:40000 -n ${WEBHOOK_NAMESPACE}
+
+delete-operator-webhook: ##		Delete the operator pod (redis-operator) in order to have a new clean pod created.
+	kubectl delete pod $(WEBHOOK) -n ${WEBHOOK_NAMESPACE}
+
 REDIS_ROBIN=$(shell kubectl -n ${NAMESPACE} get po -l='redis.rediscluster.operator/component=robin' -o=jsonpath='{.items[0].metadata.name}')
-debug-robin: ##		Build a new robin binary, copy the file to the pod and run it in debug mode (listening on port 40001 for Delve connections).
+dev-deploy-robin: ## 		Build a new robin binary, copy the file to the webhook pod and run it.
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -gcflags="all=-N -l" -C robin -o ../bin/robin  main.go
 	kubectl wait -n ${NAMESPACE} --for=condition=ready pod -l redis.rediscluster.operator/component=robin
 	kubectl cp ./bin/robin $(REDIS_ROBIN):/robin -n ${NAMESPACE}
-	kubectl exec -it po/$(REDIS_ROBIN) -n ${NAMESPACE} -- dlv --listen=:40001 --headless=true --api-version=2 --accept-multiclient exec /robin --continue
+	kubectl exec -it po/$(REDIS_ROBIN) -n ${NAMESPACE} exec /robin
 
-port-forward-robin: ##		Port forwarding of port 40001 for debugging robin with Delve.
-	kubectl port-forward pod/$(REDIS_ROBIN) 40001:40001 -n ${NAMESPACE}
+debug-robin: ##		Build a new robin binary, copy the file to the pod and run it in debug mode (listening on port 40000 for Delve connections).
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -gcflags="all=-N -l" -C robin -o ../bin/robin  main.go
+	kubectl wait -n ${NAMESPACE} --for=condition=ready pod -l redis.rediscluster.operator/component=robin
+	kubectl cp ./bin/robin $(REDIS_ROBIN):/robin -n ${NAMESPACE}
+	kubectl exec -it po/$(REDIS_ROBIN) -n ${NAMESPACE} -- dlv --listen=:40000 --headless=true --api-version=2 --accept-multiclient exec /robin --continue
+
+port-forward-robin: ##		Port forwarding of port 40002 for debugging robin with Delve.
+	kubectl port-forward pod/$(REDIS_ROBIN) 40002:40000 -n ${NAMESPACE}
 
 port-forward-metrics: ##		Port forwarding of port 8080 for debugging the manager with Delve.
 	kubectl port-forward pod/$(REDIS_ROBIN) 8080:8080 -n ${NAMESPACE}
-
-delete-operator: ##		Delete the operator pod (redis-operator) in order to have a new clean pod created.
-	kubectl delete pod $(OPERATOR) -n ${NAMESPACE}
 
 dev-apply-rdcl: ##		Apply the sample Redis Cluster manifest.
 	$(KUSTOMIZE) build config/samples | $(SED) 's/namespace: redis-operator/namespace: ${NAMESPACE}/' | kubectl apply -f -

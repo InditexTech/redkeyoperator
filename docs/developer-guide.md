@@ -97,7 +97,9 @@ EOF
 set -o errexit
 ```
 
-## Deploy Redis Operator from a custom image
+## Redis Operator
+
+### Deploy Redis Operator from a custom image
 
 Once your K8s cluster and registry are ready to work with, you need to make available the image you want to use to deploy Redis Operator.
 
@@ -134,7 +136,7 @@ make debug-docker-push IMG_DEV=localhost:5001/redis-operator:0.1.0
 
 Once the Redis Operator is available in your local registry, you can follow these steps to deploy it into you K8s cluster:
 
-1. Intall the CRD.
+1. Install the CRD.
 
 ```
 make install
@@ -164,7 +166,8 @@ make deploy
 
 >**`make` will install the needed tools like `kustomize`, `control-gen` and `envtest` if not available.**
 
-## Debuging Redis Operator
+
+### Debuging Redis Operator
 
 If you followed the steps described above to deploy the Redis Operator using the `debug` profile you'll have the CRD deployed and a redis-operator pod running.
 
@@ -187,7 +190,7 @@ The manager will the be running in your redis-operator pod and you'll see pod's 
 To enable the port forwarding:
 
 ```
-make port-foward
+make port-forward
 ```
 
 You can now attach your local debug from the IDE of your choice to the debug session in the redis-operator pod. As an example, you'll find the configuration needed to launch the debug from VSCode here:
@@ -220,6 +223,232 @@ Before redeploying the operator code using `make debug` you can delete the opera
 
 >**!! Go 1.16 or above is needed to use Delve debugging !!**
 
+
+## Redis Operator Webhook
+
+### Deploy Redis Operator Webhook from a custom image
+
+Once your K8s cluster and registry are ready to work with, you need to make available the image you want to use to deploy Redis Operator Webhook.
+
+Your cluster must be configured to be able to access your local registry.
+
+We provide and easy way to build and push the images for `dev` and `debug` profiles:
+
+- `make dev-docker-build-webhook`: builds an image containing the Redis Operator webhook built from the source code. This image is published in Docker local registry.
+- `make dev-docker-push-webhook`: pushes the image built with the command above to the corresponding registry.
+- `make debug-docker-build`: builds an image that will allow us to create an *empty* pod as the redis operator to which we will copy the manager binary and run it, as we'll explain later.
+- `make debug-docker-push`: pushes the image built with the command above to he corresponding registry.
+
+**To test a released Redis Operator Webhook version you'll have to manually pull the image, tag and push to your local registry.**
+
+The image names used by default by each profile (shown in the table above) can be overwritten using the environment variables:
+
+- `IMG_WEBHOOK`: overwrittes the image name when using `pro` profile.
+- `IMG_DEV_WEBHOOK`: overwrittes the image name when using `dev` profile.
+- `IMG_DEBUG`: overwrittes the image name when using `debug` profile.
+
+E.G. these are the commands to build and push the image for `debug` profile:
+
+```
+make debug-docker-build IMG_DEBUG=localhost:5001/redis-operator-webhook:delve
+make debug-docker-push IMG_DEBUG=localhost:5001/redis-operator-webhook:delve
+```
+
+E.G. the commands when using `dev` profile:
+
+```
+make debug-docker-build-webhook IMG_DEV_WEBHOOK=localhost:5001/redis-operator-webhook:0.1.0
+make debug-docker-push-webhook IMG_DEV_WEBHOOK=localhost:5001/redis-operator-webhook:0.1.0
+```
+
+Once the Redis Operator is available in your local registry, you can follow these steps to deploy it into you K8s cluster:
+
+1. Install the CRD.
+
+```
+make install
+```
+
+2. Create the namespace in which you want you Redis Operator Webhook to be deployed. By default, `make` uses `redis-operator-webhook`. Is you want to use a different namespace you should use the `WEBHOOK_NAMESPACE` environment variable to overwritte this value with the one of your choice.
+
+```
+kubectl create ns redis-operator-webhook
+```
+
+>**The default namespace used by make command is `redis-operato-webhook`. This value can be overwritten using the `WEBHOOK_NAMESPACE` environment variable.**
+
+3. Generate the manifests, according to the profile you choose to use, to deploy the Redis Operator. Use the `PROFILE` environment variable to define the profile to use. The manifests are generated in `deployment` directory.
+
+```
+make process-manifests-webhook PROFILE=debug IMG_DEBUG="localhost:5001/redis-operator:delve"
+```
+
+>**If no `PROFILE` environment variable defined, the default value is `dev`.**
+
+4. Deploy the Redis Operator Webhook. Uses the `deployment/webhook.yml` generated in the above step.
+
+```
+make deploy-webhook
+```
+
+>**`make` will install the needed tools like `kustomize`, `control-gen` and `envtest` if not available.**
+
+
+### Debuging Redis Operator Webhook
+
+If you followed the steps described above to deploy the Redis Operator Webhook using the `debug` profile you'll have the CRD deployed and a redis-operator-webhook pod running.
+
+This pod is created using a `golang` image with `Delve` installed on it. This will allow us to easily debug the webhook code following these steps:
+
+1. Build the webhook binary file from the source code.
+2. Copy the webhook binary file to the redis-operator-webhook pod.
+3. Run the webhook binary inside the redis-operator-webhook pod, using Delve to allow remote debugging connections.
+4. Port forward `40001` port to be able to connect to the exposed port in the redis-operator-webhook pod.
+5. Connect from the IDE of your choice to remote debugging
+
+To follow the 3 first steps simply execute:
+
+```
+make debug-webhook
+```
+
+The webohok will the be running in your redis-operator-webhook pod and you'll see pod's standard output printing in your terminal. The webhook logs will then be streamed to the terminal.
+
+To enable the port forwarding:
+
+```
+make port-forward-webhook
+```
+
+You can now attach your local debug from the IDE of your choice to the debug session in the redis-operator-webhook pod. As an example, you'll find the configuration needed to launch the debug from VSCode here:
+
+```
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Connect to webhook",
+            "type": "go",
+            "request": "attach",
+            "mode": "remote",
+            "remotePath": "${workspaceFolder}",
+            "port": 40001,
+            "host": "127.0.0.1",
+            "trace": "verbose",
+            "env": {
+                "WATCH_NAMESPACE": "default",
+                "KUBERNETES_CONFIG":  "${HOME}/.kube/config",
+            }
+        }
+    ]
+}
+```
+
+Customize the configuration to use your kubeconfig and your namespace if needed.
+
+Before redeploying the webhook code using `make debug-webhook` you can delete the webhook pod using `make delete-operator-webhook`. The webhook pod will be deleted and automatically recreated to suit the replica set requirements using the debugging image.
+
+>**!! Go 1.16 or above is needed to use Delve debugging !!**
+
+
+## Redis Robin
+
+### Deploy Redis Robin from a custom image
+
+Once your K8s cluster and registry are ready to work with, you need to make available the image you want to use to deploy Redis Robin.
+
+Your cluster must be configured to be able to access your local registry.
+
+We provide and easy way to build and push the images for `dev` and `debug` profiles:
+
+- `make dev-docker-build-robin`: builds an image containing the Redis Robin built from the source code. This image is published in Docker local registry.
+- `make dev-docker-push-robin`: pushes the image built with the command above to the corresponding registry.
+- `make debug-docker-build`: builds an image that will allow us to create an *empty* pod as the redis operator to which we will copy the manager binary and run it, as we'll explain later.
+- `make debug-docker-push`: pushes the image built with the command above to he corresponding registry.
+
+**To test a released Redis Robin version you'll have to manually pull the image, tag and push to your local registry.**
+
+The image names used by default by each profile (shown in the table above) can be overwritten using the environment variables:
+
+- `IMG_ROBIN`: overwrittes the image name when using `pro` profile.
+- `IMG_DEV_ROBIN`: overwrittes the image name when using `dev` profile.
+- `IMG_DEBUG`: overwrittes the image name when using `debug` profile.
+
+E.G. these are the commands to build and push the image for `debug` profile:
+
+```
+make debug-docker-build IMG_DEBUG=localhost:5001/redis-robin:delve
+make debug-docker-push IMG_DEBUG=localhost:5001/redis-robin:delve
+```
+
+E.G. the commands when using `dev` profile:
+
+```
+make debug-docker-build-robin IMG_DEV_ROBIN=localhost:5001/redis-robin:0.1.0
+make debug-docker-push-robin IMG_DEV_ROBIN=localhost:5001/redis-robin:0.1.0
+```
+
+Once the Redis Robin is available in your local registry, you can follow these steps to deploy it into you K8s cluster:
+
+1. Install the Redis Operator. You can follow the instructions in [Redis Operator](#redis-operator) section.
+
+2. Create a Redis Cluster setting `spec.robin.template.spec.containers[0].image` to `$IMG_ROBIN`, `$IMG_DEV_ROBIN` or `$IMG_DEBUG` depending on the profile you want to test. You can use the Redis Cluster sample in `config/samples/redis_v1_rediscluster.yml`
+
+
+
+### Debuging Redis Robin
+
+If you followed the steps described above to deploy the Redis Robin using the `debug` profile you'll have a Redis Cluster with a Redis Robin deployed.
+
+This pod is created using a `golang` image with `Delve` installed on it. This will allow us to easily debug the robin code following these steps:
+
+1. Build the robin binary file from the source code.
+2. Copy the robin binary file to the `<RedisClusterName>`-robin pod.
+3. Run the robin binary inside the `<RedisClusterName>`-robin pod, using Delve to allow remote debugging connections.
+4. Port forward `40002` port to be able to connect to the exposed port in the `<RedisClusterName>`-robin pod.
+5. Connect from the IDE of your choice to remote debugging
+
+To follow the 3 first steps simply execute:
+
+```
+make debug-robin
+```
+
+The robin will the be running in your `<RedisClusterName>`-robin pod and you'll see pod's standard output printing in your terminal. The robin logs will then be streamed to the terminal.
+
+To enable the port forwarding:
+
+```
+make port-forward-robin
+```
+
+You can now attach your local debug from the IDE of your choice to the debug session in the `<RedisClusterName>`-robin pod. As an example, you'll find the configuration needed to launch the debug from VSCode here:
+
+```
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Connect to robin",
+            "type": "go",
+            "request": "attach",
+            "mode": "remote",
+            "remotePath": "${workspaceFolder}",
+            "port": 40002,
+            "host": "127.0.0.1",
+            "trace": "verbose",
+            "env": {
+                "WATCH_NAMESPACE": "default",
+                "KUBERNETES_CONFIG":  "${HOME}/.kube/config",
+            }
+        }
+    ]
+}
+```
+
+Customize the configuration to use your kubeconfig and your namespace if needed.
+
+
 ## Cleanup
 
 Delete the operator and all associated resources with:
@@ -239,56 +468,6 @@ There are two sample manifests for creating Redis clusters under the folder `con
 
 Create an ephemeral cluster `redis_v1alpha1_rediscluster_ephemeral.yaml` **IMPORTANT specify at least `replicas: 3` `replicasPerMaster: 1`** this is important to promote failover and renconcile cluster when master fail
 
-## Getting the metrics from Redis Cluster and the Operator
-
-The folder `_local_tools/tooling` contains manifests for **Prometheus Operator** and a **Prometheus Instance**, a **Grafana Instance**, two **PodMonitor** instances and an **InfluxDB Instance**. These tools can be applied by running
-```
-kustomize build _local_tools/tooling | kubectl apply -f -
-```
-The operator serves its metrics via the port 8080. One of the PodMonitors scrapes metrics out of Operator instance and writes them to the Prometheus instance. 
-The other PodMonitor uses a label match to find out all Redis instances and scrapes all the Redis metrics and copies to the Prometheus instance.
-
-By default, Redis pods does not expose a metrics port. To achieve this, a sidecar should be added to each pod. This operation requires a change on the code where the Redis cluster statefulset is created. The can can be applied by running
-```
-git apply _local_tools/monitoring/redis_monitoring_sidecar_apply.diff
-```
-and can be removed by running
-```
-git apply _local_tools/monitoring/redis_monitoring_sidecar_remove.diff
-```
-
----
-### !!! WARNING !!!
-> It's crucial to remove this path before commiting the code to the repository as this sidecar approach is just for development purposes and not for production.
-
----
-
-After applying the patch and running the operator by running `make dev-deploy`, newly created Redis clusters will include this metrics sidecar on each Redis node. By this time all the metrics should be on the Prometheus instance and ready to inspect.
-
-## Visualizing the metrics
-
-Grafana service's type is ClusterIP and the exposed port should be forwarded in order to reach the service from the local development machine.
-
-```
-kubectl port-forward service/grafana 28080:80
-```
-
-After forwarding the port, Grafana interface can be reached by accessing `http://localhost:28080` from a browser. Grafana username and password can be found inside the `grafana.yml` file. 
-The data source for all metrics can be found by adding a Data Source by the type Prometheus and with the address `http://prometheus-operated:9090`. A sample dashboard can be created by importing the `_local_tools/dashboards/redis-prometheus.json` file.
-
-![img.png](../images/redis-dashboard.png)
-
-## How to run a load test
-
-The folder `_local_tools/tooling` contains the file `redis-load-tester.yml` which can be used to deploy a load tester.
-
-This load tester randomly generates keys and writes them on the redis cluster. Load tester also writes the metrics about its load to the InfluxDB instance.
-
-The Influxdb can be added as a data source on Grafana by using `http://inflluxdb:8086` as the address and `myk6db` as the database name. 
-
-The dashboard can be added by importing `_local_tools/dashboards/redis-k6.json` file.
-
-![img.png](../images/redis-load-dashboard.png)
 
 ## Tests
 
