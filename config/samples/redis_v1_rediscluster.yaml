@@ -41,7 +41,7 @@ spec:
         operator:
           collection_interval_seconds: 60
         cluster:
-          replicas: 3
+          replicas: 1
           namespace: redis-operator
           health_probe_interval_seconds: 60
           healing_time_seconds: 60
