@@ -7,7 +7,7 @@ Redis operator CRD defines a new resource type `RedisCluster`.
 Below you'll find an example of manifest conforming to the resource definition that will deploy a Redis cluster:
 
 ```yaml
-apiVersion: redis.inditex.com/v1alpha1
+apiVersion: redis.inditex.com/v1
 kind: RedisCluster
 metadata:
   name: rediscluster-sample
@@ -30,23 +30,23 @@ spec:
     save ""
     appendonly no
     maxmemory 1400mb
-  monitoring:
+  robin:
     spec:
       containers:
-      - name: monitoring
+      - name: robin
         image: redis-metrics:1.0.0
         ports:
         - containerPort: 8080
-          name: monitor
+          name: prometheus
           protocol: TCP
         volumeMounts:
         - mountPath: /opt/conf/configmap
-          name: rediscluster-sample-monitoring-config
+          name: rediscluster-sample-robin-config
       volumes:
       - configMap:
           defaultMode: 420
-          name: rediscluster-sample-monitoring
-        name: rediscluster-sample-monitoring-config
+          name: rediscluster-sample-robin
+        name: rediscluster-sample-robin-config
 ```
 
 ### Redis configuration
