@@ -45,7 +45,7 @@ const (
 appendonly no
 maxmemory 70mb`
 	finalizerName  = "redis.inditex.com/configmap-cleanup"
-	pollInterval   = 1 * time.Second
+	pollInterval   = 5 * time.Second
 	defaultTimeout = 60 * time.Minute
 )
 
