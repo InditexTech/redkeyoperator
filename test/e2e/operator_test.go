@@ -145,8 +145,8 @@ func newOperatorContainer(ns string) corev1.Container {
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		SecurityContext: &corev1.SecurityContext{AllowPrivilegeEscalation: ptr.To(false)},
 		Resources: corev1.ResourceRequirements{
-			Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("300m"), corev1.ResourceMemory: resource.MustParse("300Mi")},
-			Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("200m"), corev1.ResourceMemory: resource.MustParse("200Mi")},
+			Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("500m"), corev1.ResourceMemory: resource.MustParse("500Mi")},
+			Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("300m"), corev1.ResourceMemory: resource.MustParse("250Mi")},
 		},
 	}
 }
