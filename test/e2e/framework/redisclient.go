@@ -45,7 +45,7 @@ const (
 appendonly no
 maxmemory 70mb`
 	finalizerName  = "redis.inditex.com/configmap-cleanup"
-	pollInterval   = 1 * time.Minute
+	pollInterval   = 1 * time.Second
 	defaultTimeout = 60 * time.Minute
 )
 
@@ -263,37 +263,27 @@ func ChangeCluster(
 	wantGen := rc.Generation
 
 	// 4) wait for Ready again and capture the status trace
-	ready, trace, err := waitForReady(ctx, c, key, wantGen)
+	ready, trace, err := WaitForReadyWithTrace(ctx, c, key, wantGen)
 	return ready, trace, err
 }
 
-// WaitForReadyWithTrace is just a convenience wrapper used by tests that need
-// the trace list.  If you only need the final object, call waitForReady
-// directly.
+// WaitForReadyWithTrace waits until:
+//
+//   - rc.Status.Status == Ready for two consecutive polls, AND
+//   - the reconciler has observed generation ≥ wantGen.
+//
+// While waiting it records, once and in order, every
+// rc.Status.Conditions[i].Type whose Status == True and returns that trace.
 func WaitForReadyWithTrace(
 	ctx context.Context,
 	cl client.Client,
 	key types.NamespacedName,
 	wantGen int64,
 ) (*redisv1.RedisCluster, []string, error) {
-	return waitForReady(ctx, cl, key, wantGen)
-}
-
-// waitForReady blocks until the cluster is Ready *and* the reconciler has
-// observed at least generation >= wantGen.  It also returns a slice with the
-// phases it saw (useful in tests to assert intermediary states).
-func waitForReady(
-	ctx context.Context,
-	cl client.Client,
-	key types.NamespacedName,
-	wantGen int64,
-) (*redisv1.RedisCluster, []string, error) {
-
 	var (
-		trace      []string
-		last       string
-		readyCount int
-		rc         = &redisv1.RedisCluster{}
+		rc        = &redisv1.RedisCluster{}
+		trace     []string
+		readyHits int
 	)
 
 	deadline := time.After(defaultTimeout)
@@ -316,31 +306,34 @@ func waitForReady(
 			return nil, trace, err
 		}
 
-		phase := rc.Status.Status
-		gen := readyObservedGen(rc)
+		trace = append(trace, rc.Status.Status)
 
-		// record phase transitions (for debugging / assertions)
-		if phase != last {
-			// log.Printf("[waitForReady] phase=%s generation=%d wantGen=%d", phase, gen, wantGen)
-			trace = append(trace, phase)
-			last = phase
-		}
+		if rc.Status.Status == redisv1.StatusReady &&
+			readyObservedGen(rc) >= wantGen {
 
-		// consecutive-Ready logic
-		if phase == redisv1.StatusReady && gen >= wantGen {
-			readyCount++
-			if readyCount == 2 { // <- stable Ready
+			readyHits++
+			if readyHits == 2 { // stable Ready
+				if err := cl.Get(ctx, key, rc); err != nil {
+					return nil, trace, err
+				}
+
+				for _, c := range rc.Status.Conditions {
+					// Check conditions just in case polling is too fast
+					trace = append(trace, c.Type)
+				}
+
+				trace = append(trace, rc.Status.Status)
 				return rc.DeepCopy(), trace, nil
 			}
 		} else {
-			readyCount = 0 // any other phase resets the counter
+			readyHits = 0
 		}
 	}
 }
 
 // readyObservedGen returns the generation the controller has already
-// observed.  ❶ prefer .status.observedGeneration; ❷ fall back to the
-// Ready condition; ❸ if both are zero, just return rc.Generation so
+// observed. prefer .status.observedGeneration; fall back to the
+// Ready condition; if both are zero, just return rc.Generation so
 // the waiter can still progress.
 func readyObservedGen(rc *redisv1.RedisCluster) int64 {
 	for _, c := range rc.Status.Conditions {
