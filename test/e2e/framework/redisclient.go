@@ -314,6 +314,9 @@ func WaitForReadyWithTrace(
 			readyHits++
 			if readyHits == 2 { // stable Ready
 				if err := cl.Get(ctx, key, rc); err != nil {
+					if errors.IsNotFound(err) {
+						continue
+					}
 					return nil, trace, err
 				}
 
