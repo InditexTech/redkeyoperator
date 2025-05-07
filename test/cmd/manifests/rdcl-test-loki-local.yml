@@ -1,0 +1,47 @@
+# SPDX-FileCopyrightText: 2025 INDUSTRIA DE DISEÑO TEXTIL, S.A. (INDITEX, S.A.)
+#
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: redis.inditex.com/v1
+kind: RedisCluster
+metadata:
+  annotations:
+    amiga-admin: ""
+    paas-details: |
+      {"workloads":[{"kind":"StatefulSet", "name":"redis-cluster-test"}]}
+    technology: redis_7.4.0
+    nodes-extra-annotations: |
+      {"log-format": "lineformat"}
+    nodes-extra-labels: |
+      {"log-scrape": "true"}
+  labels:
+    app: redis-cluster-test
+    slot: test
+    technology: redis_7.4.0
+    version: 7.4.0
+    redis-cluster-name: redis-cluster-test
+    redis.rediscluster.operator/component: redis
+  name: redis-cluster-test
+spec:
+  config: |
+    save ""
+    appendonly no
+  deletePVC: false
+  ephemeral: true
+  purgekeysonrebalance: true
+  image: redis/redis-stack-server:7.4.0-v3
+  labels:
+    application: redis-app
+    deployment: redis-cluster-test
+    slot: test
+    technology: redis_7.4.0
+    version: 7.4.0
+  pdb:
+    enabled: true
+    pdbSizeAvailable: 50%
+    pdbSizeUnavailable: 0
+  replicas: 3
+  resources:
+    limits:
+      cpu: 50m
+      memory: 100Mi
