@@ -11,7 +11,6 @@ package   := github.com/inditextech/$(name)
 # Image URL to use for building/pushing image targets when using `pro` deployment profile.
 IMG ?= redis-operator:$(VERSION)
 IMG_WEBHOOK ?= redis-operator-webhook:$(VERSION)
-IMG_ROBIN ?= redis-operator-robin:$(VERSION)
 
 # CN for the webhook certificate
 CN ?= inditex.com
@@ -39,8 +38,7 @@ GO_COMPILE_FLAGS='-X $(MODULE)/cmd/server.GitCommit=$(COMMIT) -X $(MODULE)/cmd/s
 TEST_COVERAGE_PROFILE_OUTPUT = ".local/coverage.out"
 TEST_REPORT_OUTPUT = ".local/test_report.ndjson"
 TEST_REPORT_OUTPUT_E2E = ".local/test_report_e2e.ndjson"
-TEST_COVERAGE_PROFILE_OUTPUT_ROBIN = ".local/coverage_robin.out"
-TEST_REPORT_OUTPUT_ROBIN = ".local/test_report_robin.ndjson"
+
 # .............................................................................
 # / END SECTION
 # .............................................................................
@@ -82,7 +80,6 @@ BUNDLE_IMG ?= controller-bundle:$(VERSION)
 # We always use version 0.1.0 for this purpose.
 IMG_DEV ?= redis-operator:0.1.0-dev
 IMG_DEV_WEBHOOK ?= redis-operator-webhook:0.1.0-dev
-IMG_DEV_ROBIN ?= redis-operator-robin:0.1.0-dev
 
 # Image URL to use for deploying the operator pod when using `debug` deployment profile.
 # A base golang image is used with Delve installed, in order to be able to remotely debug the manager.
@@ -234,17 +231,11 @@ dev-build: ##	Build manager binary.
 dev-build-webhook: ##	Build webhook binary.
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -C webhook -o ../bin/webhook  main.go
 
-dev-build-robin: ##	Build robin binary.
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -C robin -o ../bin/robin  main.go
-
 docker-build: test ##	Build docker image with the manager (uses `${IMG}` image name).
 	docker build -t ${IMG} .
 
 docker-build-webhook: test ##	Build docker image with the webhook (uses `${IMG_WEBHOOK}` image name).
 	docker build -t ${IMG_WEBHOOK} -f webhook/Dockerfile .
-
-docker-build-robin: test ##	Build docker image with robin (uses `${IMG_ROBIN}` image name).
-	docker build -t ${IMG_ROBIN} -f robin/Dockerfile .
 
 docker-push: ##	Push docker image with the manager (uses `${IMG}` image name).
 	docker push ${IMG}
@@ -252,26 +243,17 @@ docker-push: ##	Push docker image with the manager (uses `${IMG}` image name).
 docker-push-webhook: ##	Push docker image with the webhook (uses `${IMG_WEBHOOK}` image name).
 	docker push ${IMG_WEBHOOK}
 
-docker-push-robin: ##	Push docker image with robin (uses `${IMG_ROBIN}` image name).
-	docker push ${IMG_ROBIN}
-
 dev-docker-build: test  ##	Build docker image with the manager for development (uses `${IMG_DEV}` image name).
 	docker build -t ${IMG_DEV} .
 
 dev-docker-build-webhook: test  ##	Build docker image with the webhook for development (uses `${IMG_DEV_WEBHOOK}` image name).
 	docker build -t ${IMG_DEV_WEBHOOK} -f webhook/Dockerfile .
 
-dev-docker-build-robin: test  ##	Build docker image with robin for development (uses `${IMG_DEV_ROBIN}` image name).
-	docker build -t ${IMG_DEV_ROBIN} -f robin/Dockerfile robin
-
 dev-docker-push: ##	Push docker image with the manager for development (uses `${IMG_DEV}` image name).
 	docker push ${IMG_DEV}
 
 dev-docker-push-webhook: ##	Push docker image with the webhook for development (uses `${IMG_DEV_WEBHOOK}` image name).
 	docker push ${IMG_DEV_WEBHOOK}
-
-dev-docker-push-robin: ##	Push docker image with the robin for development (uses `${IMG_DEV_ROBIN}` image name).
-	docker push ${IMG_DEV_ROBIN}
 
 debug-docker-build: ##	Build docker image for debugging from debug.Dockerfile (uses `${IMG_DEBUG}` image name).
 	docker build -t ${IMG_DEBUG} -f debug.Dockerfile .
@@ -418,25 +400,6 @@ port-forward-webhook: ##		Port forwarding of port 40001 for debugging the manage
 
 delete-operator-webhook: ##		Delete the operator pod (redis-operator) in order to have a new clean pod created.
 	kubectl delete pod $(WEBHOOK) -n ${WEBHOOK_NAMESPACE}
-
-REDIS_ROBIN=$(shell kubectl -n ${NAMESPACE} get po -l='redis.rediscluster.operator/component=robin' -o=jsonpath='{.items[0].metadata.name}')
-dev-deploy-robin: ## 		Build a new robin binary, copy the file to the webhook pod and run it.
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -gcflags="all=-N -l" -C robin -o ../bin/robin  main.go
-	kubectl wait -n ${NAMESPACE} --for=condition=ready pod -l redis.rediscluster.operator/component=robin
-	kubectl cp ./bin/robin $(REDIS_ROBIN):/robin -n ${NAMESPACE}
-	kubectl exec -it po/$(REDIS_ROBIN) -n ${NAMESPACE} exec /robin
-
-debug-robin: ##		Build a new robin binary, copy the file to the pod and run it in debug mode (listening on port 40000 for Delve connections).
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -gcflags="all=-N -l" -C robin -o ../bin/robin  main.go
-	kubectl wait -n ${NAMESPACE} --for=condition=ready pod -l redis.rediscluster.operator/component=robin
-	kubectl cp ./bin/robin $(REDIS_ROBIN):/robin -n ${NAMESPACE}
-	kubectl exec -it po/$(REDIS_ROBIN) -n ${NAMESPACE} -- dlv --listen=:40000 --headless=true --api-version=2 --accept-multiclient exec /robin --continue
-
-port-forward-robin: ##		Port forwarding of port 40002 for debugging robin with Delve.
-	kubectl port-forward pod/$(REDIS_ROBIN) 40002:40000 -n ${NAMESPACE}
-
-port-forward-metrics: ##		Port forwarding of port 8080 for debugging the manager with Delve.
-	kubectl port-forward pod/$(REDIS_ROBIN) 8080:8080 -n ${NAMESPACE}
 
 dev-apply-rdcl: ##		Apply the sample Redis Cluster manifest.
 	$(KUSTOMIZE) build config/samples | $(SED) 's/namespace: redis-operator/namespace: ${NAMESPACE}/' | kubectl apply -f -
@@ -627,11 +590,6 @@ test-cov: ## Execute the application test with coverage
 	mkdir -p $(TEST_REPORT_OUTPUT_DIRNAME)
 	$(GO) test ./controllers/ ./internal/*/ ./api/*/ -coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT) -covermode=count
 
-test-cov-robin: ## Execute the application test with coverage
-	$(info $(M) running robin tests and generating coverage report...)
-	$(eval TEST_REPORT_OUTPUT_ROBIN_DIRNAME=$(shell dirname $(TEST_REPORT_OUTPUT_ROBIN)))
-	mkdir -p $(TEST_REPORT_OUTPUT_ROBIN_DIRNAME)
-	$(GO) test -C robin -coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT_ROBIN) -covermode=count
 
 # Integration tests
 SED = $(shell which sed)
