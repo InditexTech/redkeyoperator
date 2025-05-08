@@ -193,7 +193,7 @@ clean: ## Clean the build artifacts and Go cache
 
 ##@ Development
 manifests: controller-gen ##	Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=redis-operator-role crd:maxDescLen=0 webhook paths="./..." output:crd:artifacts:config=deployment output:rbac:artifacts:config=deployment
+	$(CONTROLLER_GEN) rbac:roleName=redis-operator-role crd:maxDescLen=0 webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 generate: controller-gen ##	Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
@@ -268,7 +268,7 @@ install: process-manifests-crd ##		Install CRD into the K8s cluster specified by
 uninstall: process-manifests-crd ##		Uninstall CRD from the K8s cluster specified by kubectl default context (Kustomize is installed if not present).
 	kubectl delete -f deployment/redis.inditex.com_redisclusters.yaml
 
-process-manifests: kustomize manifests ##		Generate the kustomized yamls into the `deployment` directory to deploy the manager.
+process-manifests: kustomize process-manifests-crd process-manifests-webhook ##		Generate the kustomized yamls into the `deployment` directory to deploy the manager.
 	@echo "Generating manager deploying manifest files using ${PROFILE} profile"
 	cp config/deploy-profiles/${PROFILE}/kustomization.yaml config/deploy-profiles/${PROFILE}/kustomization.yaml.orig && \
 	(cd config/deploy-profiles/${PROFILE} && \
@@ -276,23 +276,23 @@ process-manifests: kustomize manifests ##		Generate the kustomized yamls into th
 	if [ ${PROFILE} == "dev" ]; then \
 		(cd config/deploy-profiles/${PROFILE} && \
 			$(KUSTOMIZE) edit set image redis-operator=${IMG_DEV}); \
-		$(KUSTOMIZE) build config/deploy-profiles/dev > deployment/deployment.yaml; \
-		$(SED) -i 's/watch-namespace/$(NAMESPACE)/' deployment/deployment.yaml; \
+		$(KUSTOMIZE) build config/deploy-profiles/dev > deployment/manager.yaml; \
+		$(SED) -i 's/watch-namespace/$(NAMESPACE)/' deployment/manager.yaml; \
 	elif [ ${PROFILE} == "debug" ]; then \
 		(cd config/deploy-profiles/${PROFILE} && \
 			$(KUSTOMIZE) edit set image /redis-operator=${IMG_DEBUG}); \
-		$(KUSTOMIZE) build config/deploy-profiles/debug > deployment/deployment.yaml; \
-		$(SED) -i 's/watch-namespace/$(NAMESPACE)/' deployment/deployment.yaml; \
+		$(KUSTOMIZE) build config/deploy-profiles/debug > deployment/manager.yaml; \
+		$(SED) -i 's/watch-namespace/$(NAMESPACE)/' deployment/manager.yaml; \
 	elif [ ${PROFILE} == "pro" ]; then \
 		(cd config/deploy-profiles/${PROFILE} && \
 			$(KUSTOMIZE) edit set image redis-operator=${IMG}); \
-		$(KUSTOMIZE) build config/deploy-profiles/pro > deployment/deployment.yaml; \
+		$(KUSTOMIZE) build config/deploy-profiles/pro > deployment/manager.yaml; \
 	fi
 	rm config/deploy-profiles/${PROFILE}/kustomization.yaml
 	mv config/deploy-profiles/${PROFILE}/kustomization.yaml.orig config/deploy-profiles/${PROFILE}/kustomization.yaml
 	@echo "Manifest generated successfully"
 
-process-manifests-crd: kustomize manifests ##		Generate the kustomized yamls into the `deployment` directory to deploy the CRD.
+process-manifests-crd: kustomize manifests ##	Generate the kustomized yamls into the `deployment` directory to deploy the CRD.
 	@echo "Generating CRD deploying manifest files"
 	if [ ! -f certs/ca.crt ]; then make generate-ca-cert; fi
 	$(eval CA_CERT := $(shell cat certs/ca.crt | base64 -w 0))
@@ -302,7 +302,7 @@ process-manifests-crd: kustomize manifests ##		Generate the kustomized yamls int
 	mv ./config/crd/patches/webhook_in_redisclusters.yaml.orig ./config/crd/patches/webhook_in_redisclusters.yaml
 	@echo "CRD manifest generated successfully"
 
-process-manifests-webhook: kustomize manifests ##		Generate the kustomized yamls into the `deployment` directory to deploy the webhook.
+process-manifests-webhook: kustomize ##	Generate the kustomized yamls into the `deployment` directory to deploy the webhook.
 	@echo "Generating webhook deploying manifest files using ${PROFILE} profile"
 	if [ ! -f certs/ca.crt ]; then make generate-ca-cert; fi
 
@@ -333,7 +333,7 @@ process-manifests-webhook: kustomize manifests ##		Generate the kustomized yamls
 	elif [ ${PROFILE} == "pro" ]; then \
 		(cd config/webhook && \
 			$(KUSTOMIZE) edit set image redis-operator-webhook=${IMG_WEBHOOK}); \
-		$(KUSTOMIZE) build config/deploy-profiles/pro > deployment/deployment.yaml; \
+		$(KUSTOMIZE) build config/deploy-profiles/pro > deployment/manager.yaml; \
 	fi
 	$(KUSTOMIZE) build config/webhook > deployment/webhook.yaml
 	rm config/webhook/kustomization.yaml
@@ -348,16 +348,23 @@ generate-ca-cert:
 	openssl genrsa -out certs/ca.key 2048
 	openssl req -x509 -new -nodes -key certs/ca.key -days 3650 -out certs/ca.crt -subj "/CN=${WEBHOOK_NAMESPACE}.${CN}"
 
-deploy: process-manifests ##		Deploy the operator.
-	kubectl apply -f deployment/deployment.yaml
+deploy: process-manifests ##		Deploy the webhook and the manager into the K8s cluster specified by kubectl default context.
+	kubectl apply -f deployment/webhook.yaml
+	kubectl apply -f deployment/manager.yaml
+
+undeploy: process-manifests ##		Undeploy the webhook and the operator from the K8s cluster specified by kubectl default context.
+	kubectl delete -f deployment/webhook.yaml
+	kubectl delete -f deployment/manager.yaml
+
+deploy-manager: process-manifests-webhook ##		Deploy the manager into the K8s cluster specified by kubectl default context.
+	kubectl apply -f deployment/manager.yaml
+
+undeploy-manager: process-manifests-webhook ##		Delete the manager from the K8s cluster specified by kubectl default context.
 
 deploy-webhook: process-manifests-webhook ##		Deploy the webhook into the K8s cluster specified by kubectl default context.
 	kubectl apply -f deployment/webhook.yaml
 
-undeploy: process-manifests ##		Delete the operator deployed.
-	kubectl delete -f deployment/deployment.yaml
-
-undeploy-webhook: process-manifests-webhook ##		Delete the webhook into the K8s cluster specified by kubectl default context.
+undeploy-webhook: process-manifests-webhook ##		Delete the webhook from the K8s cluster specified by kubectl default context.
 	kubectl delete -f deployment/webhook.yaml
 
 OPERATOR=$(shell kubectl -n ${NAMESPACE} get po -l='control-plane=redis-operator' -o=jsonpath='{.items[0].metadata.name}')

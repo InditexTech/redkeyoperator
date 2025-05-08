@@ -4,7 +4,7 @@ metadata:
   labels:
     app.kubernetes.io/name: redis-cluster-operator
     app.kubernetes.io/managed-by: kustomize
-  name: rediscluster-sample
+  name: redis-cluster-sample
 spec:
   replicas: 1
   ephemeral: true
@@ -13,7 +13,7 @@ spec:
   - ReadWriteOnce
   deletePVC: false
   image: redis/redis-stack-server:7.4.0-v3
-  purgekeysonrebalance: false
+  purgeKeysOnRebalance: false
   labels:
     team: team-a
     custom: labels
@@ -24,7 +24,7 @@ spec:
     appendonly no
     save ""
     protected-mode no
-    loadmodule /usr/lib/redis/modules/redisgraph.so
+  # loadmodule /usr/lib/redis/modules/redisgraph.so
   # override:
   #   service:
   #     metadata:

@@ -29,7 +29,6 @@ cover.out
 *.swp
 *.swo
 *~
-.vscode
 
 state/
 
