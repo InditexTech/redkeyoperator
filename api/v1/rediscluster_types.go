@@ -117,7 +117,7 @@ type RedisClusterSpec struct {
 
 	// +kubebuilder:validation:Optional
 	// PurgeKeysOnRebalance specifies if keys should be purged on rebalance.
-	PurgeKeysOnRebalance bool `json:"purgekeysonrebalance,omitempty"`
+	PurgeKeysOnRebalance bool `json:"purgeKeysOnRebalance,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// Config is the Redis configuration to use.

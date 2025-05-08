@@ -7845,7 +7845,7 @@ spec:
                     - type: string
                     x-kubernetes-int-or-string: true
                 type: object
-              purgekeysonrebalance:
+              purgeKeysOnRebalance:
                 type: boolean
               replicas:
                 format: int32
