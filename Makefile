@@ -262,7 +262,7 @@ dev-docker-build-webhook: test  ##	Build docker image with the webhook for devel
 	docker build -t ${IMG_DEV_WEBHOOK} -f webhook/Dockerfile .
 
 dev-docker-build-robin: test  ##	Build docker image with robin for development (uses `${IMG_DEV_ROBIN}` image name).
-	docker build -t ${IMG_DEV_ROBIN} -f robin/Dockerfile .
+	docker build -t ${IMG_DEV_ROBIN} -f robin/Dockerfile robin
 
 dev-docker-push: ##	Push docker image with the manager for development (uses `${IMG_DEV}` image name).
 	docker push ${IMG_DEV}

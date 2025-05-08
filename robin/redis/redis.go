@@ -17,10 +17,8 @@ import (
 	"maps"
 
 	"github.com/inditextech/redisoperator/robin/api"
-	"github.com/inditextech/redisoperator/robin/k8s"
 	"github.com/inditextech/redisoperator/robin/metrics"
 	"github.com/inditextech/redisoperator/robin/redisopconf"
-	"k8s.io/client-go/kubernetes"
 )
 
 // nodeInfoReplacer is used to clean up node info strings.
@@ -33,25 +31,18 @@ var metricNameReplacer = strings.NewReplacer("-", "_")
 type RedisPollMetrics struct {
 	conf           *redisopconf.Configuration
 	metricsManager *metrics.MetricsManager
-	clientSet      *kubernetes.Clientset
 	clusterMgr     *ClusterManager
 }
 
 // NewRedisPollMetrics constructs a RedisPollMetrics by delegating the K8s client retrieval,
 // storing the given config & metrics manager, etc.
 func NewRedisPollMetrics(conf *redisopconf.Configuration, metricsManager *metrics.MetricsManager) (*RedisPollMetrics, error) {
-	clientSet, err := k8s.GetClientSet()
-	if err != nil {
-		return nil, err
-	}
-
 	// Create a cluster manager for IP tracking & reset logic.
 	clusterMgr := NewClusterManager(metricsManager)
 
 	return &RedisPollMetrics{
 		conf:           conf,
 		metricsManager: metricsManager,
-		clientSet:      clientSet,
 		clusterMgr:     clusterMgr,
 	}, nil
 }
