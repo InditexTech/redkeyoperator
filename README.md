@@ -8,13 +8,16 @@ Redis operator is built using [kubebuilder](https://github.com/kubernetes-sigs/k
 
 ## Features
 
-* Redis cluster creation
-* Redis cluster fixing
-* Slots allocation
-* PVC
-* Sidecar pods support (e.g. custom metrics applications)
-* Persistence
-* RedisGraph support
+- Redis cluster creation
+- Cluster scaling up and down
+- CLuster upgrading
+  - Update node pods image
+  - Update Redis configuration
+  - Update node pods resources
+- Ensure cluster health
+- Slots allocation
+- Persistence
+- RedisGraph support
 
 ## Documentation
 
@@ -22,15 +25,17 @@ Refer to [operator guide](./docs/operator-guide/toc.md) to have an overview of t
 
 If you are a developer, you'll find interesting information in the [developer guide](./docs/developer-guide.md).
 
+Learn about [Redis cluster status](./docs/redis-cluster-status.md).
+
 ## Versions
 
-* Go version: v1.24.0
-* Operator SDK version: v1.37.0
+- Go version: v1.24.0
+- Operator SDK version: v1.37.0
 
 ## License
 
 Copyright 2025 Inditex.
 
-Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at <http://www.apache.org/licenses/LICENSE-2.0>
 
 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
