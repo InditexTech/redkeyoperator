@@ -686,8 +686,6 @@ func (r *RedisClusterReconciler) scaleUpAndWait(ctx context.Context, redisCluste
 			},
 		),
 	}
-
-	// TODO AMZ: Recup point
 	r.LogInfo(redisCluster.NamespacedName(), "Waiting for pods to become ready", "expectedReplicas", int(redisCluster.Spec.Replicas))
 	err = podReadyWaiter.WaitForPodsToBecomeReady(ctx, 5*time.Second, 5*time.Minute, &listOptions, int(redisCluster.Spec.Replicas))
 	if err != nil {
