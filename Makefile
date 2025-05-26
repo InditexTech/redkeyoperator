@@ -134,7 +134,7 @@ help: ##	Display this help.
 verify: deps tidy checkfmt lint vet build test-cov ## Check the code
 
 deps: ## Installs dependencies
-	$(info $(M) installing dependencies...)
+	$(info $(M) installing dependencies)
 	GONOSUMDB=honnef.co/go/* GONOPROXY=honnef.co/go/* $(GO) install honnef.co/go/tools/cmd/staticcheck@v0.6.1
 
 .PHONY: version 
@@ -153,7 +153,7 @@ version-set:: ## Set the project version to the given version, using the NEW_VER
 
 .PHONY: checkfmt 
 checkfmt: ## Check format validation
-	$(info $(M) running gofmt checking code style...)
+	$(info $(M) running gofmt checking code style)
 	@fmtRes=$$($(GOFMT) -d $(SRC)); \
 	if [ -n "$${fmtRes}" ]; then \
 		echo "gofmt checking failed!"; echo "$${fmtRes}"; echo; \
@@ -163,22 +163,22 @@ checkfmt: ## Check format validation
 
 .PHONY: fmt 
 fmt: ## Run gofmt on all source files
-	$(info $(M) running go fmt...)
+	$(info $(M) running go fmt)
 	$(GOFMT) -l -w $(SRC)
 
 .PHONY: lint 
 lint: deps ## Run golint
-	$(info $(M) running staticcheck...)
+	$(info $(M) running staticcheck)
 	$(GOLINT) ./...
 
 .PHONY: vet 
 vet: ## Run go vet
-	$(info $(M) running go vet...)
+	$(info $(M) running go vet)
 	$(GO) vet ./...
 
 .PHONY: clean
 clean: ## Clean the build artifacts and Go cache
-	$(info $(M) cleaning generated files...)
+	$(info $(M) cleaning generated files)
 	rm -rf ./target
 	rm -rf ./bin
 	rm -rf ./bundle
@@ -189,6 +189,7 @@ clean: ## Clean the build artifacts and Go cache
 
 ##@ Development
 manifests: controller-gen ##	Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+	$(info $(M)  Generating config CRD base manifest files from code)
 	$(CONTROLLER_GEN) rbac:roleName=redis-operator-role crd:maxDescLen=0 webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 generate: controller-gen ##	Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -197,7 +198,7 @@ generate: controller-gen ##	Generate code containing DeepCopy, DeepCopyInto, and
 ##@ Build
 .PHONY: build
 build: ##	Build program binary
-	$(info $(M) building executable...)
+	$(info $(M) building executable)
 	$(GO) build \
 			-ldflags $(GO_COMPILE_FLAGS) \
 			-tags release \
@@ -206,18 +207,18 @@ build: ##	Build program binary
 
 .PHONY: update-packages
 update-packages: ##	Run go get -u
-	$(info $(M) running go get -u...)
+	$(info $(M) running go get -u)
 	$(GO) get -u
 
 
 .PHONY: tidy
 tidy: ##	Run go mod tidy
-	$(info $(M) running go mod tidy...)
+	$(info $(M) running go mod tidy)
 	$(GO) mod tidy
 
 .PHONY: run
 run: ##	Execute the program locally
-	$(info $(M) running app...)
+	$(info $(M) running app)
 	CONFIGMAP_PATH=./config_test/configmap.local.yml SECRET_PATH=./config_test/secrets.local.yml $(GO) run ./cmd/main.go
 
 docker-build: test ##	Build docker image with the manager (uses `${IMG}` image name).
@@ -243,13 +244,14 @@ docker-push-webhook: ##	Push docker image with the webhook (uses `${IMG_WEBHOOK}
 
 ##@ Deployment
 install: process-manifests-crd ##		Install CRD into the K8s cluster specified by kubectl default context (Kustomize is installed if not present).
+	$(info $(M)  Generating CRD manifest file)
 	kubectl apply -f deployment/redis.inditex.com_redisclusters.yaml
 
 uninstall: process-manifests-crd ##		Uninstall CRD from the K8s cluster specified by kubectl default context (Kustomize is installed if not present).
 	kubectl delete -f deployment/redis.inditex.com_redisclusters.yaml
 
 process-manifests: kustomize process-manifests-crd ##		Generate the kustomized yamls into the `deployment` directory to deploy the manager.
-	@echo "Generating manager deploying manifest files using ${PROFILE} profile"
+	$(info $(M)  Generating manager deploying manifest files using ${PROFILE} profile)
 	cp config/deploy-profiles/${PROFILE}/kustomization.yaml config/deploy-profiles/${PROFILE}/kustomization.yaml.orig && \
 	(cd config/deploy-profiles/${PROFILE} && \
 		$(KUSTOMIZE) edit set namespace ${NAMESPACE}) && \
@@ -269,7 +271,7 @@ process-manifests: kustomize process-manifests-crd ##		Generate the kustomized y
 	@echo "Manifest generated successfully"
 
 process-manifests-crd: kustomize manifests ##	Generate the kustomized yamls into the `deployment` directory to deploy the CRD.
-	@echo "Generating CRD deploying manifest files"
+	$(info $(M) Generating CRD deploying manifest files)
 	mkdir -p deployment
 #	 if [ ! -f certs/ca.crt ]; then make generate-ca-cert; fi
 #	$(eval CA_CERT := $(shell cat certs/ca.crt | base64 -w 0))
@@ -280,11 +282,11 @@ process-manifests-crd: kustomize manifests ##	Generate the kustomized yamls into
 	@echo "CRD manifest generated successfully"
 
 process-manifests-webhook: kustomize ##	Generate the kustomized yamls into the `deployment` directory to deploy the webhook.
-	@echo "Generating webhook deploying manifest files using ${PROFILE} profile"
+	$(info $(M) Generating webhook deploying manifest files using ${PROFILE} profile)
 	mkdir -p deployment
 	if [ ! -f certs/ca.crt ]; then make generate-ca-cert; fi
 
-	@echo "Generating certificates..."
+	$(info $(M) Generating certificates...)
 	openssl req -newkey rsa:2048 -nodes -keyout certs/server.key \
   		-subj "/C=AU/CN=${WEBHOOK_NAMESPACE}.${CN}" \
   		-out certs/server.csr
@@ -320,7 +322,7 @@ process-manifests-webhook: kustomize ##	Generate the kustomized yamls into the `
 	@echo "Webhook manifest generated successfully"
 
 generate-ca-cert:
-	@echo "Generating CA certificates"
+	$(info $(M) Generating CA certificates)
 	mkdir -p certs
 	openssl genrsa -out certs/ca.key 2048
 	openssl req -x509 -new -nodes -key certs/ca.key -days 3650 -out certs/ca.crt -subj "/CN=${WEBHOOK_NAMESPACE}.${CN}"
@@ -540,8 +542,8 @@ ginkgo:
 
 .PHONY: test-e2e
 test-e2e: process-manifests-crd ginkgo ## Execute e2e application test
-	$(info $(M) running e2e tests...)
-	$(info $(M) generating sonar report...)
+	$(info $(M) running e2e tests)
+	$(info $(M) generating sonar report)
 	$(eval TEST_COVERAGE_PROFILE_OUTPUT_DIRNAME=$(shell dirname $(TEST_COVERAGE_PROFILE_OUTPUT)))
 	$(eval TEST_REPORT_OUTPUT_DIRNAME=$(shell dirname $(TEST_REPORT_OUTPUT_E2E)))
 	mkdir -p $(TEST_COVERAGE_PROFILE_OUTPUT_DIRNAME) $(TEST_REPORT_OUTPUT_DIRNAME)
@@ -549,7 +551,7 @@ test-e2e: process-manifests-crd ginkgo ## Execute e2e application test
 
 .PHONY: test-e2e-cov
 test-e2e-cov: process-manifests-crd ginkgo ## Execute e2e application test
-	$(info $(M) generating coverage report...)
+	$(info $(M) generating coverage report)
 	$(eval TEST_REPORT_OUTPUT_DIRNAME=$(shell dirname $(TEST_REPORT_OUTPUT)))
 	mkdir -p $(TEST_REPORT_OUTPUT_DIRNAME)
 	ginkgo ./test/e2e -vv -cover -coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT) -covermode=count OPERATOR_IMAGE=$(IMG)
@@ -557,7 +559,7 @@ test-e2e-cov: process-manifests-crd ginkgo ## Execute e2e application test
 
 .PHONY: test-sonar 
 test-sonar: ## Execute the application test for Sonar (coverage + test report)
-	$(info $(M) running tests and generating sonar report...)
+	$(info $(M) running tests and generating sonar report)
 	$(eval TEST_COVERAGE_PROFILE_OUTPUT_DIRNAME=$(shell dirname $(TEST_COVERAGE_PROFILE_OUTPUT)))
 	$(eval TEST_REPORT_OUTPUT_DIRNAME=$(shell dirname $(TEST_REPORT_OUTPUT)))
 	mkdir -p $(TEST_COVERAGE_PROFILE_OUTPUT_DIRNAME) $(TEST_REPORT_OUTPUT_DIRNAME)
@@ -565,7 +567,7 @@ test-sonar: ## Execute the application test for Sonar (coverage + test report)
 
 .PHONY: test-cov
 test-cov: ## Execute the application test with coverage
-	$(info $(M) running tests and generating coverage report...)
+	$(info $(M) running tests and generating coverage report)
 	$(eval TEST_REPORT_OUTPUT_DIRNAME=$(shell dirname $(TEST_REPORT_OUTPUT)))
 	mkdir -p $(TEST_REPORT_OUTPUT_DIRNAME)
 	$(GO) test ./controllers/ ./internal/*/ ./api/*/ -coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT) -covermode=count
