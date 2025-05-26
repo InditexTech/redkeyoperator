@@ -1289,6 +1289,8 @@ func (r *RedisClusterReconciler) CreateRobinDeployment(ctx context.Context, req 
 			Replicas: &replicas,
 		},
 	}
+	d.Labels[redis.RedisClusterLabel] = req.Name
+	d.Labels[redis.RedisClusterComponentLabel] = "robin"
 	d.Spec.Template.Labels = make(map[string]string)
 	for k, v := range labels {
 		d.Spec.Template.Labels[k] = v
