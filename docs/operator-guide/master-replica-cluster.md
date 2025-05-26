@@ -7,7 +7,7 @@ Clusters with master-replica architecture can be created by adding `replicas_per
 The minimum configuration for the correct operation of this function is:
 
 ```yaml
-apiVersion: redis.inditex.com/v1alpha1
+apiVersion: redis.inditex.com/v1
 kind: RedisCluster
 ...
 spec:
@@ -21,7 +21,7 @@ The `replicas` definition is the total number of Redis master nodes in the clust
 If this feature is enabled, this additional configuration should be added to `redis.conf` to improve efficiency.
 
 ```yaml
-apiVersion: redis.inditex.com/v1alpha1
+apiVersion: redis.inditex.com/v1
 kind: RedisCluster
 ...
 spec:
@@ -42,7 +42,7 @@ spec:
 ## Examples
 
 ```yaml
-apiVersion: redis.inditex.com/v1alpha1
+apiVersion: redis.inditex.com/v1
 kind: RedisCluster
 ...
 spec:
@@ -55,7 +55,7 @@ spec:
 Redis Operator will create 6 pods, 3 masters and 3 replicas (one for each master).
 
 ```yaml
-apiVersion: redis.inditex.com/v1alpha1
+apiVersion: redis.inditex.com/v1
 kind: RedisCluster
 ...
 spec:
@@ -67,7 +67,7 @@ spec:
 Redis Operator will create 15 pods, 5 masters and 10 replicas (two for each master).
 
 ```yaml
-apiVersion: redis.inditex.com/v1alpha1
+apiVersion: redis.inditex.com/v1
 kind: RedisCluster
 ...
 spec:
@@ -79,7 +79,7 @@ spec:
 Redis Operator will create 5 pods, 5 masters and no replicas.
 
 ```yaml
-apiVersion: redis.inditex.com/v1alpha1
+apiVersion: redis.inditex.com/v1
 kind: RedisCluster
 ...
 spec:

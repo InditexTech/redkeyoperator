@@ -15,7 +15,7 @@ Starting with Redis Operator release 0.2.33, Redis Operator supports deletion of
 ## Example
 
 ```yaml
-apiVersion: redis.inditex.com/v1alpha1
+apiVersion: redis.inditex.com/v1
 kind: RedisCluster
 ...
 spec:

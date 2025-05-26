@@ -1456,12 +1456,12 @@ func (r *RedisClusterReconciler) ScaleCluster(ctx context.Context, redisCluster 
 		return err
 	}
 
-	// Monitoring deployment update
-	if redisCluster.Spec.Monitoring != nil {
-		if redisCluster.Spec.Monitoring.Template != nil {
-			mdep, err := r.FindExistingDeployment(ctx, controllerruntime.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-monitoring", Namespace: redisCluster.Namespace}})
+	// Robin deployment update
+	if redisCluster.Spec.Robin != nil {
+		if redisCluster.Spec.Robin.Template != nil {
+			mdep, err := r.FindExistingDeployment(ctx, controllerruntime.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}})
 			if err != nil {
-				r.LogError(redisCluster.NamespacedName(), err, "ScaleCluster - Cannot find existing monitoring deployment", "deployment", redisCluster.Name+"-monitoring")
+				r.LogError(redisCluster.NamespacedName(), err, "ScaleCluster - Cannot find existing robin deployment", "deployment", redisCluster.Name+"-robin")
 			} else {
 				desiredReplicas := int32(0)
 				if *sset.Spec.Replicas > 0 {
@@ -1473,7 +1473,7 @@ func (r *RedisClusterReconciler) ScaleCluster(ctx context.Context, redisCluster 
 					if err != nil {
 						r.LogError(redisCluster.NamespacedName(), err, "ScaleCluster - Failed to update Deployment replicas")
 					} else {
-						r.LogInfo(redisCluster.NamespacedName(), "ScaleCluster - Monitoring Deployment replicas updated", "Replicas", mdep.Spec.Replicas)
+						r.LogInfo(redisCluster.NamespacedName(), "ScaleCluster - Robin Deployment replicas updated", "Replicas", mdep.Spec.Replicas)
 					}
 				}
 			}

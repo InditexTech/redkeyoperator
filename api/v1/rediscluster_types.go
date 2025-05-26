@@ -112,8 +112,8 @@ type RedisClusterSpec struct {
 	Backup bool `json:"backup,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// Monitoring specifies the monitoring configuration for the RedisCluster.
-	Monitoring *MonitoringSpec `json:"monitoring,omitempty"`
+	// Robin specifies the robin configuration for the RedisCluster.
+	Robin *RobinSpec `json:"robin,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// PurgeKeysOnRebalance specifies if keys should be purged on rebalance.
@@ -178,7 +178,7 @@ type RedisClusterOverrideSpec struct {
 	Service *v1.Service `json:"service,omitempty"`
 }
 
-type MonitoringSpec struct {
+type RobinSpec struct {
 	Template *v1.PodTemplateSpec `json:"template,omitempty"`
 	Config   *string             `json:"config,omitempty"`
 }
