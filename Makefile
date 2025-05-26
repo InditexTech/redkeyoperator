@@ -75,11 +75,6 @@ endif
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
 BUNDLE_IMG ?= controller-bundle:$(VERSION)
 
-# Image URL to use for building/pushing image targets when using `dev` deployment profile.
-# We always use version 0.1.0 for this purpose.
-IMG_DEV ?= redis-operator:0.1.0-dev
-IMG_DEV_WEBHOOK ?= redis-operator-webhook:0.1.0-dev
-
 # Image URL to use for deploying the operator pod when using `debug` deployment profile.
 # A base golang image is used with Delve installed, in order to be able to remotely debug the manager.
 IMG_DEBUG ?= delve:1.24.0
@@ -189,6 +184,7 @@ clean: ## Clean the build artifacts and Go cache
 	rm -rf ./bundle
 	rm -f bundle.Dockerfile
 	rm -rf ./deployment
+	rm -rf ./certs
 	$(GO) clean --modcache
 
 ##@ Development
@@ -224,35 +220,11 @@ run: ##	Execute the program locally
 	$(info $(M) running app...)
 	CONFIGMAP_PATH=./config_test/configmap.local.yml SECRET_PATH=./config_test/secrets.local.yml $(GO) run ./cmd/main.go
 
-dev-build: ##	Build manager binary.
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -o bin/manager ./cmd/main.go
-
-dev-build-webhook: ##	Build webhook binary.
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -C webhook -o ../bin/webhook  main.go
-
 docker-build: test ##	Build docker image with the manager (uses `${IMG}` image name).
 	docker build -t ${IMG} .
 
-docker-build-webhook: test ##	Build docker image with the manager (uses `${IMG_WEBHOOK}` image name).
-	docker build -t ${IMG_WEBHOOK} -f webhook/Dockerfile .
-
 docker-push: ##	Push docker image with the manager (uses `${IMG}` image name).
 	docker push ${IMG}
-
-docker-push-webhook: ##	Push docker image with the webhook (uses `${IMG_WEBHOOK}` image name).
-	docker push ${IMG_WEBHOOK}
-
-dev-docker-build: test  ##	Build docker image with the manager for development (uses `${IMG_DEV}` image name).
-	docker build -t ${IMG_DEV} .
-
-dev-docker-build-webhook: test  ##	Build docker image with the webhook for development (uses `${IMG_DEV_WEBHOOK}` image name).
-	docker build -t ${IMG_DEV_WEBHOOK} -f webhook/Dockerfile .
-
-dev-docker-push: ##	Push docker image with the manager for development (uses `${IMG_DEV}` image name).
-	docker push ${IMG_DEV}
-
-dev-docker-push-webhook: ##	Push docker image with the webhook for development (uses `${IMG_DEV_WEBHOOK}` image name).
-	docker push ${IMG_DEV_WEBHOOK}
 
 debug-docker-build: ##	Build docker image for debugging from debug.Dockerfile (uses `${IMG_DEBUG}` image name).
 	docker build -t ${IMG_DEBUG} -f debug.Dockerfile .
@@ -260,6 +232,14 @@ debug-docker-build: ##	Build docker image for debugging from debug.Dockerfile (u
 debug-docker-push: ##	Push docker image for debugging from debug.Dockerfile (uses `${IMG_DEBUG}` image name).
 	docker push ${IMG_DEBUG}
 
+build-webhook: ##	Build webhook binary.
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -C webhook -o ../bin/webhook  main.go
+
+docker-build-webhook: test ##	Build docker image with the webhook (uses `${IMG_WEBHOOK}` image name).
+	docker build -t ${IMG_WEBHOOK} -f webhook/Dockerfile .
+
+docker-push-webhook: ##	Push docker image with the webhook (uses `${IMG_WEBHOOK}` image name).
+	docker push ${IMG_WEBHOOK}
 
 ##@ Deployment
 install: process-manifests-crd ##		Install CRD into the K8s cluster specified by kubectl default context (Kustomize is installed if not present).
@@ -268,14 +248,14 @@ install: process-manifests-crd ##		Install CRD into the K8s cluster specified by
 uninstall: process-manifests-crd ##		Uninstall CRD from the K8s cluster specified by kubectl default context (Kustomize is installed if not present).
 	kubectl delete -f deployment/redis.inditex.com_redisclusters.yaml
 
-process-manifests: kustomize process-manifests-crd process-manifests-webhook ##		Generate the kustomized yamls into the `deployment` directory to deploy the manager.
+process-manifests: kustomize process-manifests-crd ##		Generate the kustomized yamls into the `deployment` directory to deploy the manager.
 	@echo "Generating manager deploying manifest files using ${PROFILE} profile"
 	cp config/deploy-profiles/${PROFILE}/kustomization.yaml config/deploy-profiles/${PROFILE}/kustomization.yaml.orig && \
 	(cd config/deploy-profiles/${PROFILE} && \
 		$(KUSTOMIZE) edit set namespace ${NAMESPACE}) && \
 	if [ ${PROFILE} == "dev" ]; then \
 		(cd config/deploy-profiles/${PROFILE} && \
-			$(KUSTOMIZE) edit set image redis-operator=${IMG_DEV}); \
+			$(KUSTOMIZE) edit set image redis-operator=${IMG}); \
 		$(KUSTOMIZE) build config/deploy-profiles/dev > deployment/manager.yaml; \
 		$(SED) -i 's/watch-namespace/$(NAMESPACE)/' deployment/manager.yaml; \
 	elif [ ${PROFILE} == "debug" ]; then \
@@ -283,10 +263,6 @@ process-manifests: kustomize process-manifests-crd process-manifests-webhook ##	
 			$(KUSTOMIZE) edit set image /redis-operator=${IMG_DEBUG}); \
 		$(KUSTOMIZE) build config/deploy-profiles/debug > deployment/manager.yaml; \
 		$(SED) -i 's/watch-namespace/$(NAMESPACE)/' deployment/manager.yaml; \
-	elif [ ${PROFILE} == "pro" ]; then \
-		(cd config/deploy-profiles/${PROFILE} && \
-			$(KUSTOMIZE) edit set image redis-operator=${IMG}); \
-		$(KUSTOMIZE) build config/deploy-profiles/pro > deployment/manager.yaml; \
 	fi
 	rm config/deploy-profiles/${PROFILE}/kustomization.yaml
 	mv config/deploy-profiles/${PROFILE}/kustomization.yaml.orig config/deploy-profiles/${PROFILE}/kustomization.yaml
@@ -294,16 +270,18 @@ process-manifests: kustomize process-manifests-crd process-manifests-webhook ##	
 
 process-manifests-crd: kustomize manifests ##	Generate the kustomized yamls into the `deployment` directory to deploy the CRD.
 	@echo "Generating CRD deploying manifest files"
-	if [ ! -f certs/ca.crt ]; then make generate-ca-cert; fi
-	$(eval CA_CERT := $(shell cat certs/ca.crt | base64 -w 0))
-	cp ./config/crd/patches/webhook_in_redisclusters.yaml ./config/crd/patches/webhook_in_redisclusters.yaml.orig
-	cat ./config/crd/patches/webhook_in_redisclusters.yaml.tpl | sed "s|WEBHOOK_CA_CERT|${CA_CERT}|g" > ./config/crd/patches/webhook_in_redisclusters.yaml
+	mkdir -p deployment
+#	 if [ ! -f certs/ca.crt ]; then make generate-ca-cert; fi
+#	$(eval CA_CERT := $(shell cat certs/ca.crt | base64 -w 0))
+#	cp ./config/crd/patches/webhook_in_redisclusters.yaml ./config/crd/patches/webhook_in_redisclusters.yaml.orig
+#	cat ./config/crd/patches/webhook_in_redisclusters.yaml.tpl | sed "s|WEBHOOK_CA_CERT|${CA_CERT}|g" > ./config/crd/patches/webhook_in_redisclusters.yaml
 	$(KUSTOMIZE) build config/crd > deployment/redis.inditex.com_redisclusters.yaml
-	mv ./config/crd/patches/webhook_in_redisclusters.yaml.orig ./config/crd/patches/webhook_in_redisclusters.yaml
+#	mv ./config/crd/patches/webhook_in_redisclusters.yaml.orig ./config/crd/patches/webhook_in_redisclusters.yaml
 	@echo "CRD manifest generated successfully"
 
 process-manifests-webhook: kustomize ##	Generate the kustomized yamls into the `deployment` directory to deploy the webhook.
 	@echo "Generating webhook deploying manifest files using ${PROFILE} profile"
+	mkdir -p deployment
 	if [ ! -f certs/ca.crt ]; then make generate-ca-cert; fi
 
 	@echo "Generating certificates..."
@@ -329,11 +307,10 @@ process-manifests-webhook: kustomize ##	Generate the kustomized yamls into the `
 		$(KUSTOMIZE) edit set namespace ${WEBHOOK_NAMESPACE}) && \
 	if [ ${PROFILE} == "dev" ]; then \
 		(cd config/webhook && \
-			$(KUSTOMIZE) edit set image redis-operator-webhook=${IMG_DEV_WEBHOOK};) \
-	elif [ ${PROFILE} == "pro" ]; then \
-		(cd config/webhook && \
-			$(KUSTOMIZE) edit set image redis-operator-webhook=${IMG_WEBHOOK}); \
-		$(KUSTOMIZE) build config/deploy-profiles/pro > deployment/manager.yaml; \
+			$(KUSTOMIZE) edit set image redis-operator-webhook=${IMG_WEBHOOK};) \
+	elif [ ${PROFILE} == "debug" ]; then \
+		(cd config/deploy-profiles/${PROFILE} && \
+			$(KUSTOMIZE) edit set image /redis-operator-webhook=${IMG_WEBHOOK}); \
 	fi
 	$(KUSTOMIZE) build config/webhook > deployment/webhook.yaml
 	rm config/webhook/kustomization.yaml
@@ -348,18 +325,15 @@ generate-ca-cert:
 	openssl genrsa -out certs/ca.key 2048
 	openssl req -x509 -new -nodes -key certs/ca.key -days 3650 -out certs/ca.crt -subj "/CN=${WEBHOOK_NAMESPACE}.${CN}"
 
-deploy: process-manifests ##		Deploy the webhook and the manager into the K8s cluster specified by kubectl default context.
-	kubectl apply -f deployment/webhook.yaml
+deploy: deploy-manager ##		Deploy the manager into the K8s cluster specified by kubectl default context.
+
+undeploy: undeploy-manager ##		Undeploy the manager from the K8s cluster specified by kubectl default context.
+
+deploy-manager: process-manifests ##		Deploy the manager into the K8s cluster specified by kubectl default context.
 	kubectl apply -f deployment/manager.yaml
 
-undeploy: process-manifests ##		Undeploy the webhook and the operator from the K8s cluster specified by kubectl default context.
-	kubectl delete -f deployment/webhook.yaml
+undeploy-manager: process-manifests ##		Delete the manager from the K8s cluster specified by kubectl default context.
 	kubectl delete -f deployment/manager.yaml
-
-deploy-manager: process-manifests-webhook ##		Deploy the manager into the K8s cluster specified by kubectl default context.
-	kubectl apply -f deployment/manager.yaml
-
-undeploy-manager: process-manifests-webhook ##		Delete the manager from the K8s cluster specified by kubectl default context.
 
 deploy-webhook: process-manifests-webhook ##		Deploy the webhook into the K8s cluster specified by kubectl default context.
 	kubectl apply -f deployment/webhook.yaml
@@ -386,15 +360,36 @@ port-forward: ##		Port forwarding of port 40000 for debugging the manager with D
 delete-operator: ##		Delete the operator pod (redis-operator) in order to have a new clean pod created.
 	kubectl delete pod $(OPERATOR) -n ${NAMESPACE}
 
-dev-apply-rdcl: ##		Apply the sample Redis Cluster manifest.
+apply-rdcl: ##		Apply the sample Redis Cluster manifest.
 	$(KUSTOMIZE) build config/samples | $(SED) 's/namespace: redis-operator/namespace: ${NAMESPACE}/' | kubectl apply -f -
 
-dev-delete-rdcl: ##		Delete the sample Redis Cluster manifest.
+delete-rdcl: ##		Delete the sample Redis Cluster manifest.
 	$(KUSTOMIZE) build config/samples | $(SED) 's/namespace: redis-operator/namespace: ${NAMESPACE}/' | kubectl delete -f -
 
-dev-apply-all: dev-docker-build dev-docker-push install process-manifests deploy dev-apply-rdcl
+apply-all: docker-build docker-push process-manifests install deploy apply-rdcl
 
-deploy-aks: install deploy-aks-manifests dev-apply-rdcl
+delete-all: delete-rdcl undeploy uninstall
+
+deploy-aks: install deploy-aks-manifests apply-rdcl
+
+WEBHOOK=$(shell kubectl -n ${WEBHOOK_NAMESPACE} get po -l='control-plane=redis-operator-webhook' -o=jsonpath='{.items[0].metadata.name}')
+dev-deploy-webhook: ## 		Build a new webhook binary, copy the file to the webhook pod and run it.
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -gcflags="all=-N -l" -C webhook -o ../bin/webhook  main.go
+	kubectl wait -n ${WEBHOOK_NAMESPACE} --for=condition=ready pod -l control-plane=redis-operator-webhook
+	kubectl cp ./bin/webhook $(WEBHOOK):/webhook -n ${WEBHOOK_NAMESPACE}
+	kubectl exec -it po/$(WEBHOOK) -n ${WEBHOOK_NAMESPACE} exec /webhook
+
+debug-webhook: ##		Build a new webhook binary, copy the file to the webhhok pod and run it in debug mode (listening on port 40000 for Delve connections).
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -gcflags="all=-N -l" -C webhook -o ../bin/webhook  main.go
+	kubectl wait -n ${WEBHOOK_NAMESPACE} --for=condition=ready pod -l control-plane=redis-operator-webhook
+	kubectl cp ./bin/webhook $(WEBHOOK):/webhook -n ${WEBHOOK_NAMESPACE}
+	kubectl exec -it po/$(WEBHOOK) -n ${WEBHOOK_NAMESPACE} -- dlv --listen=:40000 --headless=true --api-version=2 --accept-multiclient exec /webhook --continue
+
+port-forward-webhook: ##		Port forwarding of port 40001 for debugging the manager with Delve.
+	kubectl port-forward pods/$(WEBHOOK) 40001:40000 -n ${WEBHOOK_NAMESPACE}
+
+delete-webhook: ##		Delete the webhook pod in order to have a new clean pod created.
+	kubectl delete pod $(WEBHOOK) -n ${WEBHOOK_NAMESPACE}
 
 ##@ Tools
 
@@ -557,7 +552,7 @@ test-e2e-cov: process-manifests-crd ginkgo ## Execute e2e application test
 	$(info $(M) generating coverage report...)
 	$(eval TEST_REPORT_OUTPUT_DIRNAME=$(shell dirname $(TEST_REPORT_OUTPUT)))
 	mkdir -p $(TEST_REPORT_OUTPUT_DIRNAME)
-	ginkgo ./test/e2e -vv -cover -coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT) -covermode=count OPERATOR_IMAGE=$(IMG_DEV)
+	ginkgo ./test/e2e -vv -cover -coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT) -covermode=count OPERATOR_IMAGE=$(IMG)
 
 
 .PHONY: test-sonar 

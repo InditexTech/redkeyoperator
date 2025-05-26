@@ -16,7 +16,6 @@ RUN go mod download
 # Copy the go source
 COPY cmd/ cmd/
 COPY api/ api/
-COPY v1alpha1client/ v1alpha1client/
 COPY v1client/ v1client/
 COPY controllers/ controllers/
 COPY internal/ internal/

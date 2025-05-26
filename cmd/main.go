@@ -27,7 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	redisv1 "github.com/inditextech/redisoperator/api/v1"
-	redisv1alpha1 "github.com/inditextech/redisoperator/api/v1alpha1"
 	"github.com/inditextech/redisoperator/controllers"
 	//+kubebuilder:scaffold:imports
 )
@@ -45,7 +44,6 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(redisv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(redisv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }

@@ -190,6 +190,12 @@ type RedisClusterStatus struct {
 	Nodes      map[string]*RedisNode `json:"nodes"`
 	Status     string                `json:"status"`
 	Conditions []metav1.Condition    `json:"conditions,omitempty"`
+	Substatus  RedisClusterSubstatus `json:"substatus"`
+}
+
+type RedisClusterSubstatus struct {
+	Status             string `json:"status,omitempty"`
+	UpgradingPartition int    `json:"upgradingPartition,omitempty"`
 }
 
 type SlotRange struct {
@@ -223,6 +229,7 @@ type Pdb struct {
 // +kubebuilder:printcolumn:name="Storage",type="string",JSONPath=".spec.storage",description="Amount of storage for Redis"
 // +kubebuilder:printcolumn:name="StorageClassName",type="string",JSONPath=".spec.storageClassName",description="Storage Class to be used by the PVC"
 // +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.status",description="The status of Redis cluster"
+// +kubebuilder:printcolumn:name="Substatus",type="string",JSONPath=".status.substatus.status",description="The substatus of Redis cluster"
 // +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas,selectorpath=.status.selector
 // RedisCluster is the Schema for the redisclusters API
 type RedisCluster struct {
