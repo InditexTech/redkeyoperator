@@ -55,6 +55,8 @@ var StatusConfiguring = "Configuring"
 var StatusInitializing = "Initializing"
 var StatusError = "Error"
 
+var SubstatusFastUpgrade = "FastUpgrade"
+
 var ConditionUpgrading = metav1.Condition{
 	Type:               "Upgrading",
 	LastTransitionTime: metav1.Now(),
