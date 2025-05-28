@@ -531,7 +531,7 @@ func (r *RedisClusterReconciler) UpgradeCluster(ctx context.Context, redisCluste
 		err = r.FastUpgradeRebuildCluster(ctx, redisCluster, logger)
 		if err != nil {
 			return err
-		}	
+		}
 	} else {
 		startingPartition := int(*(existingStateFulSet.Spec.Replicas)) - 1
 
