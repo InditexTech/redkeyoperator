@@ -80,6 +80,8 @@ var ConditionScalingDown = metav1.Condition{
 	Status:             metav1.ConditionTrue,
 }
 
+var AllConditions = []metav1.Condition{ConditionUpgrading, ConditionScalingUp, ConditionScalingDown}
+
 // RedisClusterSpec defines the desired state of RedisCluster
 // +kubebuilder:validation:XValidation:rule="self.ephemeral || has(self.storage)", message="Ephemeral or storage must be set"
 // +kubebuilder:validation:XValidation:rule="!(self.ephemeral && has(self.storage))", message="Ephemeral and storage cannot be combined"

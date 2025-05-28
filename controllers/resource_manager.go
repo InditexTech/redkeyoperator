@@ -30,7 +30,6 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -2018,14 +2017,11 @@ func (r *RedisClusterReconciler) clusterScaledToZeroReplicas(ctx context.Context
 
 	r.deletePdb(ctx, redisCluster)
 
-	// All conditions set to false, redisCluster. Status set to Ready.
+	// All conditions set to false. Status set to Ready.
 	var update_err error
 	if !reflect.DeepEqual(redisCluster.Status, redisv1.StatusReady) {
 		redisCluster.Status.Status = redisv1.StatusReady
-		for _, condition := range redisCluster.Status.Conditions {
-			condition.Status = metav1.ConditionFalse
-			meta.SetStatusCondition(&redisCluster.Status.Conditions, condition)
-		}
+		SetAllConditionsFalse(r.GetHelperLogger(redisCluster.NamespacedName()), redisCluster)
 		update_err = r.UpdateClusterStatus(ctx, redisCluster)
 	}
 

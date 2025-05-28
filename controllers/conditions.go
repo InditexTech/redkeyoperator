@@ -18,3 +18,9 @@ func SetConditionFalse(log logr.Logger, redisCluster *redisv1.RedisCluster, cond
 		log.Info("Condition set to false", "condition", condition)
 	}
 }
+
+func SetAllConditionsFalse(log logr.Logger, redisCluster *redisv1.RedisCluster) {
+	for _, condition := range redisv1.AllConditions {
+		SetConditionFalse(log, redisCluster, condition)
+	}
+}
