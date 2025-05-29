@@ -39,6 +39,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"maps"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -1291,14 +1293,10 @@ func (r *RedisClusterReconciler) CreateRobinDeployment(ctx context.Context, req 
 	d.Labels[redis.RedisClusterLabel] = req.Name
 	d.Labels[redis.RedisClusterComponentLabel] = "robin"
 	d.Spec.Template.Labels = make(map[string]string)
-	for k, v := range labels {
-		d.Spec.Template.Labels[k] = v
-	}
+	maps.Copy(d.Spec.Template.Labels, labels)
 	d.Spec.Template.Labels[redis.RedisClusterLabel] = req.Name
 	d.Spec.Template.Labels[redis.RedisClusterComponentLabel] = "robin"
-	for k, v := range rediscluster.Spec.Robin.Template.Labels {
-		d.Spec.Template.Labels[k] = v
-	}
+	maps.Copy(d.Spec.Template.Labels, rediscluster.Spec.Robin.Template.Labels)
 
 	for i, container := range d.Spec.Template.Spec.Containers {
 		if container.Resources.Requests == nil {

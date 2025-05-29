@@ -76,6 +76,13 @@ spec:
   #           volumeMounts:
   #             - mountPath: /opt/conf/configmap
   #               name: redis-cluster-ephemeral-robin-config
+  #           resources:
+  #             requests:
+  #               cpu: 500m
+  #               memory: 100Mi
+  #             limits:
+  #               cpu: 1
+  #               memory: 200Mi
   #       volumes:
   #         - configMap:
   #             defaultMode: 420

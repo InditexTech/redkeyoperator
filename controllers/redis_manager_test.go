@@ -640,21 +640,21 @@ func TestSlotMoveMap(t *testing.T) {
 				node3: makeRange(16201, 16384),
 			},
 			map[string][]int{
-				"node-1": []int{},
+				"node-1": {},
 				"node-2": makeRange(10924, 16200),
-				"node-3": []int{},
+				"node-3": {},
 			},
 		},
 		"empty-node-move-map": {
 			map[*kubernetes.ClusterNode][]int{
 				node1: makeRange(0, 16384),
-				node2: []int{},
-				node3: []int{},
+				node2: {},
+				node3: {},
 			},
 			map[string][]int{
 				"node-1": makeRange(5462, 16384),
-				"node-2": []int{},
-				"node-3": []int{},
+				"node-2": {},
+				"node-3": {},
 			},
 		},
 		"balanced-node-move-map": {
@@ -664,9 +664,9 @@ func TestSlotMoveMap(t *testing.T) {
 				node3: makeRange(10923, 16384),
 			},
 			map[string][]int{
-				"node-1": []int{},
-				"node-2": []int{},
-				"node-3": []int{},
+				"node-1": {},
+				"node-2": {},
+				"node-3": {},
 			},
 		},
 		"balanced-node-move-map-within-threshold": {
@@ -676,9 +676,9 @@ func TestSlotMoveMap(t *testing.T) {
 				node3: makeRange(10923, 16384),
 			},
 			map[string][]int{
-				"node-1": []int{},
-				"node-2": []int{},
-				"node-3": []int{},
+				"node-1": {},
+				"node-2": {},
+				"node-3": {},
 			},
 		},
 	}
@@ -711,9 +711,9 @@ func TestSlotMoveMapWithWeights(t *testing.T) {
 				node3: makeRange(16201, 16384),
 			},
 			map[string][]int{
-				"node-1": []int{},
+				"node-1": {},
 				"node-2": makeRange(10924, 16200),
-				"node-3": []int{},
+				"node-3": {},
 			},
 			map[string]int{},
 		},
@@ -724,8 +724,8 @@ func TestSlotMoveMapWithWeights(t *testing.T) {
 				node3: makeRange(10923, 16384),
 			},
 			map[string][]int{
-				"node-1": []int{},
-				"node-2": []int{},
+				"node-1": {},
+				"node-2": {},
 				"node-3": makeRange(10923, 16384),
 			},
 			map[string]int{
@@ -739,7 +739,7 @@ func TestSlotMoveMapWithWeights(t *testing.T) {
 				node3: makeRange(16201, 16384),
 			},
 			map[string][]int{
-				"node-1": []int{},
+				"node-1": {},
 				"node-2": makeRange(5462, 16200),
 				"node-3": makeRange(16201, 16384),
 			},
@@ -757,7 +757,7 @@ func TestSlotMoveMapWithWeights(t *testing.T) {
 			map[string][]int{
 				"node-1": makeRange(4097, 5461),
 				"node-2": makeRange(9559, 10922),
-				"node-3": []int{},
+				"node-3": {},
 			},
 			map[string]int{
 				"node-3": 2,
@@ -796,7 +796,7 @@ func TestSlotMoveMapWithWeightsToZero(t *testing.T) {
 			map[string][]int{
 				"node-1": makeRange(4096, 5461),
 				"node-2": makeRange(9558, 10922),
-				"node-3": []int{},
+				"node-3": {},
 			},
 			map[string]int{
 				"node-1": 0,

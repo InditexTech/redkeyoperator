@@ -10,14 +10,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
 	RedisNamespace = "redis-e2e-test"
 )
 
-func ensureNamespaceExistsOrCreate(nsName types.NamespacedName) error {
+func ensureNamespaceExistsOrCreate() error {
 	err := k8sClient.Create(context.Background(), &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: RedisNamespace,

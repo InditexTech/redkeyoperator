@@ -50,10 +50,7 @@ var _ = Describe("Redisclusters", func() {
 
 	Context("redis operator", func() {
 		It("Should create redis operator correctly", func() {
-			err := ensureNamespaceExistsOrCreate(types.NamespacedName{
-				Name:      RedisNamespace,
-				Namespace: RedisNamespace,
-			})
+			err := ensureNamespaceExistsOrCreate()
 			Expect(err).ToNot(HaveOccurred())
 
 			err = ensureServiceAccountExistsOrCreate(types.NamespacedName{
