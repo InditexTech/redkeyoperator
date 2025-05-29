@@ -1600,12 +1600,7 @@ func (r *RedisClusterReconciler) UpdateClusterStatus(ctx context.Context, redisC
 }
 
 func containsString(slice []string, s string) bool {
-	for _, item := range slice {
-		if item == s {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(slice, s)
 }
 
 // GetStatefulSetSelectorLabel returns the label key that should be used to find RedisCluster nodes for
