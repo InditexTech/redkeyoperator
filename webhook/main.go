@@ -81,7 +81,7 @@ func main() {
 		}),
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "db95d8a6-webhook.inditex.com",
+		LeaderElectionID:       "db95d8a6-webhook.inditex.dev",
 		Client: client.Options{
 			Cache: &client.CacheOptions{
 				DisableFor: []client.Object{

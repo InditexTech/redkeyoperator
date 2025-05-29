@@ -49,9 +49,9 @@ type RedisClusterReconciler struct {
 	FindExistingPodDisruptionBudgetFunc func(ctx context.Context, req ctrl.Request) (*pv1.PodDisruptionBudget, error)
 }
 
-// +kubebuilder:rbac:groups=redis.inditex.com,resources=redisclusters,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=redis.inditex.com,resources=redisclusters/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=redis.inditex.com,resources=redisclusters/finalizers,verbs=update
+// +kubebuilder:rbac:groups=redis.inditex.dev,resources=redisclusters,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=redis.inditex.dev,resources=redisclusters/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=redis.inditex.dev,resources=redisclusters/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get
 // +kubebuilder:rbac:groups=apps,resources=statefulsets;deployments,verbs=get;list;watch

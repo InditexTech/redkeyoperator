@@ -6,6 +6,7 @@ package redisv1client
 
 import (
 	"context"
+
 	redisv1 "github.com/inditextech/redisoperator/api/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,7 +31,7 @@ func (c *rdclClient) List(ctx context.Context, opts metav1.ListOptions) (*redisv
 	result := redisv1.RedisClusterList{}
 	err := c.restClient.
 		Get().
-		AbsPath("/apis/redis.inditex.com/redisv1").
+		AbsPath("/apis/redis.inditex.dev/redisv1").
 		Namespace(c.ns).
 		Resource("redisclusters").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -44,7 +45,7 @@ func (c *rdclClient) Get(ctx context.Context, name string, opts metav1.GetOption
 	result := redisv1.RedisCluster{}
 	err := c.restClient.
 		Get().
-		AbsPath("/apis/redis.inditex.com/v1").
+		AbsPath("/apis/redis.inditex.dev/v1").
 		Namespace(c.ns).
 		Resource("redisclusters").
 		Name(name).
@@ -57,7 +58,7 @@ func (c *rdclClient) Get(ctx context.Context, name string, opts metav1.GetOption
 func (c *rdclClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.restClient.Get().
-		AbsPath("/apis/redis.inditex.com/v1").
+		AbsPath("/apis/redis.inditex.dev/v1").
 		Namespace(c.ns).
 		Resource("redisclusters").
 		VersionedParams(&opts, scheme.ParameterCodec).

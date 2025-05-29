@@ -278,17 +278,17 @@ func createRedisOperatorRole() rbacv1.Role {
 				Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
 			},
 			{
-				APIGroups: []string{"redis.inditex.com"},
+				APIGroups: []string{"redis.inditex.dev"},
 				Resources: []string{"redisclusters"},
 				Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
 			},
 			{
-				APIGroups: []string{"redis.inditex.com"},
+				APIGroups: []string{"redis.inditex.dev"},
 				Resources: []string{"redisclusters/finalizers"},
 				Verbs:     []string{"update"},
 			},
 			{
-				APIGroups: []string{"redis.inditex.com"},
+				APIGroups: []string{"redis.inditex.dev"},
 				Resources: []string{"redisclusters/status"},
 				Verbs:     []string{"get", "patch", "update"},
 			},
@@ -362,7 +362,7 @@ func createConfigMap() corev1.ConfigMap {
 				port: 9443
 				leaderElection:
 				leaderElect: true
-				resourceName: db95d8a6.inditex.com
+				resourceName: db95d8a6.inditex.dev
 				`,
 		},
 	}

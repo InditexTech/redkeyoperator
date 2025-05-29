@@ -231,12 +231,12 @@ func CreateRedisCluster() *redisv1.RedisCluster {
 	cluster := &redisv1.RedisCluster{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "RedisCluster",
-			APIVersion: "redis.inditex.com/redisv1",
+			APIVersion: "redis.inditex.dev/redisv1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "rediscluster-sample",
 			Namespace:  "default",
-			Finalizers: []string{"redis.inditex.com/configmap-cleanup"},
+			Finalizers: []string{"redis.inditex.dev/configmap-cleanup"},
 			Labels:     map[string]string{"team": "team-a"},
 		},
 		Spec: redisv1.RedisClusterSpec{

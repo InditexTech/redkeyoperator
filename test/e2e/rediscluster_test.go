@@ -134,7 +134,7 @@ var _ = Describe("Redisclusters", func() {
 			}).Should(BeTrue())
 
 			Expect(fetchedRedisCluster.Kind).To(Equal("RedisCluster"))
-			Expect(fetchedRedisCluster.APIVersion).To(Equal("redis.inditex.com/v1"))
+			Expect(fetchedRedisCluster.APIVersion).To(Equal("redis.inditex.dev/v1"))
 			Expect(fetchedRedisCluster.Spec.Replicas).To(Equal(initialReplicas))
 			Expect(fetchedRedisCluster.Spec.Auth).To(Equal(redisv1.RedisAuth{}))
 			Expect(fetchedRedisCluster.Name).To(Equal(rdclName))
@@ -521,7 +521,7 @@ var _ = Describe("Redisclusters", func() {
 			}).Should(BeTrue())
 
 			Expect(fetchedRedisCluster.Kind).To(Equal("RedisCluster"))
-			Expect(fetchedRedisCluster.APIVersion).To(Equal("redis.inditex.com/v1"))
+			Expect(fetchedRedisCluster.APIVersion).To(Equal("redis.inditex.dev/v1"))
 			Expect(fetchedRedisCluster.Spec.Replicas).To(Equal(initialReplicas))
 			Expect(fetchedRedisCluster.Spec.Auth).To(Equal(redisv1.RedisAuth{}))
 			Expect(fetchedRedisCluster.Name).To(Equal(rdclName))

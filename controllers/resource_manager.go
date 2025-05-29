@@ -99,7 +99,7 @@ func (r *RedisClusterReconciler) deletePdb(ctx context.Context, redisCluster *re
 func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) (ctrl.Result, error) {
 	currentStatus := redisCluster.Status
 	var err error
-	const pvcFinalizer = "redis.inditex.com/delete-pvc"
+	const pvcFinalizer = "redis.inditex.dev/delete-pvc"
 
 	var requeueAfter time.Duration = DEFAULT_REQUEUE_TIMEOUT
 	var auth = &corev1.Secret{}

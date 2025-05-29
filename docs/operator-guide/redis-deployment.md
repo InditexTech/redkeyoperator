@@ -7,7 +7,7 @@ Redis operator CRD defines a new resource type `RedisCluster`.
 Below you'll find an example of manifest conforming to the resource definition that will deploy a Redis cluster:
 
 ```yaml
-apiVersion: redis.inditex.com/v1
+apiVersion: redis.inditex.dev/v1
 kind: RedisCluster
 metadata:
   name: rediscluster-sample

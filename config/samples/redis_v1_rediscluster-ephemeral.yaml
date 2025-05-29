@@ -1,4 +1,4 @@
-apiVersion: redis.inditex.com/v1
+apiVersion: redis.inditex.dev/v1
 kind: RedisCluster
 metadata:
   labels:
@@ -6,7 +6,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: redis-cluster-ephemeral
 spec:
-  replicas: 1
+  replicas: 3
   ephemeral: true
   accessModes: 
   - ReadWriteOnce
@@ -85,9 +85,9 @@ spec:
   #   service:
   #     metadata:
   #       annotations:
-  #         traffic.inditex.com/weight: "101"
+  #         traffic.inditex.dev/weight: "101"
   #       labels:
-  #         inditex.com/test: "test"
+  #         inditex.dev/test: "test"
   #     spec:
   #       ports:
   #       - name: prometheus
@@ -95,16 +95,16 @@ spec:
   #         targetPort: 9090
   #         protocol: TCP
   #       selector:
-  #         inditex.com/test: "test"
+  #         inditex.dev/test: "test"
   #   statefulSet:
   #     metadata:
   #       annotations:
-  #         traffic.inditex.com/weight: "10"
+  #         traffic.inditex.dev/weight: "10"
   #     spec:
   #       template:
   #         metadata:
   #           labels:
-  #             inditex.com/test: "test"
+  #             inditex.dev/test: "test"
   #         spec:
   #           tolerations:
   #             - key: "test"

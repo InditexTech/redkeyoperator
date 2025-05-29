@@ -13,7 +13,7 @@ IMG ?= redis-operator:$(VERSION)
 IMG_WEBHOOK ?= redis-operator-webhook:$(VERSION)
 
 # CN for the webhook certificate
-CN ?= inditex.com
+CN ?= inditex.dev
 
 # .............................................................................
 # DONT TOUCH THIS SECTION
@@ -252,11 +252,11 @@ docker-push-webhook: ##	Push docker image with the webhook (uses `${IMG_WEBHOOK}
 ##@ Deployment
 install: process-manifests-crd ##		Install CRD into the K8s cluster specified by kubectl default context (Kustomize is installed if not present).
 	$(info $(M) applying CRD manifest file)
-	kubectl apply -f deployment/redis.inditex.com_redisclusters.yaml
+	kubectl apply -f deployment/redis.inditex.dev_redisclusters.yaml
 
 uninstall: process-manifests-crd ##		Uninstall CRD from the K8s cluster specified by kubectl default context (Kustomize is installed if not present).
 	$(info $(M) deleting CRD)
-	kubectl delete -f deployment/redis.inditex.com_redisclusters.yaml
+	kubectl delete -f deployment/redis.inditex.dev_redisclusters.yaml
 
 process-manifests: kustomize process-manifests-crd ##		Generate the kustomized yamls into the `deployment` directory to deploy the manager.
 	$(info $(M) generating Manager deploying manifest files using ${PROFILE} profile)
@@ -285,7 +285,7 @@ process-manifests-crd: kustomize manifests ##	Generate the kustomized yamls into
 #	$(eval CA_CERT := $(shell cat certs/ca.crt | base64 -w 0))
 #	cp ./config/crd/patches/webhook_in_redisclusters.yaml ./config/crd/patches/webhook_in_redisclusters.yaml.orig
 #	cat ./config/crd/patches/webhook_in_redisclusters.yaml.tpl | sed "s|WEBHOOK_CA_CERT|${CA_CERT}|g" > ./config/crd/patches/webhook_in_redisclusters.yaml
-	$(KUSTOMIZE) build config/crd > deployment/redis.inditex.com_redisclusters.yaml
+	$(KUSTOMIZE) build config/crd > deployment/redis.inditex.dev_redisclusters.yaml
 #	mv ./config/crd/patches/webhook_in_redisclusters.yaml.orig ./config/crd/patches/webhook_in_redisclusters.yaml
 	@echo "CRD manifest generated successfully"
 

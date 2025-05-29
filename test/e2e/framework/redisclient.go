@@ -305,12 +305,12 @@ func createRedisCluster(nsName types.NamespacedName, replicas int32, storage str
 	cluster := &redisv1.RedisCluster{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "RedisCluster",
-			APIVersion: "redis.inditex.com/v1",
+			APIVersion: "redis.inditex.dev/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       nsName.Name,
 			Namespace:  nsName.Namespace,
-			Finalizers: []string{"redis.inditex.com/configmap-cleanup"},
+			Finalizers: []string{"redis.inditex.dev/configmap-cleanup"},
 			Labels:     map[string]string{"team": "team-a"},
 		},
 		Spec: redisv1.RedisClusterSpec{

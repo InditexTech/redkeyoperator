@@ -8,7 +8,7 @@ metadata:
   name: rediscluster-editor-role
 rules:
 - apiGroups:
-  - redis.inditex.com
+  - redidev
   resources:
   - redisclusters
   verbs:
@@ -20,7 +20,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - redis.inditex.com
+  - redis.inditex.dev
   resources:
   - redisclusters/status
   verbs:

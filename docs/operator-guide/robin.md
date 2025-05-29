@@ -19,7 +19,7 @@ to the Pod IP is needed for Robin to work.
 ### Example
 
 ```yaml
-apiVersion: redis.inditex.com/v1
+apiVersion: redis.inditex.dev/v1
 kind: RedisCluster
 ...
 spec:
@@ -77,7 +77,7 @@ The expected fields of the `spec.robin.config` YAML are:
 ### Example
 
 ```yaml
-apiVersion: redis.inditex.com/v1
+apiVersion: redis.inditex.dev/v1
 kind: RedisCluster
 ...
 spec:

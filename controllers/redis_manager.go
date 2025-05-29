@@ -41,7 +41,7 @@ import (
 )
 
 const (
-	CONFIG_CHECKSUM_ANNOTATION = "inditex.com/redis-conf"
+	CONFIG_CHECKSUM_ANNOTATION = "inditex.dev/redis-conf"
 )
 
 type RedisClient struct {
