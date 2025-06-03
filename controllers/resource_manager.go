@@ -104,21 +104,8 @@ func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req
 	const pvcFinalizer = "redis.inditex.dev/delete-pvc"
 
 	var requeueAfter time.Duration = DEFAULT_REQUEUE_TIMEOUT
-	var auth = &corev1.Secret{}
 
 	r.LogInfo(redisCluster.NamespacedName(), "RedisCluster reconciler start", "status", redisCluster.Status.Status)
-
-	if len(redisCluster.Spec.Auth.SecretName) > 0 {
-		var err error
-		auth, err = r.GetSecret(ctx, types.NamespacedName{
-			Name:      redisCluster.Spec.Auth.SecretName,
-			Namespace: req.Namespace,
-		}, redisCluster.NamespacedName())
-		if err != nil {
-			r.LogError(redisCluster.NamespacedName(), err, "Can't find provided secret", "redisCluster", redisCluster)
-			return ctrl.Result{}, nil
-		}
-	}
 
 	// Populate Spec.Labels if not present (if RedisCluster created from template <= v2.5.0)
 	if redisCluster.Spec.Labels == nil {
@@ -139,7 +126,7 @@ func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req
 	// Checks the existance of the ConfigMap, StatefulSet, Pods, Robin Deployment, PDB and Service,
 	// creating the objects not created yet.
 	// Coherence and configuration details are also checked and fixed.
-	immediateRequeue, err := r.CheckAndCreateK8sObjects(ctx, req, redisCluster, auth)
+	immediateRequeue, err := r.CheckAndCreateK8sObjects(ctx, req, redisCluster)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -1610,9 +1597,10 @@ func (r *RedisClusterReconciler) GetStatefulSetSelectorLabel(rdcl *redisv1.Redis
 	return kubernetes.GetStatefulSetSelectorLabel(context.TODO(), r.Client, rdcl)
 }
 
-func (r *RedisClusterReconciler) CheckAndCreateK8sObjects(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster, auth *corev1.Secret) (bool, error) {
+func (r *RedisClusterReconciler) CheckAndCreateK8sObjects(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) (bool, error) {
 	var immediateRequeue bool = false
 	var err error = nil
+	var configMap *corev1.ConfigMap
 
 	// RedisCluster check
 	err = r.CheckAndUpdateRDCL(ctx, req.Name, redisCluster)
@@ -1622,24 +1610,62 @@ func (r *RedisClusterReconciler) CheckAndCreateK8sObjects(ctx context.Context, r
 	}
 
 	// ConfigMap check
+	if configMap, immediateRequeue, err = r.CheckAndCreateConfigMap(ctx, req, redisCluster); err != nil {
+		return immediateRequeue, err
+	}
+
+	// PodDisruptionBudget check
+	r.CheckAndManagePDB(ctx, req, redisCluster)
+
+	// StatefulSet check
+	if immediateRequeue, err = r.CheckAndCreateStatefulSet(ctx, req, redisCluster, configMap); err != nil {
+		return immediateRequeue, err
+	}
+
+	// Robin deployment check
+	r.CheckAndCreateRobin(ctx, req, redisCluster)
+
+	// Service check
+	immediateRequeue, err = r.checkAndCreateService(ctx, req, redisCluster)
+
+	return immediateRequeue, err
+}
+
+func (r *RedisClusterReconciler) CheckAndCreateConfigMap(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) (*corev1.ConfigMap, bool, error) {
+	var immediateRequeue = false
+	var auth = &corev1.Secret{}
+	var err error
+
 	configMap, err := r.FindExistingConfigMapFunc(ctx, req)
 	if err != nil {
 		if errors.IsNotFound(err) {
+			if len(redisCluster.Spec.Auth.SecretName) > 0 {
+				auth, err = r.GetSecret(ctx, types.NamespacedName{
+					Name:      redisCluster.Spec.Auth.SecretName,
+					Namespace: req.Namespace,
+				}, redisCluster.NamespacedName())
+				if err != nil {
+					r.LogError(redisCluster.NamespacedName(), err, "Can't find provided secret", "redisCluster", redisCluster)
+					return nil, immediateRequeue, err
+				}
+			}
 			configMap = r.CreateConfigMap(req, redisCluster.Spec, auth, redisCluster.GetObjectMeta().GetLabels())
 			ctrl.SetControllerReference(redisCluster, configMap, r.Scheme)
 			r.LogInfo(redisCluster.NamespacedName(), "Creating configmap", "configmap", configMap.Name)
 			createMapErr := r.Client.Create(ctx, configMap)
 			if createMapErr != nil {
 				r.LogError(redisCluster.NamespacedName(), createMapErr, "Error when creating configmap")
-				return immediateRequeue, createMapErr
+				return nil, immediateRequeue, createMapErr
 			}
 		} else {
 			r.LogError(redisCluster.NamespacedName(), err, "Getting configmap data failed")
-			return immediateRequeue, err
+			return nil, immediateRequeue, err
 		}
 	}
+	return configMap, immediateRequeue, nil
+}
 
-	// PodDisruptionBudget check
+func (r *RedisClusterReconciler) CheckAndManagePDB(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) {
 	if redisCluster.Spec.Pdb.Enabled && redisCluster.Spec.Replicas > 1 {
 		_, err := r.FindExistingPodDisruptionBudgetFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-pdb", Namespace: redisCluster.Namespace}})
 		if err != nil {
@@ -1659,8 +1685,10 @@ func (r *RedisClusterReconciler) CheckAndCreateK8sObjects(ctx context.Context, r
 	if redisCluster.Spec.Replicas == 1 || !redisCluster.Spec.Pdb.Enabled {
 		r.deletePdb(ctx, redisCluster)
 	}
+}
 
-	// StatefulSet check
+func (r *RedisClusterReconciler) CheckAndCreateStatefulSet(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster, configMap *corev1.ConfigMap) (bool, error) {
+	var immediateRequeue = false
 	statefulSet, err := r.FindExistingStatefulSet(ctx, req)
 	var createSsetError error
 	if err != nil {
@@ -1721,14 +1749,7 @@ func (r *RedisClusterReconciler) CheckAndCreateK8sObjects(ctx context.Context, r
 			return immediateRequeue, err // requeue
 		}
 	}
-
-	// Robin deployment check
-	r.CheckAndCreateRobin(ctx, req, redisCluster)
-
-	// Service check
-	immediateRequeue, err = r.checkAndCreateService(ctx, req, redisCluster)
-
-	return immediateRequeue, err
+	return immediateRequeue, nil
 }
 
 func (r *RedisClusterReconciler) CheckAndCreateRobin(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) {
