@@ -77,12 +77,6 @@ func NewRedisClusterReconciler(mgr ctrl.Manager, maxConcurrentReconciles int, co
 	return reconciler
 }
 
-// Generates a slice containing the list of labels that do not have to be populated
-// from RedisCluster.Metadata.Labels to RedisCluster.Spec.Labels.
-func getDiscardedLabels() []string {
-	return []string{"scaler/opt-in", "scaler/scaling-class"}
-}
-
 func (r *RedisClusterReconciler) deletePdb(ctx context.Context, redisCluster *redisv1.RedisCluster) {
 	// Delete PodDisruptionBudget
 	pdb, err := r.FindExistingPodDisruptionBudgetFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-pdb", Namespace: redisCluster.Namespace}})
@@ -99,29 +93,12 @@ func (r *RedisClusterReconciler) deletePdb(ctx context.Context, redisCluster *re
 }
 
 func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) (ctrl.Result, error) {
-	currentStatus := redisCluster.Status
 	var err error
 	const pvcFinalizer = "redis.inditex.dev/delete-pvc"
-
 	var requeueAfter time.Duration = DEFAULT_REQUEUE_TIMEOUT
+	currentStatus := redisCluster.Status
 
 	r.LogInfo(redisCluster.NamespacedName(), "RedisCluster reconciler start", "status", redisCluster.Status.Status)
-
-	// Populate Spec.Labels if not present (if RedisCluster created from template <= v2.5.0)
-	if redisCluster.Spec.Labels == nil {
-		discardedLabels := getDiscardedLabels()
-		specLabels := make(map[string]string)
-		for k, v := range redisCluster.ObjectMeta.Labels {
-			if !slices.Contains(discardedLabels, k) {
-				specLabels[k] = v
-			}
-		}
-		redisCluster.Spec.Labels = &specLabels
-		if err := r.Update(ctx, redisCluster); err != nil {
-			return ctrl.Result{}, err
-		}
-		r.LogInfo(redisCluster.NamespacedName(), "RedisCluster.Spec.Labels populated from RedisCluster.Metadata.Labels")
-	}
 
 	// Checks the existance of the ConfigMap, StatefulSet, Pods, Robin Deployment, PDB and Service,
 	// creating the objects not created yet.
