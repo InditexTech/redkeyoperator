@@ -93,8 +93,8 @@ func (r *RedisClusterReconciler) deletePdb(ctx context.Context, redisCluster *re
 }
 
 func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) (ctrl.Result, error) {
-	var err error
 	const pvcFinalizer = "redis.inditex.dev/delete-pvc"
+	var err error
 	var requeueAfter time.Duration = DEFAULT_REQUEUE_TIMEOUT
 	currentStatus := redisCluster.Status
 
@@ -1724,6 +1724,17 @@ func (r *RedisClusterReconciler) CheckAndCreateStatefulSet(ctx context.Context, 
 				immediateRequeue = true
 			}
 			return immediateRequeue, err // requeue
+		}
+		if redisCluster.Status.Status == "" || redisCluster.Status.Status == redisv1.StatusInitializing {
+			if currSsetReplicas != realExpectedReplicas {
+				r.LogInfo(redisCluster.NamespacedName(), "Replicas updated before reaching Configuring status: aligning StatefulSet <-> RedisCluster replicas",
+					"StatefulSet replicas", currSsetReplicas, "Ready nodes", len(readyNodes), "RedisCluster replicas", realExpectedReplicas)
+				statefulSet.Spec.Replicas = &realExpectedReplicas
+				_, err = r.UpdateStatefulSet(ctx, statefulSet, redisCluster)
+				if err != nil {
+					r.LogError(redisCluster.NamespacedName(), err, "Failed to update StatefulSet replicas")
+				}
+			}
 		}
 	}
 	return immediateRequeue, nil
