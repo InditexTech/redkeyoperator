@@ -194,9 +194,6 @@ func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req
 
 	r.checkClusterNodesIntegrity(ctx, redisCluster)
 
-	// check the cluster state and slots allocated. if states is ok, we can reset the status
-	r.LogInfo(redisCluster.NamespacedName(), "ReconcileClusterObject", "state", redisCluster.Status.Status)
-
 	readyNodes, err := r.GetReadyNodes(ctx, redisCluster)
 	if err != nil {
 		r.LogError(redisCluster.NamespacedName(), err, "Error getting redis cluster nodes")
