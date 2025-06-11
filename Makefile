@@ -538,17 +538,11 @@ ginkgo:
 
 .PHONY: test-e2e
 test-e2e: process-manifests-crd ginkgo ## Execute e2e application test
-	$(info running e2e tests... generating sonar report...)
-	$(eval TEST_COVERAGE_PROFILE_OUTPUT_DIRNAME=$(shell dirname $(TEST_COVERAGE_PROFILE_OUTPUT)))
-	$(eval TEST_REPORT_OUTPUT_DIRNAME=$(shell dirname $(TEST_REPORT_OUTPUT_E2E)))
-	mkdir -p $(TEST_COVERAGE_PROFILE_OUTPUT_DIRNAME) $(TEST_REPORT_OUTPUT_DIRNAME)
-	
+	$(info running e2e tests...)	
 	ginkgo -procs=$(TEST_PARALLEL_PROCESS) \
+			--fail-fast \
+			--flake-attempts=5 \
 	    	-vv \
-			-cover \
-			-covermode=count \
-			-coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT) \
-			--json-report $(TEST_REPORT_OUTPUT_E2E)\
 			./test/e2e \
 	    	GOMAXPROCS=$(GOMAXPROCS) \
 	    	OPERATOR_IMAGE=$(IMG_DEV) \
@@ -563,6 +557,8 @@ test-e2e-cov: process-manifests-crd ginkgo ## Execute e2e application test
 	mkdir -p $(TEST_REPORT_OUTPUT_DIRNAME)
 
 	ginkgo -procs=$(TEST_PARALLEL_PROCESS) \
+			--fail-fast \
+			--flake-attempts=5 \
 			-vv \
 			-cover \
 			-covermode=count \
