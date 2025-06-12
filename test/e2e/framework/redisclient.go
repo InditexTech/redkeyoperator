@@ -295,8 +295,7 @@ func WaitForReadyWithTrace(
 		case <-deadline:
 			return nil, trace,
 				fmt.Errorf("timeout waiting Ready, seen phases %v", trace)
-		default:
-			time.Sleep(pollInterval)
+		case <-time.After(pollInterval):
 		}
 
 		if err := cl.Get(ctx, key, rc); err != nil {
