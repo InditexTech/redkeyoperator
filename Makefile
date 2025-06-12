@@ -35,7 +35,7 @@ MODULE=$(shell go list -m)
 GO_COMPILE_FLAGS='-X $(MODULE)/cmd/server.GitCommit=$(COMMIT) -X $(MODULE)/cmd/server.BuildDate=$(DATE) -X $(MODULE)/cmd/server.VersionBuild=$(VERSION)'
 
 # Test coverage files
-TEST_COVERAGE_PROFILE_OUTPUT = ".local/coverage.out"
+TEST_COVERAGE_PROFILE_OUTPUT = "coverage.out"
 TEST_REPORT_OUTPUT = ".local/test_report.ndjson"
 TEST_REPORT_OUTPUT_E2E = ".local/test_report_e2e.ndjson"
 # .............................................................................
@@ -79,6 +79,7 @@ BUNDLE_IMG ?= controller-bundle:$(VERSION)
 # We always use version 0.1.0 for this purpose.
 IMG_DEV ?= redis-operator:0.1.0-dev
 IMG_DEV_WEBHOOK ?= redis-operator-webhook:0.1.0-dev
+OPERATOR_IMAGE ?= redis-operator:0.1.0-dev
 
 # Image URL to use for deploying the operator pod when using `debug` deployment profile.
 # A base golang image is used with Delve installed, in order to be able to remotely debug the manager.
@@ -538,19 +539,35 @@ ginkgo:
 
 .PHONY: test-e2e
 test-e2e: process-manifests-crd ginkgo ## Execute e2e application test
-	$(info $(M) running e2e tests...)
-	$(info $(M) generating sonar report...)
-	$(eval TEST_COVERAGE_PROFILE_OUTPUT_DIRNAME=$(shell dirname $(TEST_COVERAGE_PROFILE_OUTPUT)))
-	$(eval TEST_REPORT_OUTPUT_DIRNAME=$(shell dirname $(TEST_REPORT_OUTPUT_E2E)))
-	mkdir -p $(TEST_COVERAGE_PROFILE_OUTPUT_DIRNAME) $(TEST_REPORT_OUTPUT_DIRNAME)
-	ginkgo ./test/e2e -cover -coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT) -json > $(TEST_REPORT_OUTPUT_E2E)
+	$(info running e2e tests...)	
+	ginkgo -procs=$(TEST_PARALLEL_PROCESS) \
+	    	-vv \
+			./test/e2e \
+	    	GOMAXPROCS=$(GOMAXPROCS) \
+	    	OPERATOR_IMAGE=$(OPERATOR_IMAGE) \
+	    	REDIS_IMAGE=$(REDIS_IMAGE) \
+	    	CHANGED_REDIS_IMAGE=$(CHANGED_REDIS_IMAGE) \
+	    	SIDECARD_IMAGE=$(SIDECARD_IMAGE)
 
 .PHONY: test-e2e-cov
 test-e2e-cov: process-manifests-crd ginkgo ## Execute e2e application test
-	$(info $(M) generating coverage report...)
+	$(info generating coverage report...)
 	$(eval TEST_REPORT_OUTPUT_DIRNAME=$(shell dirname $(TEST_REPORT_OUTPUT)))
 	mkdir -p $(TEST_REPORT_OUTPUT_DIRNAME)
-	ginkgo ./test/e2e -vv -cover -coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT) -covermode=count OPERATOR_IMAGE=$(IMG_DEV)
+
+	ginkgo -procs=$(TEST_PARALLEL_PROCESS) \
+			--fail-fast \
+			--flake-attempts=5 \
+			-vv \
+			-cover \
+			-covermode=count \
+			-coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT) \
+			./test/e2e \
+			GOMAXPROCS=$(GOMAXPROCS) \
+			OPERATOR_IMAGE=$(OPERATOR_IMAGE) \
+			REDIS_IMAGE=$(REDIS_IMAGE) \
+			CHANGED_REDIS_IMAGE=$(CHANGED_REDIS_IMAGE) \
+			SIDECARD_IMAGE=$(SIDECARD_IMAGE)
 
 
 .PHONY: test-sonar 

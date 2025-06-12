@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -100,18 +99,4 @@ func remoteCommandExecutor(namespace, podName, command string) (remotecommand.Ex
 		return nil, err
 	}
 	return executor, nil
-}
-
-func newLimits() corev1.ResourceList {
-	return corev1.ResourceList{
-		corev1.ResourceCPU:    resource.MustParse("50m"),
-		corev1.ResourceMemory: resource.MustParse("50Mi"),
-	}
-}
-
-func newRequests() corev1.ResourceList {
-	return corev1.ResourceList{
-		corev1.ResourceCPU:    resource.MustParse("50m"),
-		corev1.ResourceMemory: resource.MustParse("50Mi"),
-	}
 }

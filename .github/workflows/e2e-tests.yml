@@ -1,39 +1,105 @@
-# Runs E2E tests on a Kind cluster building and deploying on it.
-name: Run E2E tests
+name: E2E tests
 
 on:
   pull_request:
-    branches:
-      - 'main*'
-    paths-ignore: 
-      - 'docs/**'
+    branches: [main]
+    paths-ignore: ['docs/**']
+
   workflow_dispatch:
+    inputs:
+      test_parallel_process:
+        description: Number of parallel processes for the E2E test suite
+        default: '2'
+        required: false
+
+concurrency:
+  group: e2e-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
 
 env:
-  KUBECONFIG: /tmp/kubeconfig.yaml
   OPERATOR_NAME: redis-operator
+  OPERATOR_VERSION: 0.1.0
+  KUBECONFIG: ${{ github.workspace }}/.kube/config
+  LOCAL_CLUSTER_NAME: local-cluster-test
+  LOCAL_REGISTRY: local-registry-hosting
+  LOCAL_REGISTRY_PORT: 5001
+  REDIS_STACK_SERVER: redis/redis-stack-server
+  REDIS_STACK_SERVER_VERSION: 7.4.0-v3
 
 jobs:
-  e2e-tests:
+  e2e:
     runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash -eu -o pipefail {0}
+
     steps:
-      - uses: actions/checkout@v4
-      - id: parse-gomod
-        name: Extract Go version from go.mod file
-        uses: Arthur1/parse-gomod-action@v0
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ steps.parse-gomod.outputs.go}}
-      - name: Setup kubectl
-        run: |
-          curl -sLO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" -o kubectl
-          chmod +x kubectl
-          sudo mv kubectl /usr/local/bin/kubectl
-      - name: Setup e2e environment
-        run: chmod +x ${GITHUB_WORKSPACE}/test/cmd/create_local_cluster_testing.sh && ${GITHUB_WORKSPACE}/test/cmd/create_local_cluster_testing.sh ${{ env.OPERATOR_NAME }}
-      - name: Install ginkgo
-        run: go install github.com/onsi/ginkgo/v2/ginkgo
-      - name: Run tests for Kubernetes
-        run: |
-          make test-e2e-cov OPERATOR_IMAGE=${{ env.OPERATOR_NAME }}:0.1.0
+    - name: 📥  Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🏗️  Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: go.mod
+        cache: true
+
+    - name: 🐳  Prepare Buildx builder
+      uses: docker/setup-buildx-action@v3
+      with:
+        install: true
+        driver-opts: image=moby/buildkit:v0.21.0
+
+    - name: 🔧  Install kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: v1.30.0
+
+    - name: 🌱 Kubernetes KinD Cluster
+      id: kind
+      uses: helm/kind-action@v1
+      with:
+        cluster_name: ${{ env.LOCAL_CLUSTER_NAME }}
+        registry: true
+        registry_name: ${{ env.LOCAL_REGISTRY }}
+        registry_port: ${{ env.LOCAL_REGISTRY_PORT }}
+
+    - name: 🏗️  Build operator image and load into KinD
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        tags: ${{ env.OPERATOR_NAME }}:${{ env.OPERATOR_VERSION }}
+        load: true
+        push: false
+        cache-from: type=local,src=/tmp/.buildx-cache
+        cache-to:   type=local,dest=/tmp/.buildx-cache,mode=max
+
+    - name: 📥 Load operator image into KinD
+      run: kind load docker-image --name ${{ env.LOCAL_CLUSTER_NAME }} ${{ env.OPERATOR_NAME }}:${{ env.OPERATOR_VERSION }}
+
+    - name: 📦  Pull dependency images & load into KinD
+      run: |
+        for img in \
+          ${{ env.REDIS_STACK_SERVER }}:7.2.0-v10 \
+          ${{ env.REDIS_STACK_SERVER }}:${{ env.REDIS_STACK_SERVER_VERSION }} \
+          alpine:3.21.3
+        do
+          docker pull "$img"
+          kind load docker-image --name ${{ env.LOCAL_CLUSTER_NAME }} "$img"
+        done
+
+    - name: 📚  Install Ginkgo CLI
+      run: go install github.com/onsi/ginkgo/v2/ginkgo@latest
+
+    - name: ✅  Run E2E test suite
+      env:
+        TEST_PARALLEL_PROCESSES: ${{ github.event.inputs.test_parallel_process || 2 }}
+      run: |
+        make test-e2e-cov \
+          OPERATOR_IMAGE=${{ env.OPERATOR_NAME }}:${{ env.OPERATOR_VERSION }} \
+          TEST_PARALLEL_PROCESS=${TEST_PARALLEL_PROCESSES} \
+          GOMAXPROCS=${TEST_PARALLEL_PROCESSES}
+
+    - name: 🧹  Delete KinD cluster (always)
+      if: always()
+      run: kind delete cluster --name ${{ env.LOCAL_CLUSTER_NAME }}
