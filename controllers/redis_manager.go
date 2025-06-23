@@ -493,7 +493,7 @@ func (r *RedisClusterReconciler) doFastUpgrade(ctx context.Context, redisCluster
 
 			r.Client.Delete(ctx, existingStatefulSet)
 		}
-		
+
 		return true, nil
 	}
 
@@ -534,7 +534,7 @@ func (r *RedisClusterReconciler) doSlowUpgrade(ctx context.Context, redisCluster
 			return nil
 		}
 	}
-	
+
 	// ScaleUp the cluster before upgrading
 	scaledBeforeUpgrade := false
 	if !redisCluster.Spec.PurgeKeysOnRebalance && redisCluster.Spec.ReplicasPerMaster == 0 {
@@ -556,7 +556,7 @@ func (r *RedisClusterReconciler) doSlowUpgrade(ctx context.Context, redisCluster
 	// Before we proceed, we want to wait for all pods to be ready.
 	// We might have just finished a scaling event or something of the likes,
 	// and if we upgrade straight away, we will run into bugs where pods cannot be contacted for the upgrade
-		podReadyWaiter := utils.PodReadyWait{
+	podReadyWaiter := utils.PodReadyWait{
 		Client: r.Client,
 	}
 	listOptions := client.ListOptions{
