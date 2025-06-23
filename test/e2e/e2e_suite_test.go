@@ -6,17 +6,21 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+
 	redisv1 "github.com/inditextech/redisoperator/api/v1"
-	"github.com/inditextech/redisoperator/test/e2e/internal/config"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/rest"
 	"k8s.io/kubectl/pkg/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -28,96 +32,92 @@ import (
 )
 
 const (
+	crdDirName  = "deployment"
 	metricsAddr = ":8080"
-	CrdFileName = "deployment"
+	defaultPoll = 10 * time.Second
+	defaultWait = 100 * time.Second
 )
 
 var (
-	testEnv            *envtest.Environment
-	crdDirectoryPath   = filepath.Join("..", "..", CrdFileName)
-	k8sClient          client.Client
-	k8sManagerCancelFn context.CancelFunc
-	ctx                context.Context
+	testEnv       *envtest.Environment
+	k8sClient     client.Client
+	managerCancel context.CancelFunc
+	ctx           context.Context
 )
 
-func TestE2e(t *testing.T) {
-	RunSpecs(t, "E2e Suite")
+// NewCachingClientFunc returns a controller‑runtime NewClientFunc
+// that enables Unstructured caching (i.e. watches on arbitrary CRDs).
+// This is useful when you rely on types not registered in the built‑in scheme.
+func NewCachingClientFunc() client.NewClientFunc {
+	return func(cfg *rest.Config, opts client.Options) (client.Client, error) {
+		// Turn on unstructured caching for CRDs / unknown types
+		opts.Cache.Unstructured = true
+		return client.New(cfg, opts)
+	}
+}
+
+func TestE2E(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Redis Operator E2E Suite", Label("e2e"))
 }
 
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
-	RegisterFailHandler(Fail)
-
-	SetDefaultEventuallyTimeout(time.Second * 10)
-
+	By("bootstrapping test environment")
 	useCluster := true
-	By("configuring test environment")
 	testEnv = &envtest.Environment{
 		UseExistingCluster:       &useCluster,
 		AttachControlPlaneOutput: true,
-		CRDDirectoryPaths:        []string{crdDirectoryPath},
+		CRDDirectoryPaths:        []string{filepath.Join("..", "..", crdDirName)},
 		ErrorIfCRDPathMissing:    true,
 	}
 
-	By("starting test environment")
-	time.Sleep(10 * time.Second)
 	cfg, err := testEnv.Start()
-	Expect(err).ToNot(HaveOccurred())
-	Expect(cfg).ToNot(BeNil())
-
-	By("updating scheme")
-	err = redisv1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		if errors.IsAlreadyExists(err) {
+			GinkgoWriter.Printf("warning: CRD already existed, continuing: %v\n", err)
+			err = nil
+		} else {
+			Fail(fmt.Sprintf("failed to start test environment: %v", err))
+		}
+	}
+	Expect(cfg).NotTo(BeNil())
 	Expect(err).NotTo(HaveOccurred())
 
-	err = metav1.AddMetaToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
+	// register all schemes in one shot
+	utilruntime.Must(redisv1.AddToScheme(scheme.Scheme))
+	utilruntime.Must(corev1.AddToScheme(scheme.Scheme))
+	utilruntime.Must(apiextensions.AddToScheme(scheme.Scheme))
+	utilruntime.Must(metav1.AddMetaToScheme(scheme.Scheme))
 
-	err = corev1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
+	port := 8080 + GinkgoParallelProcess() - 1
+	metricsAddr := fmt.Sprintf(":%d", port)
 
-	err = apiextensions.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-
-	By("creating manager")
-	k8sManager, err := ctrl.NewManager(testEnv.Config, ctrl.Options{
-		NewClient: config.NewClient(),
+	By("creating controller manager")
+	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
+		NewClient: NewCachingClientFunc(),
 		Scheme:    scheme.Scheme,
-		Cache: cache.Options{
-			DefaultNamespaces: map[string]cache.Config{
-				RedisNamespace: {},
-			},
-		},
-		Metrics: server.Options{
-			BindAddress: metricsAddr,
-		},
+		Cache:     cache.Options{DefaultNamespaces: map[string]cache.Config{}},
+		Metrics:   server.Options{BindAddress: metricsAddr},
 	})
-	Expect(err).ToNot(HaveOccurred())
 
-	k8sClient = k8sManager.GetClient()
 	Expect(err).NotTo(HaveOccurred())
-	Expect(k8sClient).ToNot(BeNil())
 
+	k8sClient = mgr.GetClient()
+	Expect(k8sClient).NotTo(BeNil())
+
+	ctx, managerCancel = context.WithCancel(ctrl.SetupSignalHandler())
 	go func() {
-		ctx, k8sManagerCancelFn = context.WithCancel(ctrl.SetupSignalHandler())
-		err = k8sManager.Start(ctx)
-		Expect(err).ToNot(HaveOccurred())
+		defer GinkgoRecover()
+		Expect(mgr.Start(ctx)).To(Succeed())
 	}()
 })
 
 var _ = AfterSuite(func() {
-	redisClusterOperator, err := createOperator()
-	Expect(err).NotTo(HaveOccurred())
-
-	By("tearing down the test environment")
-	Expect(k8sClient.Delete(context.Background(), &redisClusterOperator)).Should(Succeed())
-
-	if k8sManagerCancelFn != nil {
-		k8sManagerCancelFn()
+	By("shutting down test environment")
+	if managerCancel != nil {
+		managerCancel()
 	}
-	k8sManagerCancelFn = nil
-	By("tearing down the test environment")
-	Expect(testEnv).ToNot(BeNil())
-	err = testEnv.Stop()
-	Expect(err).ToNot(HaveOccurred())
+	Expect(testEnv.Stop()).To(Succeed())
 })
