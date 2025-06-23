@@ -612,7 +612,6 @@ func (r *RedisClusterReconciler) freeClusterNodes(clusterNodes kubernetes.Cluste
 
 func (r *RedisClusterReconciler) scaleUpAndWait(ctx context.Context, redisCluster *redisv1.RedisCluster) (int32, error) {
 	// Add a new node to the cluster to make sure that there's enough space to move slots
-	r.LogInfo(redisCluster.NamespacedName(), "Scaling up before the upgrade")
 	// But first lets check if there is a pod dangling from a previous attempt that gone sour
 	// For example if a non-existant redis image is requested, it'd get stuck on n+1th pod being never created successfuly and that pod
 	// might be still there.

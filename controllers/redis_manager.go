@@ -415,6 +415,94 @@ func (r *RedisClusterReconciler) CheckPDB(ctx context.Context, redisCluster *red
 }
 
 func (r *RedisClusterReconciler) UpgradeCluster(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
+
+	// If a Fast Upgrade is possible or already en progress, start it or check if it's already finished.
+	// In both situations we return here.
+	fastUpgrade, err := r.doFastUpgrade(ctx, redisCluster)
+	if err != nil || fastUpgrade {
+		return err
+	}
+
+	// Continue doing a Slow Upgrade if we can't go the Fast way.
+	return r.doSlowUpgrade(ctx, redisCluster)
+}
+
+// If PurgeKeysOnRebalance flag is active and Redis cluster is not configures as master-replica we can
+// do a Fast Upgrade, applying the changes to the StatefulSet and recreaing it. Slots move will be avoided.
+func (r *RedisClusterReconciler) doFastUpgrade(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, error) {
+	req := controllerruntime.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      redisCluster.Name,
+			Namespace: redisCluster.Namespace,
+		},
+	}
+
+	existingStatefulSet, err := r.FindExistingStatefulSet(ctx, req)
+	if err != nil {
+		return false, err
+	}
+	logger := r.GetHelperLogger(redisCluster.NamespacedName())
+
+	// Already Fast upgrading. Check if still in progress or rebuild the cluster if finished.
+	if redisCluster.Status.Substatus.Status == redisv1.SubstatusFastUpgrade {
+		r.LogInfo(redisCluster.NamespacedName(), "Retaking Fast Upgrade")
+
+		podsReady, err := r.AllPodsReady(ctx, redisCluster)
+		if err != nil {
+			r.LogError(redisCluster.NamespacedName(), err, "Could not check for pods being ready")
+			return true, err
+		}
+		if !podsReady {
+			r.LogInfo(redisCluster.NamespacedName(), "Waiting for pods to become ready to end Fast Upgrade", "expectedReplicas", int(*(existingStatefulSet.Spec.Replicas)))
+			return true, nil
+		}
+
+		// Rebuild the cluster
+		err = r.FastUpgradeRebuildCluster(ctx, redisCluster, logger)
+		if err != nil {
+			return true, err
+		}
+
+		// The cluster is now upgraded, and we can set the Cluster Status as Ready again and remove the Substatus.
+		redisCluster.Status.Status = redisv1.StatusReady
+		redisCluster.Status.Substatus.Status = ""
+		SetConditionFalse(logger, redisCluster, redisv1.ConditionUpgrading)
+
+		return true, nil
+	}
+
+	// Fast upgrade: If purgeKeysOnRebalance property is set to 'true' and we have no replicas. No need to iterate over the partitions.
+	// If fast upgrade is not allowed but we have no replicas, the cluster must be scaled up adding one extra
+	// node to be able to move slots and keys in order to ensure keys are preserved.
+	if redisCluster.Spec.PurgeKeysOnRebalance && redisCluster.Spec.ReplicasPerMaster == 0 {
+		r.LogInfo(redisCluster.NamespacedName(), "Fast upgrade will be performed")
+		err := r.updateSubStatus(ctx, redisCluster, redisv1.SubstatusFastUpgrade, 0)
+		if err != nil {
+			r.LogError(redisCluster.NamespacedName(), err, "Error updating substatus")
+			return true, err
+		}
+
+		// ** FAST UPGRADE **
+		if redisCluster.Status.Substatus.Status != redisv1.SubstatusFastUpgrade {
+			// StatefulSet will be deleted only when switching to FastUpgrade.
+
+			existingStatefulSet, err = r.UpgradeClusterConfigurationUpdate(ctx, redisCluster)
+			if err != nil {
+				return true, err
+			}
+
+			r.Client.Delete(ctx, existingStatefulSet)
+		}
+		
+		return true, nil
+	}
+
+	return false, nil
+}
+
+// Classic Slow Upgrade: StatefulSet updated with the config changes, cluster is scaledUp if no replicas used,
+// slots and keys are copied. No data lose.
+func (r *RedisClusterReconciler) doSlowUpgrade(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
 	req := controllerruntime.Request{
 		NamespacedName: types.NamespacedName{
 			Name:      redisCluster.Name,
@@ -446,21 +534,10 @@ func (r *RedisClusterReconciler) UpgradeCluster(ctx context.Context, redisCluste
 			return nil
 		}
 	}
-
-	// Fast upgrade: If purgeKeysOnRebalance property is set to 'true' and we have no replicas. No need to iterate over the partitions.
-	// If fast upgrade is not allowed but we have no replicas, the cluster must be scaled up adding one extra
-	// node to be able to move slots and keys in order to ensure keys are preserved.
-	fastUpgrade := false
+	
+	// ScaleUp the cluster before upgrading
 	scaledBeforeUpgrade := false
-	if redisCluster.Spec.PurgeKeysOnRebalance && redisCluster.Spec.ReplicasPerMaster == 0 {
-		r.LogInfo(redisCluster.NamespacedName(), "Fast upgrade will be performed")
-		fastUpgrade = true
-		err = r.updateSubStatus(ctx, redisCluster, redisv1.SubstatusFastUpgrade, 0)
-		if err != nil {
-			r.LogError(redisCluster.NamespacedName(), err, "Error updating substatus")
-			return err
-		}
-	} else if !redisCluster.Spec.PurgeKeysOnRebalance && redisCluster.Spec.ReplicasPerMaster == 0 {
+	if !redisCluster.Spec.PurgeKeysOnRebalance && redisCluster.Spec.ReplicasPerMaster == 0 {
 		r.LogInfo(redisCluster.NamespacedName(), "Scaling Up the cluster before upgrading")
 		_, err = r.scaleUpAndWait(ctx, redisCluster)
 		if err != nil {
@@ -479,7 +556,7 @@ func (r *RedisClusterReconciler) UpgradeCluster(ctx context.Context, redisCluste
 	// Before we proceed, we want to wait for all pods to be ready.
 	// We might have just finished a scaling event or something of the likes,
 	// and if we upgrade straight away, we will run into bugs where pods cannot be contacted for the upgrade
-	podReadyWaiter := utils.PodReadyWait{
+		podReadyWaiter := utils.PodReadyWait{
 		Client: r.Client,
 	}
 	listOptions := client.ListOptions{
@@ -511,62 +588,39 @@ func (r *RedisClusterReconciler) UpgradeCluster(ctx context.Context, redisCluste
 		return err
 	}
 
-	if fastUpgrade {
-		r.LogInfo(redisCluster.NamespacedName(), "Fast upgrade")
+	startingPartition := int(*(existingStatefulSet.Spec.Replicas)) - 1
 
-		// Rolling update
-		err = r.FastUpgradeRollingUpdate(ctx, redisCluster, existingStatefulSet)
-		if err != nil {
-			return err
+	if !reflect.DeepEqual(existingStatefulSet.Spec.UpdateStrategy, v1.StatefulSetUpdateStrategy{}) {
+		// An UpdateStrategy is already set.
+		// We can reuse the partition as the starting partition
+		// We should only do this for partitions higher than zero,
+		// as we cannot unset the partition after an upgrade, and the default will be zero.
+		//
+		// So 0 partition will trigger a bad thing, where the whole cluster will be immediately applied,
+		// and all pods destroyed simultaneously.
+		// We need to only set the starting partition if it is higher than 0,
+		// otherwise use the replica count one from before.
+		if int(*(existingStatefulSet.Spec.UpdateStrategy.RollingUpdate.Partition)) > 0 {
+			r.LogInfo(redisCluster.NamespacedName(), "Update Strategy already set. Reusing partition", "partition", existingStatefulSet.Spec.UpdateStrategy.RollingUpdate.Partition)
+			startingPartition = int(*(existingStatefulSet.Spec.UpdateStrategy.RollingUpdate.Partition))
 		}
+	}
 
-		// Wait till all pods have been recreated.
-		r.LogInfo(redisCluster.NamespacedName(), "Waiting for pods to become ready", "expectedReplicas", int(*(existingStatefulSet.Spec.Replicas)))
-		err = podReadyWaiter.WaitForPodsToBecomeReady(ctx, 5*time.Second, 10*time.Minute, &listOptions, int(*(existingStatefulSet.Spec.Replicas)))
-		if err != nil {
-			return err
-		}
-
-		// Rebuild the cluster
-		err = r.FastUpgradeRebuildCluster(ctx, redisCluster, logger)
-		if err != nil {
-			return err
-		}
-	} else {
-		startingPartition := int(*(existingStatefulSet.Spec.Replicas)) - 1
-
-		if !reflect.DeepEqual(existingStatefulSet.Spec.UpdateStrategy, v1.StatefulSetUpdateStrategy{}) {
-			// An UpdateStrategy is already set.
-			// We can reuse the partition as the starting partition
-			// We should only do this for partitions higher than zero,
-			// as we cannot unset the partition after an upgrade, and the default will be zero.
-			//
-			// So 0 partition will trigger a bad thing, where the whole cluster will be immediately applied,
-			// and all pods destroyed simultaneously.
-			// We need to only set the starting partition if it is higher than 0,
-			// otherwise use the replica count one from before.
-			if int(*(existingStatefulSet.Spec.UpdateStrategy.RollingUpdate.Partition)) > 0 {
-				r.LogInfo(redisCluster.NamespacedName(), "Update Strategy already set. Reusing partition", "partition", existingStatefulSet.Spec.UpdateStrategy.RollingUpdate.Partition)
-				startingPartition = int(*(existingStatefulSet.Spec.UpdateStrategy.RollingUpdate.Partition))
+	if redisCluster.Spec.ReplicasPerMaster == 0 {
+		// Loop over the cluster partitions upgrading once at a time
+		for partition := startingPartition; partition >= 0; partition-- {
+			err = r.UpgradePartition(ctx, redisCluster, existingStatefulSet, partition, logger)
+			if err != nil {
+				return err
 			}
 		}
-
-		if redisCluster.Spec.ReplicasPerMaster == 0 {
-			// Loop over the cluster partitions upgrading once at a time
-			for partition := startingPartition; partition >= 0; partition-- {
-				err = r.UpgradePartition(ctx, redisCluster, existingStatefulSet, partition, logger)
-				if err != nil {
-					return err
-				}
-			}
-		} else if redisCluster.Spec.ReplicasPerMaster > 0 {
-			// We have replicas in this cluster
-			// We don't need to rebalance, we only need to failover if master, and restart and re-replicate if replica
-			for partition := startingPartition; partition >= 0; partition-- {
-				err = r.UpgradePartitionWithReplicas(ctx, redisCluster, existingStatefulSet, partition, logger)
-				if err != nil {
-					return err
-				}
+	} else if redisCluster.Spec.ReplicasPerMaster > 0 {
+		// We have replicas in this cluster
+		// We don't need to rebalance, we only need to failover if master, and restart and re-replicate if replica
+		for partition := startingPartition; partition >= 0; partition-- {
+			err = r.UpgradePartitionWithReplicas(ctx, redisCluster, existingStatefulSet, partition, logger)
+			if err != nil {
+				return err
 			}
 		}
 	}
