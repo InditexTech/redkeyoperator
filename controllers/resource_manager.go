@@ -199,7 +199,7 @@ func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req
 
 func (r *RedisClusterReconciler) checkClusterNodesIntegrity(ctx context.Context, redisCluster *redisv1.RedisCluster) {
 
-	if redisCluster.Status.Status == redisv1.StatusInitializing {
+	if redisCluster.Status.Status == redisv1.StatusInitializing || redisCluster.Status.Status == redisv1.StatusUpgrading {
 		return
 	}
 
@@ -610,7 +610,7 @@ func (r *RedisClusterReconciler) freeClusterNodes(clusterNodes kubernetes.Cluste
 	}
 }
 
-func (r *RedisClusterReconciler) scaleUpAndWait(ctx context.Context, redisCluster *redisv1.RedisCluster) (int32, error) {
+func (r *RedisClusterReconciler) scaleUpForUpgrade(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, error) {
 	// Add a new node to the cluster to make sure that there's enough space to move slots
 	// But first lets check if there is a pod dangling from a previous attempt that gone sour
 	// For example if a non-existant redis image is requested, it'd get stuck on n+1th pod being never created successfuly and that pod
@@ -619,50 +619,45 @@ func (r *RedisClusterReconciler) scaleUpAndWait(ctx context.Context, redisCluste
 	sset, err := r.FindExistingStatefulSet(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name, Namespace: redisCluster.Namespace}})
 	if err != nil {
 		r.LogError(redisCluster.NamespacedName(), err, "Error while getting StatefulSet")
-		return 0, err
+		return false, err
 	}
 
 	originalCount := redisCluster.Spec.Replicas
-	if *sset.Spec.Replicas == originalCount {
+	if *sset.Spec.Replicas == originalCount && redisCluster.Status.Substatus.Status == "" {
 		redisCluster.Spec.Replicas++
 		err = r.ScaleCluster(ctx, redisCluster)
 		if err != nil {
 			r.LogError(redisCluster.NamespacedName(), err, "Error when scaling up")
 			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
 			redisCluster.Status.Status = redisv1.StatusError
-			return 0, err
+			return false, err
 		}
-		r.LogInfo(redisCluster.NamespacedName(), "Added a new pod, now we'll wait it to become ready")
+		err = r.updateSubStatus(ctx, redisCluster, redisv1.SubstatusScalingUp, 0)
+		if err != nil {
+			r.LogError(redisCluster.NamespacedName(), err, "Error updating substatus")
+			return false, err
+		}
 	} else if *sset.Spec.Replicas == originalCount+1 {
 		// Resume if the cluster was already scaled for upgrading.
 		r.LogInfo(redisCluster.NamespacedName(), "Cluster already scaled, resume the processing")
 		redisCluster.Spec.Replicas = *sset.Spec.Replicas
 	}
-	podReadyWaiter := utils.PodReadyWait{
-		Client: r.Client,
-	}
-	listOptions := client.ListOptions{
-		Namespace: redisCluster.Namespace,
-		LabelSelector: labels.SelectorFromSet(
-			map[string]string{
-				redis.RedisClusterLabel:                     redisCluster.Name,
-				r.GetStatefulSetSelectorLabel(redisCluster): "redis",
-			},
-		),
-	}
-	r.LogInfo(redisCluster.NamespacedName(), "Waiting for pods to become ready", "expectedReplicas", int(redisCluster.Spec.Replicas))
-	err = podReadyWaiter.WaitForPodsToBecomeReady(ctx, 5*time.Second, 5*time.Minute, &listOptions, int(redisCluster.Spec.Replicas))
+
+	podsReady, err := r.AllPodsReady(ctx, redisCluster)
 	if err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Error waiting for pods to become ready", "expectedReplicas", int(redisCluster.Spec.Replicas))
-		r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
-		return 0, err
+		r.LogError(redisCluster.NamespacedName(), err, "Could not check for pods readiness")
+		return false, err
+	}
+	if !podsReady {
+		// pods not ready yet, return to requeue and keep waiting
+		return false, nil
 	}
 
-	// All the pods are ready. Do they need a cluster meet ?
+	// All the pods are ready. Do they need a cluster meet?
 	nodes, err := r.GetReadyNodes(ctx, redisCluster)
 	if err != nil {
 		r.LogError(redisCluster.NamespacedName(), err, "Could not fetch nodes for Cluster Meet check")
-		return 0, err
+		return false, err
 	}
 	needsMeet, _ := redis.NeedsClusterMeet(ctx, r.Client, nodes, redisCluster)
 	if needsMeet {
@@ -670,11 +665,11 @@ func (r *RedisClusterReconciler) scaleUpAndWait(ctx context.Context, redisCluste
 		err = r.ClusterMeet(ctx, nodes, redisCluster)
 		if err != nil {
 			r.LogError(redisCluster.NamespacedName(), err, "Could not run ClusterMeet")
-			return 0, err
+			return false, err
 		}
 	}
 	r.LogInfo(redisCluster.NamespacedName(), "ClusterMeet not needed, or finished")
-	return originalCount, nil
+	return true, nil
 }
 
 func (r *RedisClusterReconciler) AllPodsReady(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, error) {
@@ -1696,6 +1691,13 @@ func (r *RedisClusterReconciler) CheckAndCreateStatefulSet(ctx context.Context, 
 		}
 	} else {
 		// Check StatefulSet <-> RedisCluster coherence
+
+		// When scaling up before upgrading we can have inconsistencies currReadyNodes <> currSsetReplicas
+		// we skip these checks till the sacling up is done.
+		if redisCluster.Status.Status == redisv1.StatusUpgrading && redisCluster.Status.Substatus.Status == redisv1.SubstatusScalingUp {
+			return immediateRequeue, nil
+		}
+
 		readyNodes, err := r.GetReadyNodes(ctx, redisCluster)
 		if err != nil {
 			return immediateRequeue, err

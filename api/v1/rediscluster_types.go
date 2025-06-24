@@ -55,7 +55,10 @@ var StatusConfiguring = "Configuring"
 var StatusInitializing = "Initializing"
 var StatusError = "Error"
 
-var SubstatusFastUpgrade = "FastUpgrade"
+var SubstatusFastUpgrading = "FastUpgrading"
+var SubstatusScalingUp = "ScalingUp"
+var SubstatusSlowUpgrading = "SlowUpgrading"
+var SubstatusScalingDown = "ScalingDown"
 
 var ConditionUpgrading = metav1.Condition{
 	Type:               "Upgrading",
