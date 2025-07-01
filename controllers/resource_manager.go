@@ -1224,7 +1224,7 @@ func (r *RedisClusterReconciler) CreateConfigMap(req ctrl.Request, spec redisv1.
 			Namespace: req.Namespace,
 			Labels:    labels,
 		},
-		Data: map[string]string{"redis.conf": redisConf, "memory-overhead": "300Mi"},
+		Data: map[string]string{"redis.conf": redisConf},
 	}
 
 	r.LogInfo(req.NamespacedName, "Generated Configmap", "configmap", cm)
