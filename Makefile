@@ -77,7 +77,7 @@ BUNDLE_IMG ?= controller-bundle:$(VERSION)
 
 # Image URL to use for deploying the operator pod when using `debug` deployment profile.
 # A base golang image is used with Delve installed, in order to be able to remotely debug the manager.
-IMG_DEBUG ?= delve:1.24.0
+IMG_DEBUG ?= delve:1.24.4
 
 # Set the Operator SDK version to use. By default, what is installed on the system is used.
 # This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.

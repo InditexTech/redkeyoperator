@@ -30,6 +30,7 @@ cover.out
 *.swp
 *.swo
 *~
+.vscode/settings.json
 
 state/
 

@@ -18,7 +18,7 @@ Three **Deployment Profiles** have been defined. Basically, these profiles deter
 
 | Profile | Image used to create the Redis Operator pod | Purpose                                         |
 |---------|---------------------------------------------|-------------------------------------------------|
-| debug   | delve:1.24.0                                | Debug code from your IDE using Delve            |
+| debug   | delve:1.24.4                                | Debug code from your IDE using Delve            |
 | dev     | redis-operator:1.3.0                        | Test a locally built (from source code) release |
 
 ## Create your Kubernetes cluster
