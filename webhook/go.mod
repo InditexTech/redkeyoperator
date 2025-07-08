@@ -1,6 +1,6 @@
 module github.com/inditextech/redisoperator/webhook
 
-go 1.24.0
+go 1.24.4
 
 replace github.com/inditextech/redisoperator => ../
 

@@ -8,4 +8,4 @@ webhook:
   port: 9443
 leaderElection:
   leaderElect: true
-  resourceName: db95d8a6.inditex.com
+  resourceName: db95d8a6.inditex.dev

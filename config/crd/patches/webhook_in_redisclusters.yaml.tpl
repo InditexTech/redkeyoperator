@@ -2,7 +2,7 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: redisclusters.redis.inditex.com
+  name: redisclusters.redis.inditex.dev
 spec:
   conversion:
     strategy: Webhook

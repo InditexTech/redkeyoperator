@@ -55,6 +55,11 @@ var StatusConfiguring = "Configuring"
 var StatusInitializing = "Initializing"
 var StatusError = "Error"
 
+var SubstatusFastUpgrading = "FastUpgrading"
+var SubstatusScalingUp = "ScalingUp"
+var SubstatusSlowUpgrading = "SlowUpgrading"
+var SubstatusScalingDown = "ScalingDown"
+
 var ConditionUpgrading = metav1.Condition{
 	Type:               "Upgrading",
 	LastTransitionTime: metav1.Now(),
@@ -77,6 +82,8 @@ var ConditionScalingDown = metav1.Condition{
 	Reason:             "RedisClusterScalingDown",
 	Status:             metav1.ConditionTrue,
 }
+
+var AllConditions = []metav1.Condition{ConditionUpgrading, ConditionScalingUp, ConditionScalingDown}
 
 // RedisClusterSpec defines the desired state of RedisCluster
 // +kubebuilder:validation:XValidation:rule="self.ephemeral || has(self.storage)", message="Ephemeral or storage must be set"
@@ -112,12 +119,12 @@ type RedisClusterSpec struct {
 	Backup bool `json:"backup,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// Monitoring specifies the monitoring configuration for the RedisCluster.
-	Monitoring *MonitoringSpec `json:"monitoring,omitempty"`
+	// Robin specifies the robin configuration for the RedisCluster.
+	Robin *RobinSpec `json:"robin,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// PurgeKeysOnRebalance specifies if keys should be purged on rebalance.
-	PurgeKeysOnRebalance bool `json:"purgekeysonrebalance,omitempty"`
+	PurgeKeysOnRebalance bool `json:"purgeKeysOnRebalance,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// Config is the Redis configuration to use.
@@ -178,7 +185,7 @@ type RedisClusterOverrideSpec struct {
 	Service *v1.Service `json:"service,omitempty"`
 }
 
-type MonitoringSpec struct {
+type RobinSpec struct {
 	Template *v1.PodTemplateSpec `json:"template,omitempty"`
 	Config   *string             `json:"config,omitempty"`
 }
@@ -190,6 +197,12 @@ type RedisClusterStatus struct {
 	Nodes      map[string]*RedisNode `json:"nodes"`
 	Status     string                `json:"status"`
 	Conditions []metav1.Condition    `json:"conditions,omitempty"`
+	Substatus  RedisClusterSubstatus `json:"substatus"`
+}
+
+type RedisClusterSubstatus struct {
+	Status             string `json:"status,omitempty"`
+	UpgradingPartition int    `json:"upgradingPartition,omitempty"`
 }
 
 type SlotRange struct {
@@ -223,6 +236,7 @@ type Pdb struct {
 // +kubebuilder:printcolumn:name="Storage",type="string",JSONPath=".spec.storage",description="Amount of storage for Redis"
 // +kubebuilder:printcolumn:name="StorageClassName",type="string",JSONPath=".spec.storageClassName",description="Storage Class to be used by the PVC"
 // +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.status",description="The status of Redis cluster"
+// +kubebuilder:printcolumn:name="Substatus",type="string",JSONPath=".status.substatus.status",description="The substatus of Redis cluster"
 // +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas,selectorpath=.status.selector
 // RedisCluster is the Schema for the redisclusters API
 type RedisCluster struct {

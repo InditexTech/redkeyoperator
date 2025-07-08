@@ -8,7 +8,7 @@ metadata:
   name: rediscluster-viewer-role
 rules:
 - apiGroups:
-  - redis.inditex.com
+  - redis.inditex.dev
   resources:
   - redisclusters
   verbs:
@@ -16,7 +16,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - redis.inditex.com
+  - redis.inditex.dev
   resources:
   - redisclusters/status
   verbs:

@@ -16,11 +16,10 @@ As we will see below, you can use the `make` command to deploy the different com
 
 Three **Deployment Profiles** have been defined. Basically, these profiles determine which image will be used to deploy the Redis Operator pod. These are the 3 Deployment Profiles and the default images used to create the Redis Operator pod:
 
-| Profile | Image used to create the Redis Operator pod | Purpose |
-|---------|---------------------------------------------|---------|
-| debug | inditex-docker-snapshot.jfrog.io/production/itxapps/delve:1.24.0 | Debug code from your IDE using Delve |
-| dev | redis-operator:0.1.0 | Test a locally built (from source code) release | 
-| pro | operator.redis-operator:1.2.1 | Test a released version |
+| Profile | Image used to create the Redis Operator pod | Purpose                                         |
+|---------|---------------------------------------------|-------------------------------------------------|
+| debug   | delve:1.24.4                                | Debug code from your IDE using Delve            |
+| dev     | redis-operator:1.3.0                        | Test a locally built (from source code) release |
 
 ## Create your Kubernetes cluster
 
@@ -97,7 +96,9 @@ EOF
 set -o errexit
 ```
 
-## Deploy Redis Operator from a custom image
+## Redis Operator
+
+### Deploy Redis Operator from a custom image
 
 Once your K8s cluster and registry are ready to work with, you need to make available the image you want to use to deploy Redis Operator.
 
@@ -105,8 +106,8 @@ Your cluster must be configured to be able to access your local registry.
 
 We provide and easy way to build and push the images for `dev` and `debug` profiles:
 
-- `make dev-docker-build`: builds an image containing the Redis Operator manager built from the source code. This image is published in Docker local registry.
-- `make dev-docker-push`: pushes the image built with the command above to the corresponding registry.
+- `make docker-build`: builds an image containing the Redis Operator manager built from the source code. This image is published in Docker local registry.
+- `make docker-push`: pushes the image built with the command above to the corresponding registry.
 - `make debug-docker-build`: builds an image that will allow us to create an *empty* pod as the redis operator to which we will copy the manager binary and run it, as we'll explain later.
 - `make debug-docker-push`: pushes the image built with the command above to he corresponding registry.
 
@@ -114,35 +115,34 @@ We provide and easy way to build and push the images for `dev` and `debug` profi
 
 The image names used by default by each profile (shown in the table above) can be overwritten using the environment variables:
 
-- `IMG`: overwrittes the image name when using `pro` profile.
-- `IMG_DEV`: overwrittes the image name when using `dev` profile.
+- `IMG`: overwrittes the image name when using `dev` profile.
 - `IMG_DEBUG`: overwrittes the image name when using `debug` profile.
 
 E.G. these are the commands to build and push the image for `debug` profile:
 
-```
+```shell
 make debug-docker-build IMG_DEBUG=localhost:5001/redis-operator:delve
 make debug-docker-push IMG_DEBUG=localhost:5001/redis-operator:delve
 ```
 
 E.G. the commands when using `dev` profile:
 
-```
+```shell
 make debug-docker-build IMG_DEV=localhost:5001/redis-operator:0.1.0
 make debug-docker-push IMG_DEV=localhost:5001/redis-operator:0.1.0
 ```
 
 Once the Redis Operator is available in your local registry, you can follow these steps to deploy it into you K8s cluster:
 
-1. Intall the CRD.
+1. Install the CRD.
 
-```
+```shell
 make install
 ```
 
 2. Create the namespace in which you want you Redis Operator to be deployed. By default, `make` uses `redis-operator`. Is you want to use a different namespace you should use the `NAMESPACE` environment variable to overwritte this value with the one of your choice.
 
-```
+```shell
 kubectl create ns redis-operator
 ```
 
@@ -150,7 +150,7 @@ kubectl create ns redis-operator
 
 3. Generate the manifests, according to the profile you choose to use, to deploy the Redis Operator. Use the `PROFILE` environment variable to define the profile to use. The manifests are generated in `deployment` directory.
 
-```
+```shell
 make process-manifests PROFILE=debug IMG_DEBUG="localhost:5001/redis-operator:delve"
 ```
 
@@ -158,13 +158,13 @@ make process-manifests PROFILE=debug IMG_DEBUG="localhost:5001/redis-operator:de
 
 4. Deploy the Redis Operator. Uses the `deployment/deployment.yml` generated in the above step.
 
-```
+```shell
 make deploy
 ```
 
 >**`make` will install the needed tools like `kustomize`, `control-gen` and `envtest` if not available.**
 
-## Debuging Redis Operator
+### Debuging Redis Operator
 
 If you followed the steps described above to deploy the Redis Operator using the `debug` profile you'll have the CRD deployed and a redis-operator pod running.
 
@@ -178,7 +178,7 @@ This pod is created using a `golang` image with `Delve` installed on it. This wi
 
 To follow the 3 first steps simply execute:
 
-```
+```shell
 make debug
 ```
 
@@ -186,13 +186,13 @@ The manager will the be running in your redis-operator pod and you'll see pod's 
 
 To enable the port forwarding:
 
-```
-make port-foward
+```shell
+make port-forward
 ```
 
 You can now attach your local debug from the IDE of your choice to the debug session in the redis-operator pod. As an example, you'll find the configuration needed to launch the debug from VSCode here:
 
-```
+```json
 {
     "version": "0.2.0",
     "configurations": [
@@ -220,12 +220,136 @@ Before redeploying the operator code using `make debug` you can delete the opera
 
 >**!! Go 1.16 or above is needed to use Delve debugging !!**
 
+## Redis Operator Webhook
+
+### Deploy Redis Operator Webhook from a custom image
+
+Once your K8s cluster and registry are ready to work with, you need to make available the image you want to use to deploy Redis Operator Webhook.
+
+Your cluster must be configured to be able to access your local registry.
+
+We provide and easy way to build and push the images for `dev` and `debug` profiles:
+
+- `make docker-build-webhook`: builds an image containing the Redis Operator webhook built from the source code. This image is published in Docker local registry.
+- `make docker-push-webhook`: pushes the image built with the command above to the corresponding registry.
+- `make debug-docker-build`: builds an image that will allow us to create an *empty* pod as the redis operator to which we will copy the manager binary and run it, as we'll explain later.
+- `make debug-docker-push`: pushes the image built with the command above to he corresponding registry.
+
+**To test a released Redis Operator Webhook version you'll have to manually pull the image, tag and push to your local registry.**
+
+The image names used by default by each profile (shown in the table above) can be overwritten using the environment variables:
+
+- `IMG_WEBHOOK`: overwrittes the image name when using `dev` profile.
+- `IMG_DEBUG`: overwrittes the image name when using `debug` profile.
+
+E.G. these are the commands to build and push the image for `debug` profile:
+
+```shell
+make debug-docker-build IMG_DEBUG=localhost:5001/redis-operator-webhook:delve
+make debug-docker-push IMG_DEBUG=localhost:5001/redis-operator-webhook:delve
+```
+
+E.G. the commands when using `dev` profile:
+
+```shell
+make debug-docker-build-webhook IMG_DEV_WEBHOOK=localhost:5001/redis-operator-webhook:0.1.0
+make debug-docker-push-webhook IMG_DEV_WEBHOOK=localhost:5001/redis-operator-webhook:0.1.0
+```
+
+Once the Redis Operator is available in your local registry, you can follow these steps to deploy it into you K8s cluster:
+
+1. Install the CRD.
+
+```shell
+make install
+```
+
+2. Create the namespace in which you want you Redis Operator Webhook to be deployed. By default, `make` uses `redis-operator-webhook`. Is you want to use a different namespace you should use the `WEBHOOK_NAMESPACE` environment variable to overwritte this value with the one of your choice.
+
+```shell
+kubectl create ns redis-operator-webhook
+```
+
+>**The default namespace used by make command is `redis-operato-webhook`. This value can be overwritten using the `WEBHOOK_NAMESPACE` environment variable.**
+
+3. Generate the manifests, according to the profile you choose to use, to deploy the Redis Operator. Use the `PROFILE` environment variable to define the profile to use. The manifests are generated in `deployment` directory.
+
+```shell
+make process-manifests-webhook PROFILE=debug IMG_DEBUG="localhost:5001/redis-operator:delve"
+```
+
+>**If no `PROFILE` environment variable defined, the default value is `dev`.**
+
+4. Deploy the Redis Operator Webhook. Uses the `deployment/webhook.yml` generated in the above step.
+
+```shell
+make deploy-webhook
+```
+
+>**`make` will install the needed tools like `kustomize`, `control-gen` and `envtest` if not available.**
+
+### Debuging Redis Operator Webhook
+
+If you followed the steps described above to deploy the Redis Operator Webhook using the `debug` profile you'll have the CRD deployed and a redis-operator-webhook pod running.
+
+This pod is created using a `golang` image with `Delve` installed on it. This will allow us to easily debug the webhook code following these steps:
+
+1. Build the webhook binary file from the source code.
+2. Copy the webhook binary file to the redis-operator-webhook pod.
+3. Run the webhook binary inside the redis-operator-webhook pod, using Delve to allow remote debugging connections.
+4. Port forward `40001` port to be able to connect to the exposed port in the redis-operator-webhook pod.
+5. Connect from the IDE of your choice to remote debugging
+
+To follow the 3 first steps simply execute:
+
+```shell
+make debug-webhook
+```
+
+The webohok will the be running in your redis-operator-webhook pod and you'll see pod's standard output printing in your terminal. The webhook logs will then be streamed to the terminal.
+
+To enable the port forwarding:
+
+```shell
+make port-forward-webhook
+```
+
+You can now attach your local debug from the IDE of your choice to the debug session in the redis-operator-webhook pod. As an example, you'll find the configuration needed to launch the debug from VSCode here:
+
+```json
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Connect to webhook",
+            "type": "go",
+            "request": "attach",
+            "mode": "remote",
+            "remotePath": "${workspaceFolder}",
+            "port": 40001,
+            "host": "127.0.0.1",
+            "trace": "verbose",
+            "env": {
+                "WATCH_NAMESPACE": "default",
+                "KUBERNETES_CONFIG":  "${HOME}/.kube/config",
+            }
+        }
+    ]
+}
+```
+
+Customize the configuration to use your kubeconfig and your namespace if needed.
+
+Before redeploying the webhook code using `make debug-webhook` you can delete the webhook pod using `make delete-operator-webhook`. The webhook pod will be deleted and automatically recreated to suit the replica set requirements using the debugging image.
+
+>**!! Go 1.16 or above is needed to use Delve debugging !!**
+
 ## Cleanup
 
 Delete the operator and all associated resources with:
 
-```
-make dev-delete-rdcl
+```shell
+make delete-rdcl
 make undeploy
 make uninstall
 kubectl delete ns redis-operator
@@ -233,68 +357,19 @@ kubectl delete ns redis-operator
 
 ## Deploying a Redis cluster
 
-There are two sample manifests for creating Redis clusters under the folder `config/samples`. `redis_v1alpha1_rediscluster-storage.yaml` creates a persistent cluster and `redis_v1alpha1_rediscluster_ephemeral.yaml` creates an ephemeral cluster. Please note that some of the following tooling (such as PoMonitor and load tester) are dependent of the Redis cluster name, so both samples share the same name.
+You can deploy a sample Redis Cluster from `config/samples` folder running:
 
-### Deploying a master-replica Redis cluster
-
-Create an ephemeral cluster `redis_v1alpha1_rediscluster_ephemeral.yaml` **IMPORTANT specify at least `replicas: 3` `replicasPerMaster: 1`** this is important to promote failover and renconcile cluster when master fail
-
-## Getting the metrics from Redis Cluster and the Operator
-
-The folder `_local_tools/tooling` contains manifests for **Prometheus Operator** and a **Prometheus Instance**, a **Grafana Instance**, two **PodMonitor** instances and an **InfluxDB Instance**. These tools can be applied by running
-```
-kustomize build _local_tools/tooling | kubectl apply -f -
-```
-The operator serves its metrics via the port 8080. One of the PodMonitors scrapes metrics out of Operator instance and writes them to the Prometheus instance. 
-The other PodMonitor uses a label match to find out all Redis instances and scrapes all the Redis metrics and copies to the Prometheus instance.
-
-By default, Redis pods does not expose a metrics port. To achieve this, a sidecar should be added to each pod. This operation requires a change on the code where the Redis cluster statefulset is created. The can can be applied by running
-```
-git apply _local_tools/monitoring/redis_monitoring_sidecar_apply.diff
-```
-and can be removed by running
-```
-git apply _local_tools/monitoring/redis_monitoring_sidecar_remove.diff
+```shell
+make apply-rdcl
 ```
 
----
-### !!! WARNING !!!
-> It's crucial to remove this path before commiting the code to the repository as this sidecar approach is just for development purposes and not for production.
-
----
-
-After applying the patch and running the operator by running `make dev-deploy`, newly created Redis clusters will include this metrics sidecar on each Redis node. By this time all the metrics should be on the Prometheus instance and ready to inspect.
-
-## Visualizing the metrics
-
-Grafana service's type is ClusterIP and the exposed port should be forwarded in order to reach the service from the local development machine.
-
-```
-kubectl port-forward service/grafana 28080:80
-```
-
-After forwarding the port, Grafana interface can be reached by accessing `http://localhost:28080` from a browser. Grafana username and password can be found inside the `grafana.yml` file. 
-The data source for all metrics can be found by adding a Data Source by the type Prometheus and with the address `http://prometheus-operated:9090`. A sample dashboard can be created by importing the `_local_tools/dashboards/redis-prometheus.json` file.
-
-![img.png](../images/redis-dashboard.png)
-
-## How to run a load test
-
-The folder `_local_tools/tooling` contains the file `redis-load-tester.yml` which can be used to deploy a load tester.
-
-This load tester randomly generates keys and writes them on the redis cluster. Load tester also writes the metrics about its load to the InfluxDB instance.
-
-The Influxdb can be added as a data source on Grafana by using `http://inflluxdb:8086` as the address and `myk6db` as the database name. 
-
-The dashboard can be added by importing `_local_tools/dashboards/redis-k6.json` file.
-
-![img.png](../images/redis-load-dashboard.png)
+This will apply the manifest file to create an single node ephemeral RedisCluster object with `purgeKeysOnRebalance` set to **true**.
 
 ## Tests
 
-There are some basic tests validating deployments.
 Tests can be run with:
-```
+
+```shell
 make test
 ```
 
@@ -318,13 +393,13 @@ Please note the openshift version in your project
 
 Set up the new CRC 
 
-```
+```shell
 crc setup
 ```
 
 Start the new CRC instance:
 
-```
+```shell
 crc start
 ```
 
@@ -332,31 +407,31 @@ crc start
 
 Ensure that the internal image registry is accessible by checking for a route. The following command can be used with OpenShift 4:
 
-```
+```shell
 oc get route -n openshift-image-registry
 ```
 
 If the route is not exposed, the following command can be run:
 
-```
+```shell
 oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge
 ```
 
 We will dynamically create an environment variable with the name of route to the OpenShift registry. The route will have “/openshift” appended as this is a project that all users can access:
 
-```
+```shell
 REGISTRY="$(oc get route/default-route -n openshift-image-registry -o=jsonpath='{.spec.host}')/openshift"
 ```
 
 we need to log in to the OpenShift internal registry
 
-```
+```shell
 docker login -u kubeadmin -p $(oc whoami -t) ${REGISTRY} 
 ```
 
 The output should end with:
 
-```
+```shell
 Login Succeeded
 ```
 
@@ -364,39 +439,38 @@ Login Succeeded
 
 Export environment variables
 
-```
+```shell
 export IMG=${REGISTRY}/redis-operator:$VERSION // location where your operator image is hosted
 export BUNDLE_IMG=${REGISTRY}/redis-operator-bundle:$VERSION // location where your bundle will be hosted
 ```
 
 Create a image with the operator
 
-```
+```shell
 make docker-build docker-push
 ```
 
 Create a bundle from the root directory of your project
 
-```
+```shell
 make bundle
 ```
 
 Build and push the bundle image
 
-```
+```shell
 make bundle-build bundle-push
 ```
 
 create a secret inside the namespace where you would like to install the bundle
 
-```
+```shell
 kubectl create secret docker-registry regcred --docker-server="${REGISTRY}" --docker-username="kubeadmin" \
     --docker-password=$(oc whoami -t) --dry-run=client -o yaml -n ${namespace} | kubectl apply -f -
 ```
 
-
 Install the bundle with OLM
 
-```
+```shell
 operator-sdk run bundle $BUNDLE_IMG --skip-tls-verify --pull-secret-name regcred
 ```

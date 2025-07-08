@@ -10,6 +10,7 @@ testbin/*
 config/test/tests.yaml
 target/
 .local/
+__debug_bin*
 
 # Test binary, build with `go test -c`
 *.test
@@ -29,7 +30,7 @@ cover.out
 *.swp
 *.swo
 *~
-.vscode
+.vscode/settings.json
 
 state/
 

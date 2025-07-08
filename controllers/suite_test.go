@@ -173,7 +173,7 @@ var _ = Describe("Reconciler", func() {
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: cluster.Name, Namespace: "default"}, cluster)
 				log.Log.Info("ncluster", "cluster", rcluster)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(len(rcluster.Spec.Monitoring.Template.GetObjectMeta().GetLabels())).To(Equal(2))
+				Expect(len(rcluster.Spec.Robin.Template.GetObjectMeta().GetLabels())).To(Equal(2))
 			})
 			It("Configmap is deleted when passing finalizers", func() {
 				err := k8sClient.Delete(context.Background(), cluster)
@@ -231,12 +231,12 @@ func CreateRedisCluster() *redisv1.RedisCluster {
 	cluster := &redisv1.RedisCluster{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "RedisCluster",
-			APIVersion: "redis.inditex.com/redisv1",
+			APIVersion: "redis.inditex.dev/redisv1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "rediscluster-sample",
 			Namespace:  "default",
-			Finalizers: []string{"redis.inditex.com/configmap-cleanup"},
+			Finalizers: []string{"redis.inditex.dev/configmap-cleanup"},
 			Labels:     map[string]string{"team": "team-a"},
 		},
 		Spec: redisv1.RedisClusterSpec{
@@ -247,7 +247,7 @@ func CreateRedisCluster() *redisv1.RedisCluster {
 			maxmemory 500mb
 
 	`,
-			Monitoring: &redisv1.MonitoringSpec{
+			Robin: &redisv1.RobinSpec{
 				Template: &corev1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:   "monitor",
