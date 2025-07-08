@@ -6,7 +6,6 @@ package controllers
 
 import (
 	"context"
-	"crypto/md5"
 	"fmt"
 	"reflect"
 	"slices"
@@ -26,7 +25,6 @@ import (
 
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	pv1 "k8s.io/api/policy/v1"
 	"k8s.io/client-go/util/retry"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -38,8 +36,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	"maps"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -75,21 +71,6 @@ func NewRedisClusterReconciler(mgr ctrl.Manager, maxConcurrentReconciles int, co
 	reconciler.FindExistingPodDisruptionBudgetFunc = reconciler.DoFindExistingPodDisruptionBudget
 
 	return reconciler
-}
-
-func (r *RedisClusterReconciler) deletePdb(ctx context.Context, redisCluster *redisv1.RedisCluster) {
-	// Delete PodDisruptionBudget
-	pdb, err := r.FindExistingPodDisruptionBudgetFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-pdb", Namespace: redisCluster.Namespace}})
-	if err != nil {
-		r.LogInfo(redisCluster.NamespacedName(), "PodDisruptionBudget not deployed", "PodDisruptionBudget Name", redisCluster.Name+"-pdb")
-	} else {
-		err = r.DeletePodDisruptionBudget(ctx, pdb, redisCluster)
-		if err != nil {
-			r.LogError(redisCluster.NamespacedName(), err, "Failed to delete PodDisruptionBudget")
-		} else {
-			r.LogInfo(redisCluster.NamespacedName(), "PodDisruptionBudget Deleted")
-		}
-	}
 }
 
 func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) (ctrl.Result, error) {
@@ -314,28 +295,12 @@ func (r *RedisClusterReconciler) reconcileStatusConfiguring(ctx context.Context,
 		return requeue, DEFAULT_REQUEUE_TIMEOUT
 	}
 
-	// Cluster meet if needed.
-	err = r.CheckAndMeet(ctx, redisCluster)
-	if err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Error when checking if the cluster needs a meet. Will retry again.")
-		return requeue, DEFAULT_REQUEUE_TIMEOUT
-	}
-
-	// Rebalance if needed.
-	err = r.CheckAndBalance(ctx, redisCluster)
-	if err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Error when checking if the cluster is balanced. Will retry again.")
-		return requeue, DEFAULT_REQUEUE_TIMEOUT
-	}
-
 	// PodDisruptionBudget update
-	if redisCluster.Spec.Pdb.Enabled && redisCluster.Spec.Replicas > 1 {
-		err = r.UpdatePodDisruptionBudget(ctx, redisCluster)
-		if err != nil {
-			r.LogError(redisCluster.NamespacedName(), err, "ScaleCluster - Failed to update PodDisruptionBudget")
-		} else {
-			r.LogInfo(redisCluster.NamespacedName(), "ScaleCluster - PodDisruptionBudget updated ", "Name", redisCluster.Name+"-pdb")
-		}
+	err = r.updatePodDisruptionBudget(ctx, redisCluster)
+	if err != nil {
+		r.LogError(redisCluster.NamespacedName(), err, "ScaleCluster - Failed to update PodDisruptionBudget")
+	} else {
+		r.LogInfo(redisCluster.NamespacedName(), "ScaleCluster - PodDisruptionBudget updated ", "Name", redisCluster.Name+"-pdb")
 	}
 
 	r.CheckConfigurationStatus(ctx, redisCluster)
@@ -387,14 +352,9 @@ func (r *RedisClusterReconciler) reconcileStatusReady(ctx context.Context, redis
 			r.LogError(redisCluster.NamespacedName(), err, "Error when updating upgrading status")
 		}
 	}
-	// -> The cluster needs a meet or rebalance: switch to Configuring status.
-	err = r.UpdateConfiguringStatusMeetOrBalance(ctx, redisCluster)
-	if err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Error when updating configuration status if a meet or rebalance is required")
-	}
 
 	if redisCluster.Status.Status == redisv1.StatusReady {
-		err = r.CheckPDB(ctx, redisCluster)
+		err = r.checkPDB(ctx, redisCluster)
 		if err != nil {
 			r.LogError(redisCluster.NamespacedName(), err, "Error checking PDB changes")
 		}
@@ -927,146 +887,6 @@ func (r *RedisClusterReconciler) CheckConfigurationStatus(ctx context.Context, r
 	}
 }
 
-// Checks if the RedisCluster needs a meet or a rebalance, when in Ready status. If any of both is needed, then the status is
-// switched to Configuring to be meet o rebalanced.
-func (r *RedisClusterReconciler) UpdateConfiguringStatusMeetOrBalance(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
-	// Only when the cluster is in Ready status we check for the need of a meet or balance, switching to Configuring status if needed.
-	if redisCluster.Status.Status != redisv1.StatusReady {
-		return nil
-	}
-
-	// Checks if a node meet is needed.
-	sset, ssetErr := r.FindExistingStatefulSetFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name, Namespace: redisCluster.Namespace}})
-	if ssetErr != nil {
-		return ssetErr
-	}
-	currSsetReplicas := *(sset.Spec.Replicas)
-	clusterInfo := r.GetClusterInfo(ctx, redisCluster)
-	clusterKnownNodes, csError := strconv.Atoi(clusterInfo["cluster_known_nodes"])
-
-	// Nodes meet needed if known nodes not matching StatefulSet currect replicas. Entering Configuring status to fix it.
-	if csError == nil && currSsetReplicas > int32(clusterKnownNodes) {
-		redisCluster.Status.Status = redisv1.StatusConfiguring
-		r.LogInfo(redisCluster.NamespacedName(), "CheckConfigurationStatus - current sset replicas > clusterKnownNodes", "currSsetReplicas", currSsetReplicas, "clusterKnownNodes", clusterKnownNodes)
-	}
-
-	// Checks if a cluster rebalance is needed.
-	balanced, err := r.isClusterBalanced(ctx, redisCluster)
-	if err != nil {
-		return err
-	}
-	if !balanced {
-		redisCluster.Status.Status = redisv1.StatusConfiguring
-		r.LogInfo(redisCluster.NamespacedName(), "CheckConfigurationStatus - redis cluster unbalanced, switching to Configuring status to rebalance")
-	}
-
-	return nil
-}
-
-// Checks if a RedisCluster needs a meet, comparing the cluster_known_nodes from redis-cli cluster info value
-// with the current replicas in the StatefulSet. Cluster meet is done if needed.
-func (r *RedisClusterReconciler) CheckAndMeet(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
-	sset, ssetErr := r.FindExistingStatefulSetFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name, Namespace: redisCluster.Namespace}})
-	if ssetErr != nil {
-		return ssetErr
-	}
-	currSsetReplicas := *(sset.Spec.Replicas)
-
-	clusterInfo := r.GetClusterInfo(ctx, redisCluster)
-	clusterKnownNodes, csError := strconv.Atoi(clusterInfo["cluster_known_nodes"])
-
-	// Nodes meet needed if known nodes not matching StatefulSet currect replicas
-	if csError == nil && currSsetReplicas > int32(clusterKnownNodes) {
-		r.LogInfo(redisCluster.NamespacedName(), "Cluster needs a nodes meet", "redis_cluster", redisCluster.Name, "cluster_known_nodes", clusterKnownNodes, "StatefulSet replicas", currSsetReplicas)
-		clusterNodes, err := r.getClusterNodes(ctx, redisCluster)
-		if err != nil {
-			r.LogError(redisCluster.NamespacedName(), err, "Could not get cluster nodes")
-			return err
-		}
-		// Free cluster nodes to avoid memory consumption
-		defer r.freeClusterNodes(clusterNodes, redisCluster.NamespacedName())
-		if err = clusterNodes.ClusterMeet(ctx); err != nil {
-			r.Recorder.Event(redisCluster, "Warning", "ClusterMeet", "Error when attempting ClusterMeet")
-			return err
-		}
-		r.LogInfo(redisCluster.NamespacedName(), "Cluster meet completed", "redis_cluster", redisCluster.Name)
-	}
-
-	return nil
-}
-
-// Checks if a RedisCluster needs to be balanced and rebalances it when needed.
-func (r *RedisClusterReconciler) CheckAndBalance(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
-	// Check if the cluster is not balanced
-	balanced, err := r.isClusterBalanced(ctx, redisCluster)
-	if err != nil {
-		return err
-	}
-
-	// Rebalance if needed
-	if !balanced {
-		r.LogInfo(redisCluster.NamespacedName(), "Cluster needs to be rebalanced", "redis_cluster", redisCluster.Name)
-		clusterNodes, err := r.getClusterNodes(ctx, redisCluster)
-		if err != nil {
-			r.LogError(redisCluster.NamespacedName(), err, "Could not get cluster nodes")
-			return err
-		}
-		// Free cluster nodes to avoid memory consumption
-		defer r.freeClusterNodes(clusterNodes, redisCluster.NamespacedName())
-
-		if err = r.ensureClusterRatioAndRebalance(ctx, redisCluster, clusterNodes); err != nil {
-			r.Recorder.Event(redisCluster, "Warning", "ClusterRebalance", "Error when attempting ClusterRebalance")
-			return err
-		}
-		r.LogInfo(redisCluster.NamespacedName(), "Cluster rebalance completed", "redis_cluster", redisCluster.Name)
-
-	}
-
-	return nil
-}
-
-// Checks if the cluster is balanced.
-// If any of the nodes has no slots assigned or the number of slots assigned to the number of slots assigned
-// to the nodes differs by more than the established rate, the cluster is considered unbalanced.
-func (r *RedisClusterReconciler) isClusterBalanced(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, error) {
-
-	// Rebalance needed if any of the nodes has no slots assigned, no need to check anything else
-	clusterInfo := r.GetClusterInfo(ctx, redisCluster)
-	clusterSize, crError := strconv.Atoi(clusterInfo["cluster_size"])
-	// Update clusterSize with replicasPerMaster before checking
-	if redisCluster.Spec.ReplicasPerMaster > 0 {
-		clusterSize = clusterSize + (clusterSize * int(redisCluster.Spec.ReplicasPerMaster))
-	}
-	realExpectedReplicas := int(redisCluster.NodesNeeded())
-	if crError == nil && clusterSize < realExpectedReplicas {
-		r.LogInfo(redisCluster.NamespacedName(), "Check cluster balance - one or more nodes has no slots assigned", "clusterSize", clusterSize, "realExpectedReplicas", realExpectedReplicas)
-		return false, nil
-	}
-
-	clusterNodes, err := r.getClusterNodes(ctx, redisCluster)
-	if err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Could not get cluster nodes")
-		return false, err
-	}
-	// Free cluster nodes to avoid memory consumption
-	defer r.freeClusterNodes(clusterNodes, redisCluster.NamespacedName())
-
-	unbalancedNodes, err := clusterNodes.GetUnbalancedNodes(ctx)
-	if err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Could not check nodes balance")
-		return false, err
-	}
-	if len(unbalancedNodes) == 0 {
-		r.LogInfo(redisCluster.NamespacedName(), fmt.Sprintf("No rebalancing needed! All nodes are within the %d%% threshold", kubernetes.RedisNodesUnbalancedThreshold))
-		return true, nil
-	} else {
-		for node, leftoverSlots := range unbalancedNodes {
-			r.LogInfo(redisCluster.NamespacedName(), "Unbalanced node found! Has more than exepected assigned slots", "node", node, "leftover slots", leftoverSlots)
-		}
-		return false, nil
-	}
-}
-
 func (r *RedisClusterReconciler) FindExistingStatefulSet(ctx context.Context, req ctrl.Request) (*v1.StatefulSet, error) {
 	return r.FindExistingStatefulSetFunc(ctx, req)
 }
@@ -1079,16 +899,8 @@ func (r *RedisClusterReconciler) FindExistingDeployment(ctx context.Context, req
 	return r.FindExistingDeploymentFunc(ctx, req)
 }
 
-func (r *RedisClusterReconciler) FindExistingPodDisruptionBudget(ctx context.Context, req ctrl.Request) (*pv1.PodDisruptionBudget, error) {
-	return r.FindExistingPodDisruptionBudgetFunc(ctx, req)
-}
-
 func (r *RedisClusterReconciler) DoFindExistingDeployment(ctx context.Context, req ctrl.Request) (*v1.Deployment, error) {
 	return kubernetes.FindExistingDeployment(ctx, r.Client, req)
-}
-
-func (r *RedisClusterReconciler) DoFindExistingPodDisruptionBudget(ctx context.Context, req ctrl.Request) (*pv1.PodDisruptionBudget, error) {
-	return kubernetes.FindExistingPodDisruptionBudget(ctx, r.Client, req)
 }
 
 func (r *RedisClusterReconciler) GetPersistentVolumeClaim(ctx context.Context, client client.Client, redisCluster *redisv1.RedisCluster, name string) (*corev1.PersistentVolumeClaim, error) {
@@ -1151,97 +963,6 @@ func (r *RedisClusterReconciler) CreateConfigMap(req ctrl.Request, spec redisv1.
 	r.LogInfo(req.NamespacedName, "Generated Configmap", "configmap", cm)
 	r.LogInfo(req.NamespacedName, "Spec config", "speconfig", spec.Config)
 	return &cm
-}
-
-func (r *RedisClusterReconciler) CreateRobinDeployment(ctx context.Context, req ctrl.Request, rediscluster *redisv1.RedisCluster, labels map[string]string) *v1.Deployment {
-	var replicas = int32(1)
-	d := &v1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      req.Name + "-robin",
-			Namespace: req.Namespace,
-			Labels:    labels,
-		},
-		Spec: v1.DeploymentSpec{
-			Template: *rediscluster.Spec.Robin.Template,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{redis.RedisClusterLabel: req.Name, r.GetStatefulSetSelectorLabel(rediscluster): "robin"},
-			},
-			Replicas: &replicas,
-		},
-	}
-	d.Labels[redis.RedisClusterLabel] = req.Name
-	d.Labels[redis.RedisClusterComponentLabel] = "robin"
-	d.Spec.Template.Labels = make(map[string]string)
-	maps.Copy(d.Spec.Template.Labels, labels)
-	d.Spec.Template.Labels[redis.RedisClusterLabel] = req.Name
-	d.Spec.Template.Labels[redis.RedisClusterComponentLabel] = "robin"
-	maps.Copy(d.Spec.Template.Labels, rediscluster.Spec.Robin.Template.Labels)
-
-	for i, container := range d.Spec.Template.Spec.Containers {
-		if container.Resources.Requests == nil {
-			d.Spec.Template.Spec.Containers[i].Resources.Requests = corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("20m"),
-				corev1.ResourceMemory: resource.MustParse("100Mi"),
-			}
-		}
-		if container.Resources.Limits == nil {
-			d.Spec.Template.Spec.Containers[i].Resources.Limits = corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("100m"),
-				corev1.ResourceMemory: resource.MustParse("100Mi"),
-			}
-		}
-	}
-
-	return d
-}
-
-func (r *RedisClusterReconciler) CreateRobinConfigMap(req ctrl.Request, spec redisv1.RedisClusterSpec, labels map[string]string) *corev1.ConfigMap {
-	cm := corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      req.Name + "-robin",
-			Namespace: req.Namespace,
-			Labels:    labels,
-		},
-		Data: map[string]string{"application-configmap.yml": *spec.Robin.Config},
-	}
-
-	r.LogInfo(req.NamespacedName, "Generated robin configmap")
-	return &cm
-}
-
-func (r *RedisClusterReconciler) CreatePodDisruptionBudget(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster, labels map[string]string) *pv1.PodDisruptionBudget {
-	pdb := &pv1.PodDisruptionBudget{}
-	if redisCluster.Spec.Pdb.PdbSizeUnavailable.StrVal != "" || redisCluster.Spec.Pdb.PdbSizeUnavailable.IntVal != 0 {
-		pdb = &pv1.PodDisruptionBudget{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      req.Name + "-pdb",
-				Namespace: req.Namespace,
-				Labels:    labels,
-			},
-			Spec: pv1.PodDisruptionBudgetSpec{
-				MaxUnavailable: &redisCluster.Spec.Pdb.PdbSizeUnavailable,
-				Selector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{redis.RedisClusterLabel: req.Name, r.GetStatefulSetSelectorLabel(redisCluster): "redis"},
-				},
-			},
-		}
-	} else {
-		pdb = &pv1.PodDisruptionBudget{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      req.Name + "-pdb",
-				Namespace: req.Namespace,
-				Labels:    labels,
-			},
-			Spec: pv1.PodDisruptionBudgetSpec{
-				MinAvailable: &redisCluster.Spec.Pdb.PdbSizeAvailable,
-				Selector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{redis.RedisClusterLabel: req.Name, r.GetStatefulSetSelectorLabel(redisCluster): "redis"},
-				},
-			},
-		}
-	}
-
-	return pdb
 }
 
 func (r *RedisClusterReconciler) CreateStatefulSet(ctx context.Context, req ctrl.Request, spec redisv1.RedisClusterSpec, labels map[string]string, annotations map[string]string, configmap *corev1.ConfigMap) (*v1.StatefulSet, error) {
@@ -1507,7 +1228,7 @@ func (r *RedisClusterReconciler) CheckAndCreateK8sObjects(ctx context.Context, r
 	}
 
 	// PodDisruptionBudget check
-	r.CheckAndManagePDB(ctx, req, redisCluster)
+	r.checkAndManagePodDisruptionBudget(ctx, req, redisCluster)
 
 	// StatefulSet check
 	if immediateRequeue, err = r.CheckAndCreateStatefulSet(ctx, req, redisCluster, configMap); err != nil {
@@ -1515,7 +1236,7 @@ func (r *RedisClusterReconciler) CheckAndCreateK8sObjects(ctx context.Context, r
 	}
 
 	// Robin deployment check
-	r.CheckAndCreateRobin(ctx, req, redisCluster)
+	r.checkAndCreateRobin(ctx, req, redisCluster)
 
 	// Service check
 	immediateRequeue, err = r.checkAndCreateService(ctx, req, redisCluster)
@@ -1555,28 +1276,6 @@ func (r *RedisClusterReconciler) CheckAndCreateConfigMap(ctx context.Context, re
 		}
 	}
 	return configMap, immediateRequeue, nil
-}
-
-func (r *RedisClusterReconciler) CheckAndManagePDB(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) {
-	if redisCluster.Spec.Pdb.Enabled && redisCluster.Spec.Replicas > 1 {
-		_, err := r.FindExistingPodDisruptionBudgetFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-pdb", Namespace: redisCluster.Namespace}})
-		if err != nil {
-			if errors.IsNotFound(err) {
-				// Create PodDisruptionBudget
-				pdb := r.CreatePodDisruptionBudget(ctx, req, redisCluster, *redisCluster.Spec.Labels)
-				ctrl.SetControllerReference(redisCluster, pdb, r.Scheme)
-				pdbCreateErr := r.Client.Create(ctx, pdb)
-				if pdbCreateErr != nil {
-					r.LogError(redisCluster.NamespacedName(), pdbCreateErr, "Error creating PodDisruptionBudget")
-				}
-			} else {
-				r.LogError(redisCluster.NamespacedName(), err, "Error getting existing PodDisruptionBudget")
-			}
-		}
-	}
-	if redisCluster.Spec.Replicas == 1 || !redisCluster.Spec.Pdb.Enabled {
-		r.deletePdb(ctx, redisCluster)
-	}
 }
 
 func (r *RedisClusterReconciler) CheckAndCreateStatefulSet(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster, configMap *corev1.ConfigMap) (bool, error) {
@@ -1660,173 +1359,6 @@ func (r *RedisClusterReconciler) CheckAndCreateStatefulSet(ctx context.Context, 
 		}
 	}
 	return immediateRequeue, nil
-}
-
-func (r *RedisClusterReconciler) CheckAndCreateRobin(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) {
-	// Populate robin spec if not provided. This to handle the case where the user removes the robin spec of an existing cluster. The robin objects will be deleted.
-	if redisCluster.Spec.Robin == nil {
-		redisCluster.Spec.Robin = &redisv1.RobinSpec{
-			Config:   nil,
-			Template: nil,
-		}
-	}
-
-	// Robin configmap
-	r.handleRobinConfig(ctx, req, redisCluster)
-
-	// Robin deployment
-	r.handleRobinDeployment(ctx, req, redisCluster)
-}
-
-func (r *RedisClusterReconciler) handleRobinConfig(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) {
-	// Get robin configmap
-	configmap, err := r.FindExistingConfigMapFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}})
-
-	// Robin configmap not provided: delete configmap if exists
-	if redisCluster.Spec.Robin.Config == nil {
-		r.deleteRobinObject(ctx, configmap, redisCluster, "configmap")
-		return
-	}
-
-	// Robin configmap not found: create configmap
-	if err != nil {
-		// Return if the error is not a NotFound error
-		if !errors.IsNotFound(err) {
-			r.LogError(redisCluster.NamespacedName(), err, "Getting robin configmap failed")
-			return
-		}
-
-		// Create Robin ConfigMap
-		mcm := r.CreateRobinConfigMap(req, redisCluster.Spec, *redisCluster.Spec.Labels)
-		r.createRobinObject(ctx, mcm, redisCluster, "configmap")
-		return
-	}
-
-	// Robin configmap found: check if it needs to be updated
-	if *redisCluster.Spec.Robin.Config == configmap.Data["application-configmap.yml"] {
-		return
-	}
-
-	// Robin configmap changed: update configmap
-	configmap.Data["application-configmap.yml"] = *redisCluster.Spec.Robin.Config
-	r.updateRobinObject(ctx, configmap, redisCluster, "configmap")
-
-	// Add checksum to the deployment annotations to force the deployment rollout
-	if redisCluster.Spec.Robin.Template != nil {
-		if redisCluster.Spec.Robin.Template.Annotations == nil {
-			redisCluster.Spec.Robin.Template.Annotations = make(map[string]string)
-		}
-		redisCluster.Spec.Robin.Template.Annotations["checksum/config"] = fmt.Sprintf("%x", md5.Sum([]byte(*redisCluster.Spec.Robin.Config)))
-	}
-}
-
-func (r *RedisClusterReconciler) handleRobinDeployment(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) {
-	// Get robin deployment
-	deployment, err := r.FindExistingDeployment(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}})
-
-	// Robin deployment template not provided: delete deployment if exists
-	if redisCluster.Spec.Robin.Template == nil {
-		r.deleteRobinObject(ctx, deployment, redisCluster, "deployment")
-		return
-	}
-
-	// Robin deployment not found: create deployment
-	if err != nil {
-		// Return if the error is not a NotFound error
-		if !errors.IsNotFound(err) {
-			r.LogError(redisCluster.NamespacedName(), err, "Getting robin deployment failed")
-			return
-		}
-
-		// Create Robin Deployment
-		mdep := r.CreateRobinDeployment(ctx, req, redisCluster, *redisCluster.Spec.Labels)
-		r.createRobinObject(ctx, mdep, redisCluster, "deployment")
-		return
-	}
-
-	// Robin deployment found: check if it needs to be updated
-	patchedPodTemplateSpec, changed := r.OverrideRobinDeployment(ctx, req, redisCluster, deployment.Spec.Template)
-	if !changed {
-		return
-	}
-
-	// Robin deployment changed: update deployment
-	deployment.Spec.Template = patchedPodTemplateSpec
-	r.updateRobinObject(ctx, deployment, redisCluster, "deployment")
-}
-
-func (r *RedisClusterReconciler) createRobinObject(ctx context.Context, obj client.Object, redisCluster *redisv1.RedisCluster, kind string) error {
-	if obj.DeepCopyObject() == nil {
-		return nil
-	}
-
-	ctrl.SetControllerReference(redisCluster, obj, r.Scheme)
-
-	r.LogInfo(redisCluster.NamespacedName(), "Creating robin "+kind)
-	err := r.Client.Create(ctx, obj)
-	if err != nil {
-		if !errors.IsAlreadyExists(err) {
-			r.LogError(redisCluster.NamespacedName(), err, "Error creating robin "+kind)
-			return err
-		}
-		r.LogInfo(redisCluster.NamespacedName(), "robin "+kind+" already exists")
-		return nil
-	}
-
-	r.LogInfo(redisCluster.NamespacedName(), "Successfully created robin "+kind, kind, redisCluster.Name+"-robin")
-	return nil
-}
-
-func (r *RedisClusterReconciler) updateRobinObject(ctx context.Context, obj client.Object, redisCluster *redisv1.RedisCluster, kind string) error {
-	if obj.DeepCopyObject() == nil {
-		return nil
-	}
-
-	r.LogInfo(redisCluster.NamespacedName(), "Updating robin "+kind)
-	err := r.Client.Update(ctx, obj)
-	if err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Error updating robin "+kind)
-		return err
-	}
-
-	r.LogInfo(redisCluster.NamespacedName(), "Successfully updated robin "+kind, kind, redisCluster.Name+"-robin")
-	return nil
-}
-
-func (r *RedisClusterReconciler) deleteRobinObject(ctx context.Context, obj client.Object, redisCluster *redisv1.RedisCluster, kind string) error {
-	if obj.DeepCopyObject() == nil {
-		return nil
-	}
-
-	r.LogInfo(redisCluster.NamespacedName(), "Deleting robin "+kind)
-	err := r.Client.Delete(ctx, obj)
-	if err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Error deleting robin "+kind)
-		return err
-	}
-
-	r.LogInfo(redisCluster.NamespacedName(), "Successfully deleted robin "+kind, kind, redisCluster.Name+"-robin")
-	return nil
-}
-
-func (r *RedisClusterReconciler) OverrideRobinDeployment(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster, podTemplateSpec corev1.PodTemplateSpec) (corev1.PodTemplateSpec, bool) {
-	// Apply the override
-	patchedPodTemplateSpec, err := redis.ApplyPodTemplateSpecOverride(podTemplateSpec, *redisCluster.Spec.Robin.Template)
-	if err != nil {
-		ctrl.Log.Error(err, "Error applying pod template spec override")
-		return podTemplateSpec, false
-	}
-
-	// Check if the override changes something in the original PodTemplateSpec
-	changed := !reflect.DeepEqual(podTemplateSpec.Labels, patchedPodTemplateSpec.Labels) || !reflect.DeepEqual(podTemplateSpec.Annotations, patchedPodTemplateSpec.Annotations) || !reflect.DeepEqual(podTemplateSpec.Spec, patchedPodTemplateSpec.Spec)
-
-	if changed {
-		r.LogInfo(req.NamespacedName, "Detected robin deployment change")
-	} else {
-		r.LogInfo(req.NamespacedName, "No robin deployment change detected")
-	}
-
-	return *patchedPodTemplateSpec, changed
 }
 
 func (r *RedisClusterReconciler) checkAndCreateService(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) (bool, error) {
@@ -1920,26 +1452,9 @@ func (r *RedisClusterReconciler) clusterScaledToZeroReplicas(ctx context.Context
 		r.LogInfo(redisCluster.NamespacedName(), "StatefulSet updated", "Replicas", sset.Spec.Replicas)
 	}
 
-	// Robin deployment update
-	if redisCluster.Spec.Robin != nil {
-		if redisCluster.Spec.Robin.Template != nil {
-			mdep, err := r.FindExistingDeployment(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}})
-			if err != nil {
-				r.LogError(redisCluster.NamespacedName(), err, "Cannot find existing robin deployment", "deployment", redisCluster.Name+"-robin")
-			} else {
-				// Scaledown
-				*mdep.Spec.Replicas = 0
-				mdep, err = r.UpdateDeployment(ctx, mdep, redisCluster)
-				if err != nil {
-					r.LogError(redisCluster.NamespacedName(), err, "Failed to update Deployment replicas")
-				} else {
-					r.LogInfo(redisCluster.NamespacedName(), "Robin Deployment updated", "Replicas", mdep.Spec.Replicas)
-				}
-			}
-		}
-	}
+	r.scaleDownRobin(ctx, redisCluster)
 
-	r.deletePdb(ctx, redisCluster)
+	r.deletePodDisruptionBudget(ctx, redisCluster)
 
 	// All conditions set to false. Status set to Ready.
 	var update_err error

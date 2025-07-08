@@ -31,7 +31,6 @@ import (
 	redisclient "github.com/redis/go-redis/v9"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	pv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -332,86 +331,6 @@ func (r *RedisClusterReconciler) UpdateUpgradingStatus(ctx context.Context, redi
 		SetConditionFalse(r.GetHelperLogger(redisCluster.NamespacedName()), redisCluster, redisv1.ConditionUpgrading)
 	}
 
-	return nil
-}
-
-func (r *RedisClusterReconciler) CheckPDB(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
-	// Check if the pdb availables are changed
-	if redisCluster.Spec.Pdb.Enabled && redisCluster.Spec.Replicas > 1 {
-		pdb, err := r.FindExistingPodDisruptionBudgetFunc(ctx, controllerruntime.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-pdb", Namespace: redisCluster.Namespace}})
-		if err != nil {
-			r.LogError(redisCluster.NamespacedName(), err, "Failed to get PodDisruptionBudget")
-		}
-		if pdb != nil {
-			maxUnavailableFromRedisCluster := &redisCluster.Spec.Pdb.PdbSizeUnavailable
-			minAvailableFromRedisCluster := &redisCluster.Spec.Pdb.PdbSizeAvailable
-			if redisCluster.Spec.Pdb.PdbSizeAvailable.IntVal == 0 && redisCluster.Spec.Pdb.PdbSizeAvailable.StrVal == "" {
-				minAvailableFromRedisCluster = nil
-			}
-			if redisCluster.Spec.Pdb.PdbSizeUnavailable.IntVal == 0 && redisCluster.Spec.Pdb.PdbSizeUnavailable.StrVal == "" {
-				maxUnavailableFromRedisCluster = nil
-			}
-			if maxUnavailableFromRedisCluster != nil {
-				if pdb.Spec.MaxUnavailable != nil {
-					if pdb.Spec.MaxUnavailable.IntVal != redisCluster.Spec.Pdb.PdbSizeUnavailable.IntVal || pdb.Spec.MaxUnavailable.StrVal != redisCluster.Spec.Pdb.PdbSizeUnavailable.StrVal {
-						r.LogInfo(redisCluster.NamespacedName(), "Cluster Configured Issued", "reason", "PDB changed update pdb deployed", "OldMaxUnavailable", pdb.Spec.MaxUnavailable, "NewMaxUnavailable", maxUnavailableFromRedisCluster)
-						redisCluster.Status.Status = redisv1.StatusConfiguring
-						r.Recorder.Event(redisCluster, "Normal", "UpdatePdb", "Cluster configuring pdb by update")
-						return nil
-					}
-				} else {
-					r.LogInfo(redisCluster.NamespacedName(), "Cluster Configured Issued", "reason", "PBD changed update pdb deployed", "OldMaxUnavailable", pdb.Spec.MaxUnavailable, "NewMaxUnavailable", maxUnavailableFromRedisCluster)
-					redisCluster.Status.Status = redisv1.StatusConfiguring
-					r.Recorder.Event(redisCluster, "Normal", "UpdatePdb", "Cluster configuring pdb by update")
-					return nil
-				}
-
-			} else if minAvailableFromRedisCluster != nil {
-				if pdb.Spec.MinAvailable != nil {
-					if pdb.Spec.MinAvailable.IntVal != redisCluster.Spec.Pdb.PdbSizeAvailable.IntVal || pdb.Spec.MinAvailable.StrVal != redisCluster.Spec.Pdb.PdbSizeAvailable.StrVal {
-						r.LogInfo(redisCluster.NamespacedName(), "Cluster Configured Issued", "reason", "PDB changed update pdb deployed", "OldMinAvailable", pdb.Spec.MinAvailable, "NewMinAvailable", minAvailableFromRedisCluster)
-						redisCluster.Status.Status = redisv1.StatusConfiguring
-						r.Recorder.Event(redisCluster, "Normal", "UpdatePdb", "Cluster configuring pdb by update")
-						return nil
-					}
-				} else {
-					r.LogInfo(redisCluster.NamespacedName(), "Cluster Configured Issued", "reason", "PDB changed update pdb deployed", "OldMinAvailable", pdb.Spec.MinAvailable, "NewMinAvailable", minAvailableFromRedisCluster)
-					redisCluster.Status.Status = redisv1.StatusConfiguring
-					r.Recorder.Event(redisCluster, "Normal", "UpdatePdb", "Cluster configuring pdb by update")
-					return nil
-				}
-			}
-			// Selector match labels check
-			desiredLabels := map[string]string{redis.RedisClusterLabel: redisCluster.ObjectMeta.Name, r.GetStatefulSetSelectorLabel(redisCluster): "redis"}
-			if len(pdb.Spec.Selector.MatchLabels) != len(desiredLabels) {
-				r.LogInfo(redisCluster.NamespacedName(), "Cluster Configured Issued", "reason", "PDB selector match labels", "existing labels", pdb.Spec.Selector.MatchLabels, "desired labels", desiredLabels)
-				redisCluster.Status.Status = redisv1.StatusConfiguring
-				r.Recorder.Event(redisCluster, "Normal", "UpdatePdb", "Cluster configuring pdb by update")
-				return nil
-			}
-			for k, v := range desiredLabels {
-				if pdb.Spec.Selector.MatchLabels[k] != v {
-					r.LogInfo(redisCluster.NamespacedName(), "Cluster Configured Issued", "reason", "PDB selector match labels", "existing labels", pdb.Spec.Selector.MatchLabels, "desired labels", desiredLabels)
-					redisCluster.Status.Status = redisv1.StatusConfiguring
-					r.Recorder.Event(redisCluster, "Normal", "UpdatePdb", "Cluster configuring pdb by update")
-					return nil
-				}
-			}
-		}
-	} else {
-		// Delete PodDisruptionBudget if exists
-		pdb, err := r.FindExistingPodDisruptionBudgetFunc(ctx, controllerruntime.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-pdb", Namespace: redisCluster.Namespace}})
-		if err == nil && pdb != nil {
-			pdb.Name = redisCluster.Name + "-pdb"
-			pdb.Namespace = redisCluster.Namespace
-			err := r.DeletePodDisruptionBudget(ctx, pdb, redisCluster)
-			if err != nil {
-				r.LogError(redisCluster.NamespacedName(), err, "Failed to delete PodDisruptionBudget")
-			} else {
-				r.LogInfo(redisCluster.NamespacedName(), "PodDisruptionBudget Deleted")
-			}
-		}
-	}
 	return nil
 }
 
@@ -1114,51 +1033,6 @@ func (r *RedisClusterReconciler) UpdateDeployment(ctx context.Context, deploymen
 	return refreshedDeployment, nil
 }
 
-func (r *RedisClusterReconciler) UpdatePodDisruptionBudget(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
-	refreshedPdb := &pv1.PodDisruptionBudget{}
-	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		// get a fresh rediscluster to minimize conflicts
-		err := r.Client.Get(ctx, types.NamespacedName{Namespace: redisCluster.Namespace, Name: redisCluster.Name + "-pdb"}, refreshedPdb)
-		if err != nil {
-			r.LogError(redisCluster.NamespacedName(), err, "Error getting a refreshed RedisCluster before updating it. It may have been deleted?")
-			return err
-		}
-		if redisCluster.Spec.Pdb.PdbSizeUnavailable.IntVal != 0 || redisCluster.Spec.Pdb.PdbSizeUnavailable.StrVal != "" {
-			refreshedPdb.Spec.MinAvailable = nil
-			refreshedPdb.Spec.MaxUnavailable = &redisCluster.Spec.Pdb.PdbSizeUnavailable
-		} else {
-			refreshedPdb.Spec.MaxUnavailable = nil
-			refreshedPdb.Spec.MinAvailable = &redisCluster.Spec.Pdb.PdbSizeAvailable
-		}
-		refreshedPdb.ObjectMeta.Labels = *redisCluster.Spec.Labels
-		refreshedPdb.Spec.Selector.MatchLabels = map[string]string{redis.RedisClusterLabel: redisCluster.ObjectMeta.Name, r.GetStatefulSetSelectorLabel(redisCluster): "redis"}
-
-		var updateErr = r.Client.Update(ctx, refreshedPdb)
-		return updateErr
-	})
-	if err != nil {
-		return err
-	}
-	return nil
-}
-func (r *RedisClusterReconciler) DeletePodDisruptionBudget(ctx context.Context, pdb *pv1.PodDisruptionBudget, redisCluster *redisv1.RedisCluster) error {
-	refreshedPdb := &pv1.PodDisruptionBudget{}
-	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		// get a fresh rediscluster to minimize conflicts
-		err := r.Client.Get(ctx, types.NamespacedName{Namespace: pdb.Namespace, Name: pdb.Name}, refreshedPdb)
-		if err != nil {
-			r.LogError(redisCluster.NamespacedName(), err, "Error getting a refreshed RedisCluster before updating it. It may have been deleted?")
-			return err
-		}
-		var updateErr = r.Client.Delete(ctx, refreshedPdb)
-		return updateErr
-	})
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 // GetSidedNodesForScaleDown splits the cluster nodes into two sides. Left and Right.
 // This is usually used when a cluster is about to scale down.
 // We can work out which nodes will be left after we have scaled down, and which will have bee cut off.
@@ -1600,7 +1474,7 @@ func (r *RedisClusterReconciler) ScaleCluster(ctx context.Context, redisCluster 
 	// PodDisruptionBudget update
 	// We use currSsetReplicas to check the configured number of replicas (not taking int account the extra pod if created)
 	if redisCluster.Spec.Pdb.Enabled && math.Min(float64(redisCluster.Spec.Replicas), float64(currSsetReplicas)) > 1 {
-		err = r.UpdatePodDisruptionBudget(ctx, redisCluster)
+		err = r.updatePodDisruptionBudget(ctx, redisCluster)
 		if err != nil {
 			r.LogError(redisCluster.NamespacedName(), err, "ScaleCluster - Failed to update PodDisruptionBudget")
 		} else {
