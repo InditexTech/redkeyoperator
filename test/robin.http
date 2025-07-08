@@ -1,0 +1,58 @@
+# Robin base URL. Update the IP before launching any of the requests.
+@robinBaseUrl = http://10.244.0.38:8080
+
+# Metrics
+
+###
+
+GET {{robinBaseUrl}}/metrics
+
+# RedisCluster
+
+## Status
+
+###
+
+GET {{robinBaseUrl}}/v1/rediscluster/status
+
+###
+
+PUT {{robinBaseUrl}}/v1/rediscluster/status
+
+{
+    "status": "Ready"
+}
+
+## Replicas
+
+###
+
+GET {{robinBaseUrl}}/v1/rediscluster/replicas
+
+###
+
+PUT {{robinBaseUrl}}/v1/rediscluster/replicas
+
+{
+    "replicas": 3,
+    "replicas_per_master": 0
+}
+
+## Cluster
+
+### Check
+
+GET {{robinBaseUrl}}/v1/cluster/check
+
+### Nodes
+
+GET {{robinBaseUrl}}/v1/cluster/nodes
+
+### Fix
+
+PUT {{robinBaseUrl}}/v1/cluster/fix
+
+### ResetNode
+
+@nodeIndex = 2
+PUT {{robinBaseUrl}}/v1/cluster/reset/{{nodeIndex}}

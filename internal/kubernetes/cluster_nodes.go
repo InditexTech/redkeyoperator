@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"net"
 	"sort"
 	"strconv"
 	"strings"
@@ -548,47 +547,6 @@ func (nodeList *ClusterNodeList) buildSlotMap() (map[*ClusterNode][]int, error) 
 		slotMap[node] = node.ClusterNode.Slots()
 	}
 	return slotMap, nil
-}
-
-func (nodeList *ClusterNodeList) NeedsClusterMeet(ctx context.Context) (bool, error) {
-	// Compile a map of all the IPs which should be listed for each node.
-	// We are using a map to make it faster, as searching a has table is better than a list
-	ipList := map[string]struct{}{}
-	for _, node := range nodeList.Nodes {
-		ipList[node.Pod.Status.PodIP] = struct{}{}
-	}
-
-	// Now for every node, make sure that the nodes it knows about, is the same as the nodes we know about.
-	for _, node := range nodeList.Nodes {
-		clusterNodes, err := node.ClusterNode.R().Do(ctx, "CLUSTER", "NODES").Text()
-		if err != nil {
-			return false, err
-		}
-		clusterNodeStrings := strings.Split(clusterNodes, "\n")
-		clusterNodeCount := 0
-		// name addr flags role ping_sent ping_recv link_status slots
-		for _, val := range clusterNodeStrings {
-			parts := strings.Split(val, " ")
-			if len(parts) <= 3 {
-				continue
-			}
-
-			clusterNodeCount++
-			addr := strings.Split(parts[1], "@")[0]
-			host, _, _ := net.SplitHostPort(addr)
-			// If the IP does not exist in our list,
-			// we are probably using an outdated one and should ClusterMeet.
-			if _, ok := ipList[host]; !ok {
-				return true, nil
-			}
-		}
-		// Every cluster node should see all the nodes.
-		// If a node has forgotten any other node we need to meet nodes.
-		if len(nodeList.Nodes) > clusterNodeCount {
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 func (nodeList *ClusterNodeList) EnsureReplicaSpread(ctx context.Context, redisCluster *redisv1.RedisCluster) error {

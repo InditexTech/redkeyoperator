@@ -138,7 +138,6 @@ func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req
 		r.LogInfo(redisCluster.NamespacedName(), "Delete PVCs feature disabled in cluster spec or not specified. Not deleting PVCs after scale down or cluster deletion")
 	}
 
-	// Kubernetes API
 	if !redisCluster.GetDeletionTimestamp().IsZero() {
 		for _, f := range r.Finalizers {
 			if containsString(redisCluster.GetFinalizers(), f.GetId()) {
@@ -154,10 +153,6 @@ func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req
 			}
 		}
 	}
-
-	// Redis API
-
-	r.checkClusterNodesIntegrity(ctx, redisCluster)
 
 	readyNodes, err := r.GetReadyNodes(ctx, redisCluster)
 	if err != nil {
@@ -195,80 +190,6 @@ func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req
 		return ctrl.Result{RequeueAfter: time.Second * requeueAfter}, update_err
 	}
 	return ctrl.Result{}, update_err
-}
-
-func (r *RedisClusterReconciler) checkClusterNodesIntegrity(ctx context.Context, redisCluster *redisv1.RedisCluster) {
-
-	if redisCluster.Status.Status == redisv1.StatusInitializing || redisCluster.Status.Status == redisv1.StatusUpgrading {
-		return
-	}
-
-	// At a minimum, we have to have the pods ready. You can reach this point when you are creating
-	// a new cluster, in Configuring status.
-	podsReady, err := r.AllPodsReady(ctx, redisCluster)
-	if err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Could not check ready pods")
-	}
-	if !podsReady {
-		return
-	}
-
-	clusterNodes, err := r.getClusterNodes(ctx, redisCluster)
-	if err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Could not get cluster nodes")
-		return
-	}
-	// Free cluster nodes to avoid memory consumption
-	defer r.freeClusterNodes(clusterNodes, redisCluster.NamespacedName())
-
-	logger := r.GetHelperLogger(redisCluster.NamespacedName())
-
-	// Forget outdated nodes.
-	err = clusterNodes.RemoveClusterOutdatedNodes(ctx, redisCluster, logger)
-	if err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Could not check outdated nodes")
-	}
-
-	// Meet nodes if needed.
-	needsMeet, err := clusterNodes.NeedsClusterMeet(ctx)
-	if err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Could not check if cluster meet is necessary")
-		return
-	}
-	if needsMeet {
-		err = clusterNodes.ClusterMeet(ctx)
-		if err != nil {
-			r.LogError(redisCluster.NamespacedName(), err, "Could not cluster meet")
-			return
-		}
-	}
-
-	// Ensure cluster master-replica nodes ratio.
-	err = clusterNodes.EnsureClusterRatio(ctx, redisCluster, logger)
-	if err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Could not assign missing slots")
-	}
-
-	// Fix open slots (only master nodes).
-	openSlots := false
-	for _, node := range clusterNodes.Nodes {
-		if !node.IsMaster() {
-			continue
-		}
-		openSlots, err = node.HasOpenSlots()
-		if err != nil {
-			r.LogError(redisCluster.NamespacedName(), err, "Could not check if node has open slots")
-			break
-		}
-		if openSlots {
-			r.LogInfo(redisCluster.NamespacedName(), "Open slots found. Cleanup needed")
-			err = clusterNodes.EnsureClusterSlotsStable(ctx, logger)
-			if err != nil {
-				r.LogError(redisCluster.NamespacedName(), err, "Could not check if slots are stable")
-			}
-			break
-		}
-	}
 }
 
 // Checks storage configuration for inconsistencies.
