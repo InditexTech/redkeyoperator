@@ -153,10 +153,9 @@ func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req
 	case redisv1.StatusError:
 		requeue, requeueAfter = r.reconcileStatusError(ctx, redisCluster)
 	default:
-
+		r.LogError(redisCluster.NamespacedName(), nil, "Status not allowd", "status", redisCluster.Status.Status)
+		return ctrl.Result{}, nil
 	}
-
-	// r.CheckConfigurationStatus(ctx, redisCluster)
 
 	r.LogInfo(redisCluster.NamespacedName(), "RedisCluster reconciler end", "status", redisCluster.Status.Status)
 
