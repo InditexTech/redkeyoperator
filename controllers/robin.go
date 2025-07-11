@@ -63,6 +63,8 @@ func (r *RedisClusterReconciler) handleRobinConfig(ctx context.Context, req ctrl
 		return
 	}
 
+	// AMZ status updates force to rewrite config
+
 	// Robin configmap found: check if it needs to be updated
 	if *redisCluster.Spec.Robin.Config == configmap.Data["application-configmap.yml"] {
 		return
@@ -106,7 +108,7 @@ func (r *RedisClusterReconciler) handleRobinDeployment(ctx context.Context, req 
 	}
 
 	// Robin deployment found: check if it needs to be updated
-	patchedPodTemplateSpec, changed := r.overrideRobinDeployment(ctx, req, redisCluster, deployment.Spec.Template)
+	patchedPodTemplateSpec, changed := r.overrideRobinDeployment(req, redisCluster, deployment.Spec.Template)
 	if !changed {
 		return
 	}
@@ -170,7 +172,7 @@ func (r *RedisClusterReconciler) deleteRobinObject(ctx context.Context, obj clie
 	return nil
 }
 
-func (r *RedisClusterReconciler) overrideRobinDeployment(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster, podTemplateSpec corev1.PodTemplateSpec) (corev1.PodTemplateSpec, bool) {
+func (r *RedisClusterReconciler) overrideRobinDeployment(req ctrl.Request, redisCluster *redisv1.RedisCluster, podTemplateSpec corev1.PodTemplateSpec) (corev1.PodTemplateSpec, bool) {
 	// Apply the override
 	patchedPodTemplateSpec, err := redis.ApplyPodTemplateSpecOverride(podTemplateSpec, *redisCluster.Spec.Robin.Template)
 	if err != nil {

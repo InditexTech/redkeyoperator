@@ -2,14 +2,14 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-package kubernetes_test
+package kubernetes
 
 import (
 	"context"
 	"testing"
 
 	redisv1 "github.com/inditextech/redisoperator/api/v1"
-	"github.com/inditextech/redisoperator/internal/kubernetes"
+	"github.com/inditextech/redisoperator/internal/common"
 	"github.com/inditextech/redisoperator/internal/redis"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -39,7 +39,7 @@ func TestFindExistingStatefulSetFindsCorrectStatefulSet(t *testing.T) {
 			Namespace: "default",
 		},
 	}
-	statefulset, err := kubernetes.FindExistingStatefulSet(context.TODO(), fakeClient, request)
+	statefulset, err := FindExistingStatefulSet(context.TODO(), fakeClient, request)
 	if err != nil {
 		t.Errorf("Received unexpected error, when fetching statefulset. Error: [%v]", err)
 		t.FailNow()
@@ -88,7 +88,7 @@ func TestFindExistingStatefulSetReturnsNotFoundForCases(t *testing.T) {
 		},
 	}
 	for name, test := range testMap {
-		_, err := kubernetes.FindExistingStatefulSet(context.TODO(), test.client, request)
+		_, err := FindExistingStatefulSet(context.TODO(), test.client, request)
 		if err == nil {
 			// We are expecting a Not Found error. No errors means we we found the wrong thing
 			t.Errorf("Expected an not found error, but did not get an error at all while running case: [%s]", name)
@@ -138,7 +138,7 @@ func TestGetStatefulSetSelectorLabelReturnsCorrectLabels(t *testing.T) {
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
-								redis.RedisClusterComponentLabel: "redis",
+								redis.RedisClusterComponentLabel: common.ComponentLabelRedis,
 							},
 						},
 					},
@@ -156,7 +156,7 @@ func TestGetStatefulSetSelectorLabelReturnsCorrectLabels(t *testing.T) {
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
-								redis.RedisClusterComponentLabel: "redis",
+								redis.RedisClusterComponentLabel: common.ComponentLabelRedis,
 								"app":                            "redis",
 							},
 						},
@@ -167,7 +167,7 @@ func TestGetStatefulSetSelectorLabelReturnsCorrectLabels(t *testing.T) {
 		},
 	}
 	for name, test := range testMap {
-		labelKey := kubernetes.GetStatefulSetSelectorLabel(context.TODO(), test.client, &redisv1.RedisCluster{
+		labelKey := GetStatefulSetSelectorLabel(context.TODO(), test.client, &redisv1.RedisCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "redis-cluster",
 				Namespace: "default",

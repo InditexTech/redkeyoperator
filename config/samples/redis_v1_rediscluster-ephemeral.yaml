@@ -45,7 +45,7 @@ spec:
           ephemeral: true
           health_probe_interval_seconds: 60
           healing_time_seconds: 60
-          max_retries: 2
+          max_retries: 10
           back_off: 10s
         metrics:
           interval_seconds: 60

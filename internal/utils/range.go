@@ -4,8 +4,8 @@
 
 package utils
 
-func MakeRangeMap(min int, max int) map[int]interface{} {
-	result := map[int]interface{}{}
+func MakeRangeMap(min int, max int) map[int]any {
+	result := map[int]any{}
 	a := make([]int, max-min+1)
 	for i := range a {
 		result[min+i] = ""

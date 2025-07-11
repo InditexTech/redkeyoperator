@@ -20,6 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	redisv1 "github.com/inditextech/redisoperator/api/v1"
+	finalizer "github.com/inditextech/redisoperator/internal/finalizers"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -228,6 +229,7 @@ func EnsureClusterExistsOrCreate(nsName types.NamespacedName) {
 }
 
 func CreateRedisCluster() *redisv1.RedisCluster {
+	var finalizerId = (&finalizer.ConfigMapCleanupFinalizer{}).GetId()
 	cluster := &redisv1.RedisCluster{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "RedisCluster",
@@ -236,7 +238,7 @@ func CreateRedisCluster() *redisv1.RedisCluster {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "rediscluster-sample",
 			Namespace:  "default",
-			Finalizers: []string{"redis.inditex.dev/configmap-cleanup"},
+			Finalizers: []string{finalizerId},
 			Labels:     map[string]string{"team": "team-a"},
 		},
 		Spec: redisv1.RedisClusterSpec{

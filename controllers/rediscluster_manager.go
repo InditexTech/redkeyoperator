@@ -11,13 +11,13 @@ import (
 	"slices"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	redisv1 "github.com/inditextech/redisoperator/api/v1"
 	finalizer "github.com/inditextech/redisoperator/internal/finalizers"
 	"github.com/inditextech/redisoperator/internal/kubernetes"
 	redis "github.com/inditextech/redisoperator/internal/redis"
+	"github.com/inditextech/redisoperator/internal/robin"
 	"github.com/inditextech/redisoperator/internal/utils"
 
 	"k8s.io/apimachinery/pkg/labels"
@@ -63,7 +63,6 @@ func NewRedisClusterReconciler(mgr ctrl.Manager, maxConcurrentReconciles int, co
 		},
 	}
 
-	reconciler.GetClusterInfoFunc = reconciler.DoGetClusterInfo
 	reconciler.GetReadyNodesFunc = reconciler.DoGetReadyNodes
 	reconciler.FindExistingStatefulSetFunc = reconciler.DoFindExistingStatefulSet
 	reconciler.FindExistingConfigMapFunc = reconciler.DoFindExistingConfigMap
@@ -74,7 +73,7 @@ func NewRedisClusterReconciler(mgr ctrl.Manager, maxConcurrentReconciles int, co
 }
 
 func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) (ctrl.Result, error) {
-	const pvcFinalizer = "redis.inditex.dev/delete-pvc"
+	var pvcFinalizer = (&finalizer.DeletePVCFinalizer{}).GetId()
 	var err error
 	var requeueAfter time.Duration = DEFAULT_REQUEUE_TIMEOUT
 	currentStatus := redisCluster.Status
@@ -84,7 +83,7 @@ func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req
 	// Checks the existance of the ConfigMap, StatefulSet, Pods, Robin Deployment, PDB and Service,
 	// creating the objects not created yet.
 	// Coherence and configuration details are also checked and fixed.
-	immediateRequeue, err := r.CheckAndCreateK8sObjects(ctx, req, redisCluster)
+	immediateRequeue, err := r.checkAndCreateK8sObjects(ctx, req, redisCluster)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -96,7 +95,7 @@ func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req
 	r.checkStorageConfigConsistency(ctx, redisCluster, redisCluster.Status.Status != redisv1.StatusError)
 
 	// Redis cluster scaled to 0 replicas?
-	// If it's a newly deployed cluster it won't have a status set yet and won't be catched it here.
+	// If it's a newly deployed cluster it won't have a status set yet and won't be catched here.
 	if redisCluster.Spec.Replicas == 0 && redisCluster.Status.Status != "" {
 		err = r.clusterScaledToZeroReplicas(ctx, redisCluster)
 		if err != nil {
@@ -116,7 +115,7 @@ func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req
 			r.LogInfo(redisCluster.NamespacedName(), "Added finalizer. Deleting PVCs after scale down or cluster deletion")
 		}
 	} else {
-		r.LogInfo(redisCluster.NamespacedName(), "Delete PVCs feature disabled in cluster spec or not specified. Not deleting PVCs after scale down or cluster deletion")
+		r.LogInfo(redisCluster.NamespacedName(), "Delete PVCs feature disabled in cluster spec or not specified. PVCs won't be deleted after scaling down or cluster deletion")
 	}
 
 	if !redisCluster.GetDeletionTimestamp().IsZero() {
@@ -135,15 +134,12 @@ func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req
 		}
 	}
 
-	readyNodes, err := r.GetReadyNodes(ctx, redisCluster)
-	if err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Error getting redis cluster nodes")
-		return ctrl.Result{}, err
-	}
-	redisCluster.Status.Nodes = readyNodes
-
 	requeue := false
 	switch redisCluster.Status.Status {
+	case "":
+		requeue, requeueAfter = r.reconcileStatusNew(redisCluster)
+	case redisv1.StatusInitializing:
+		requeue, requeueAfter = r.reconcileStatusInitializing(ctx, redisCluster)
 	case redisv1.StatusConfiguring:
 		requeue, requeueAfter = r.reconcileStatusConfiguring(ctx, redisCluster)
 	case redisv1.StatusReady:
@@ -157,14 +153,18 @@ func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req
 	case redisv1.StatusError:
 		requeue, requeueAfter = r.reconcileStatusError(ctx, redisCluster)
 	default:
-		r.CheckConfigurationStatus(ctx, redisCluster)
+
 	}
+
+	// r.CheckConfigurationStatus(ctx, redisCluster)
 
 	r.LogInfo(redisCluster.NamespacedName(), "RedisCluster reconciler end", "status", redisCluster.Status.Status)
 
+	// AMZ update nodes info in status
+
 	var update_err error
 	if !reflect.DeepEqual(redisCluster.Status, currentStatus) {
-		update_err = r.UpdateClusterStatus(ctx, redisCluster)
+		update_err = r.updateClusterStatus(ctx, redisCluster)
 	}
 
 	if requeue {
@@ -278,32 +278,28 @@ func (r *RedisClusterReconciler) checkStorageConfigConsistency(ctx context.Conte
 	return true
 }
 
+func (r *RedisClusterReconciler) reconcileStatusNew(redisCluster *redisv1.RedisCluster) (bool, time.Duration) {
+	var requeue = true
+	r.LogInfo(redisCluster.NamespacedName(), "New RedisCluster. Initializing...")
+	if redisCluster.Status.Nodes == nil {
+		redisCluster.Status.Nodes = make(map[string]*redisv1.RedisNode, 0)
+	}
+	redisCluster.Status.Status = redisv1.StatusInitializing
+	return requeue, DEFAULT_REQUEUE_TIMEOUT
+}
+
+func (r *RedisClusterReconciler) reconcileStatusInitializing(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, time.Duration) {
+	var requeue = true
+
+	// AMZ check redis and robin pods are ready && robin accepting API calls --> Configuring
+
+	return requeue, DEFAULT_REQUEUE_TIMEOUT
+}
+
 func (r *RedisClusterReconciler) reconcileStatusConfiguring(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, time.Duration) {
 	var requeue = true
 
-	clusterNodes, err := r.getClusterNodes(ctx, redisCluster)
-	if err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Could not get cluster nodes")
-		return requeue, DEFAULT_REQUEUE_TIMEOUT
-	}
-	// Free cluster nodes to avoid memory consumption
-	defer r.freeClusterNodes(clusterNodes, redisCluster.NamespacedName())
-
-	err = r.ConfigureRedisCluster(ctx, redisCluster, clusterNodes)
-	if err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Error when configuring cluster. Will retry again.")
-		return requeue, DEFAULT_REQUEUE_TIMEOUT
-	}
-
-	// PodDisruptionBudget update
-	err = r.updatePodDisruptionBudget(ctx, redisCluster)
-	if err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "ScaleCluster - Failed to update PodDisruptionBudget")
-	} else {
-		r.LogInfo(redisCluster.NamespacedName(), "ScaleCluster - PodDisruptionBudget updated ", "Name", redisCluster.Name+"-pdb")
-	}
-
-	r.CheckConfigurationStatus(ctx, redisCluster)
+	// AMZ call to Robin GET {{robinBaseUrl}}/v1/cluster/check to verify the cluster is built
 
 	return requeue, DEFAULT_REQUEUE_TIMEOUT
 }
@@ -337,6 +333,12 @@ func (r *RedisClusterReconciler) reconcileStatusReady(ctx context.Context, redis
 		}
 	}
 
+	// Reconcile PDB
+	err = r.checkAndUpdatePodDisruptionBudget(ctx, redisCluster)
+	if err != nil {
+		r.LogError(redisCluster.NamespacedName(), err, "Error checking PDB changes")
+	}
+
 	// Check and update RedisCluster status value accordingly to its configuration and status
 	// -> Cluster needs to be scaled?
 	if redisCluster.Status.Status == redisv1.StatusReady {
@@ -350,13 +352,6 @@ func (r *RedisClusterReconciler) reconcileStatusReady(ctx context.Context, redis
 		err = r.UpdateUpgradingStatus(ctx, redisCluster)
 		if err != nil {
 			r.LogError(redisCluster.NamespacedName(), err, "Error when updating upgrading status")
-		}
-	}
-
-	if redisCluster.Status.Status == redisv1.StatusReady {
-		err = r.checkPDB(ctx, redisCluster)
-		if err != nil {
-			r.LogError(redisCluster.NamespacedName(), err, "Error checking PDB changes")
 		}
 	}
 
@@ -433,7 +428,6 @@ func (r *RedisClusterReconciler) reconcileStatusError(ctx context.Context, redis
 
 	// Try to recover from Error status if storage configuration led to this but it has been now fixed.
 	if redisCluster.Spec.Storage == stsStorage && redisCluster.Spec.StorageClassName == stsStorageClassName {
-		r.CheckConfigurationStatus(ctx, redisCluster)
 		err := r.ScaleCluster(ctx, redisCluster)
 		if err == nil {
 			err = r.UpdateScalingStatus(ctx, redisCluster)
@@ -534,22 +528,6 @@ func (r *RedisClusterReconciler) scaleUpForUpgrade(ctx context.Context, redisClu
 		return false, nil
 	}
 
-	// All the pods are ready. Do they need a cluster meet?
-	nodes, err := r.GetReadyNodes(ctx, redisCluster)
-	if err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Could not fetch nodes for Cluster Meet check")
-		return false, err
-	}
-	needsMeet, _ := redis.NeedsClusterMeet(ctx, r.Client, nodes, redisCluster)
-	if needsMeet {
-		r.LogInfo(redisCluster.NamespacedName(), "ClusterMeet needed, starting")
-		err = r.ClusterMeet(ctx, nodes, redisCluster)
-		if err != nil {
-			r.LogError(redisCluster.NamespacedName(), err, "Could not run ClusterMeet")
-			return false, err
-		}
-	}
-	r.LogInfo(redisCluster.NamespacedName(), "ClusterMeet not needed, or finished")
 	return true, nil
 }
 
@@ -783,107 +761,6 @@ func (r *RedisClusterReconciler) releaseClusterNodes(clusterNodes map[string]*re
 			// Log error and keep trying with the other nodes
 			r.LogError(RCNamespacedName, err, "Error releasing cluster node")
 		}
-	}
-}
-
-func (r *RedisClusterReconciler) EnsureClusterContention(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
-	// First we need to get all the nodes
-	// Then calculate which slots are assigned
-	// We then need to subtract this from all the slots.
-	// Then we need to loop over the unassigned slots,
-	// and add them to the nodes with the least amount of assigned slots
-	nodes, err := r.GetReadyNodes(ctx, redisCluster)
-	if err != nil {
-		return err
-	}
-
-	redisSecret, _ := r.GetRedisSecret(redisCluster)
-	for _, node := range nodes {
-		redisClient := r.GetRedisClient(ctx, node.IP, redisSecret)
-		defer redisClient.Close()
-		info, err := redisClient.Do(ctx, "INFO").Result()
-		if err != nil {
-			r.LogError(redisCluster.NamespacedName(), err, "Could not get node info", "node", node)
-			return err
-		}
-		if !strings.Contains(info.(string), "role:master") {
-			// The node restarted without being a master node.
-			_, err = redisClient.Do(ctx, "cluster", "reset").Result()
-			if err != nil {
-				r.LogError(redisCluster.NamespacedName(), err, "Could not reset node")
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func (r *RedisClusterReconciler) CheckClusterMeet(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
-	// We might be reconciling from a pod restart.
-	// We want to check whether the nodes all have the correct IPs for one another.
-	// Due to an existing bug in Redis where a node doesn't update it's own IP upon restart,
-	// we need to make sure to update all the nodes whenever a pod is rescheduled and receives a new IP.
-	// First, let's check whether all the pods are ready
-	listOptions := client.ListOptions{
-		Namespace: redisCluster.Namespace,
-		LabelSelector: labels.SelectorFromSet(
-			map[string]string{
-				redis.RedisClusterLabel:                     redisCluster.Name,
-				r.GetStatefulSetSelectorLabel(redisCluster): "redis",
-			},
-		),
-	}
-	podsReady, err := utils.AllPodsReady(ctx, r.Client, &listOptions, int(redisCluster.Spec.Replicas))
-	if err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Could not check for pods being ready")
-	}
-	if podsReady {
-		// All the pods are ready. Do they need a cluster meet ?
-		nodes, err := r.GetReadyNodes(ctx, redisCluster)
-		if err != nil {
-			r.LogError(redisCluster.NamespacedName(), err, "Could not fetch nodes for Cluster Meet check")
-			return err
-		}
-		needsMeet, err := redis.NeedsClusterMeet(ctx, r.Client, nodes, redisCluster)
-		if err != nil {
-			r.LogError(redisCluster.NamespacedName(), err, "Could not determine if there was any change needed")
-		}
-		if needsMeet {
-			err = r.ClusterMeet(ctx, nodes, redisCluster)
-			if err != nil {
-				r.LogError(redisCluster.NamespacedName(), err, "Could not run ClusterMeet")
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func (r *RedisClusterReconciler) CheckConfigurationStatus(ctx context.Context, redisCluster *redisv1.RedisCluster) {
-	clusterInfo := r.GetClusterInfo(ctx, redisCluster)
-	state := clusterInfo["cluster_state"]
-	slots_ok := clusterInfo["cluster_slots_ok"]
-	slots_assigned := clusterInfo["cluster_slots_assigned"]
-	readyNodes, _ := r.GetReadyNodes(ctx, redisCluster)
-	r.LogInfo(redisCluster.NamespacedName(), "CheckConfigurationStatus", "cluster_state", state, "cluster_slots_ok", slots_ok, "status", redisCluster.Status.Status, "clusterinfo", clusterInfo)
-	if state == "ok" && slots_ok == strconv.Itoa(redis.TotalClusterSlots) {
-		redisCluster.Status.Status = redisv1.StatusReady
-	}
-	if slots_ok == "0" || slots_ok == "" {
-		if len(readyNodes) == redisCluster.NodesNeeded() {
-			if redisCluster.Spec.Replicas == 0 {
-				redisCluster.Status.Status = redisv1.StatusReady
-			} else {
-				redisCluster.Status.Status = redisv1.StatusConfiguring
-			}
-		} else {
-			redisCluster.Status.Status = redisv1.StatusInitializing
-		}
-		return
-	}
-	if slots_ok != slots_assigned {
-		redisCluster.Status.Status = redisv1.StatusConfiguring
-		r.LogInfo(redisCluster.NamespacedName(), "CheckConfigurationStatus - slots assigned != slots  ok", "slots_ok", slots_ok, "slots_assigned", slots_assigned)
 	}
 }
 
@@ -1151,10 +1028,6 @@ func (r *RedisClusterReconciler) GetSecret(ctx context.Context, ns types.Namespa
 	return secret, err
 }
 
-func (r *RedisClusterReconciler) GetClusterInfo(ctx context.Context, redisCluster *redisv1.RedisCluster) map[string]string {
-	return r.GetClusterInfoFunc(ctx, redisCluster)
-}
-
 func (r *RedisClusterReconciler) DoGetClusterInfo(ctx context.Context, redisCluster *redisv1.RedisCluster) map[string]string {
 	if len(redisCluster.Status.Nodes) == 0 {
 		r.LogInfo(redisCluster.NamespacedName(), "No ready nodes available on the cluster.", "clusterinfo", map[string]string{})
@@ -1172,15 +1045,18 @@ func (r *RedisClusterReconciler) DoGetClusterInfo(ctx context.Context, redisClus
 	return parsedClusterInfo
 }
 
-func (r *RedisClusterReconciler) UpdateClusterStatus(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
+func (r *RedisClusterReconciler) updateClusterStatus(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
 	var req reconcile.Request
 	req.NamespacedName.Namespace = redisCluster.Namespace
 	req.NamespacedName.Name = redisCluster.Name
 
-	r.LogInfo(redisCluster.NamespacedName(), "Updating cluster status", "status", redisCluster.Status.Status, "nodes", redisCluster.Status.Nodes)
+	r.LogInfo(redisCluster.NamespacedName(), "New cluster status", "status", redisCluster.Status.Status)
 
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		time.Sleep(time.Second * 1)
+
+		// Update RedisCluster status first
+
 		// get a fresh rediscluster to minimize conflicts
 		refreshedRedisCluster := redisv1.RedisCluster{}
 		err := r.Client.Get(ctx, types.NamespacedName{Namespace: redisCluster.Namespace, Name: redisCluster.Name}, &refreshedRedisCluster)
@@ -1194,8 +1070,41 @@ func (r *RedisClusterReconciler) UpdateClusterStatus(ctx context.Context, redisC
 		refreshedRedisCluster.Status.Conditions = redisCluster.Status.Conditions
 		refreshedRedisCluster.Status.Substatus = redisCluster.Status.Substatus
 
-		var updateErr = r.Client.Status().Update(ctx, &refreshedRedisCluster)
-		return updateErr
+		err = r.Client.Status().Update(ctx, &refreshedRedisCluster)
+		if err != nil {
+			r.LogError(redisCluster.NamespacedName(), err, "Error updating RedisCluster object with new status")
+			return err
+		}
+		r.LogInfo(redisCluster.NamespacedName(), "RedisCluster has been updated with the new status", "status", redisCluster.Status.Status)
+
+		// Update Robin status
+		// Do not update if we are switching to Initializing status because Robin needs some
+		// time to be ready to accept API requests.
+		if redisCluster.Status.Status != redisv1.StatusInitializing {
+			logger := r.GetHelperLogger(redisCluster.NamespacedName())
+			robin, err := robin.GetRobin(ctx, r.Client, redisCluster, logger)
+			if err != nil {
+				r.LogError(redisCluster.NamespacedName(), err, "Error getting Robin to update the status")
+				return err
+			}
+
+			err = robin.SetStatus(redisCluster.Status.Status)
+			if err != nil {
+				r.LogError(redisCluster.NamespacedName(), err, "Error setting the new status to Robin", "status", redisCluster.Status.Status)
+				return err
+			}
+			r.LogInfo(redisCluster.NamespacedName(), "Robin has been notified of the new status", "status", redisCluster.Status.Status)
+		}
+
+		// Update Robin ConfigMap status
+		err = kubernetes.PersistRobinStatut(ctx, r.Client, redisCluster)
+		if err != nil {
+			r.LogError(redisCluster.NamespacedName(), err, "Error updating the new status in Robin ConfigMap", "status", redisCluster.Status.Status)
+			return err
+		}
+		r.LogInfo(redisCluster.NamespacedName(), "Robin ConfigMap has been updated with the new status", "status", redisCluster.Status.Status)
+
+		return nil
 	})
 }
 
@@ -1210,7 +1119,7 @@ func (r *RedisClusterReconciler) GetStatefulSetSelectorLabel(rdcl *redisv1.Redis
 	return kubernetes.GetStatefulSetSelectorLabel(context.TODO(), r.Client, rdcl)
 }
 
-func (r *RedisClusterReconciler) CheckAndCreateK8sObjects(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) (bool, error) {
+func (r *RedisClusterReconciler) checkAndCreateK8sObjects(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) (bool, error) {
 	var immediateRequeue bool = false
 	var err error = nil
 	var configMap *corev1.ConfigMap
@@ -1318,45 +1227,40 @@ func (r *RedisClusterReconciler) CheckAndCreateStatefulSet(ctx context.Context, 
 			return immediateRequeue, nil
 		}
 
-		readyNodes, err := r.GetReadyNodes(ctx, redisCluster)
-		if err != nil {
-			return immediateRequeue, err
-		}
 		currSsetReplicas := *(statefulSet.Spec.Replicas)
-		currReadyNodes := int32(len(readyNodes))
 		realExpectedReplicas := int32(redisCluster.NodesNeeded())
-		if currSsetReplicas != currReadyNodes {
-			immediateRequeue = false
-			var err error
-			if realExpectedReplicas < currSsetReplicas {
-				// Inconsistency: if a scaleup could not be completed because of a lack of resources that prevented
-				// all the needed pods from being created
-				// StatefulSet replicas are then aligned with RedisCluster replicas
-				r.LogInfo(redisCluster.NamespacedName(), "Not all required pods instantiated: aligning StatefulSet <-> RedisCluster replicas",
-					"StatefulSet replicas", currSsetReplicas, "Ready nodes", len(readyNodes), "RedisCluster replicas", realExpectedReplicas)
-				statefulSet.Spec.Replicas = &realExpectedReplicas
-				_, err = r.UpdateStatefulSet(ctx, statefulSet, redisCluster)
-				if err != nil {
-					r.LogError(redisCluster.NamespacedName(), err, "Failed to update StatefulSet replicas")
-				}
-			} else {
-				r.LogInfo(redisCluster.NamespacedName(), "StatefulSet - Not all pods Ready", "StatefulSet replicas", currSsetReplicas,
-					"Ready nodes", currReadyNodes, "RedisCluster replicas", realExpectedReplicas)
-				immediateRequeue = true
-			}
-			return immediateRequeue, err // requeue
-		}
+		immediateRequeue = false
+		var err error
 		if redisCluster.Status.Status == "" || redisCluster.Status.Status == redisv1.StatusInitializing {
 			if currSsetReplicas != realExpectedReplicas {
+				immediateRequeue = true
 				r.LogInfo(redisCluster.NamespacedName(), "Replicas updated before reaching Configuring status: aligning StatefulSet <-> RedisCluster replicas",
-					"StatefulSet replicas", currSsetReplicas, "Ready nodes", len(readyNodes), "RedisCluster replicas", realExpectedReplicas)
+					"StatefulSet replicas", currSsetReplicas, "RedisCluster replicas", realExpectedReplicas)
 				statefulSet.Spec.Replicas = &realExpectedReplicas
 				_, err = r.UpdateStatefulSet(ctx, statefulSet, redisCluster)
 				if err != nil {
 					r.LogError(redisCluster.NamespacedName(), err, "Failed to update StatefulSet replicas")
 				}
+				return true, err
 			}
 		}
+		if realExpectedReplicas < currSsetReplicas {
+			// Inconsistency: if a scaleup could not be completed because of a lack of resources that prevented
+			// all the needed pods from being created
+			// StatefulSet replicas are then aligned with RedisCluster replicas
+			r.LogInfo(redisCluster.NamespacedName(), "Not all required pods instantiated: aligning StatefulSet <-> RedisCluster replicas",
+				"StatefulSet replicas", currSsetReplicas, "RedisCluster replicas", realExpectedReplicas)
+			statefulSet.Spec.Replicas = &realExpectedReplicas
+			_, err = r.UpdateStatefulSet(ctx, statefulSet, redisCluster)
+			if err != nil {
+				r.LogError(redisCluster.NamespacedName(), err, "Failed to update StatefulSet replicas")
+			}
+		} else {
+			r.LogInfo(redisCluster.NamespacedName(), "StatefulSet - Not all pods Ready", "StatefulSet replicas", currSsetReplicas,
+				"RedisCluster replicas", realExpectedReplicas)
+			immediateRequeue = true
+		}
+		return immediateRequeue, err
 	}
 	return immediateRequeue, nil
 }
@@ -1461,7 +1365,7 @@ func (r *RedisClusterReconciler) clusterScaledToZeroReplicas(ctx context.Context
 	if !reflect.DeepEqual(redisCluster.Status, redisv1.StatusReady) {
 		redisCluster.Status.Status = redisv1.StatusReady
 		SetAllConditionsFalse(r.GetHelperLogger(redisCluster.NamespacedName()), redisCluster)
-		update_err = r.UpdateClusterStatus(ctx, redisCluster)
+		update_err = r.updateClusterStatus(ctx, redisCluster)
 	}
 
 	return update_err

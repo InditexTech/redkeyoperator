@@ -41,7 +41,6 @@ type RedisClusterReconciler struct {
 	Finalizers                          []finalizer.Finalizer
 	MaxConcurrentReconciles             int
 	ConcurrentMigrate                   int
-	GetClusterInfoFunc                  func(ctx context.Context, redisCluster *redisv1.RedisCluster) map[string]string
 	GetReadyNodesFunc                   func(ctx context.Context, redisCluster *redisv1.RedisCluster) (map[string]*redisv1.RedisNode, error)
 	FindExistingStatefulSetFunc         func(ctx context.Context, req ctrl.Request) (*v1.StatefulSet, error)
 	FindExistingConfigMapFunc           func(ctx context.Context, req ctrl.Request) (*corev1.ConfigMap, error)
@@ -62,7 +61,6 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	r.Log.Info("RedisCluster reconciler called", "redis-cluster", req.NamespacedName, "name", req.Name, "ns", req.Namespace)
 	redisCluster := &redisv1.RedisCluster{}
 	err := r.Client.Get(ctx, req.NamespacedName, redisCluster)
-	r.RefreshRedisClients(ctx, redisCluster)
 	if err == nil {
 		r.Log.Info("Found RedisCluster", "redis-cluster", req.NamespacedName, "name", redisCluster.GetName(), "GVK", redisCluster.GroupVersionKind().String(), "status", redisCluster.Status.Status)
 		return r.ReconcileClusterObject(ctx, req, redisCluster)

@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	redisv1 "github.com/inditextech/redisoperator/api/v1"
+	"github.com/inditextech/redisoperator/internal/common"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -170,7 +171,7 @@ func CreateStatefulSet(ctx context.Context, req ctrl.Request, spec redisv1.Redis
 
 	defaultLabels := map[string]string{
 		RedisClusterLabel:          req.Name,
-		RedisClusterComponentLabel: "redis",
+		RedisClusterComponentLabel: common.ComponentLabelRedis,
 	}
 
 	// Add default labels and apply them to the statefulset.
@@ -195,7 +196,7 @@ func CreateStatefulSet(ctx context.Context, req ctrl.Request, spec redisv1.Redis
 			ServiceName: req.Name,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{RedisClusterLabel: req.Name, RedisClusterComponentLabel: "redis"},
+					Labels: map[string]string{RedisClusterLabel: req.Name, RedisClusterComponentLabel: common.ComponentLabelRedis},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -375,11 +376,12 @@ func AddStatefulSetStorage(statefulSet *v1.StatefulSet, req ctrl.Request, spec r
 	accessModesTypes := make([]corev1.PersistentVolumeAccessMode, 0, 3)
 	if accessModes != nil {
 		for _, volumeAccessMode := range accessModes {
-			if volumeAccessMode == corev1.ReadOnlyMany {
+			switch volumeAccessMode {
+			case corev1.ReadOnlyMany:
 				accessModesTypes = append(accessModesTypes, corev1.ReadOnlyMany)
-			} else if volumeAccessMode == corev1.ReadWriteMany {
+			case corev1.ReadWriteMany:
 				accessModesTypes = append(accessModesTypes, corev1.ReadWriteMany)
-			} else {
+			default:
 				accessModesTypes = append(accessModesTypes, corev1.ReadWriteOnce)
 			}
 		}
@@ -446,7 +448,7 @@ func CreateService(Namespace, Name string, labels map[string]string) *corev1.Ser
 			Ports: []corev1.ServicePort{
 				defaultPort,
 			},
-			Selector:  map[string]string{RedisClusterLabel: Name, RedisClusterComponentLabel: "redis"},
+			Selector:  map[string]string{RedisClusterLabel: Name, RedisClusterComponentLabel: common.ComponentLabelRedis},
 			ClusterIP: "None",
 		},
 	}
@@ -507,7 +509,7 @@ func cleanServiceResult(result, original, override *corev1.Service) {
 
 	// Assure to clean selector if override does not set them
 	if len(override.Spec.Selector) == 0 {
-		result.Spec.Selector = map[string]string{RedisClusterLabel: original.Name, RedisClusterComponentLabel: "redis"}
+		result.Spec.Selector = map[string]string{RedisClusterLabel: original.Name, RedisClusterComponentLabel: common.ComponentLabelRedis}
 	}
 }
 
@@ -814,18 +816,19 @@ func SplitNodeSlots(nodesTotal int) []*NodesSlots {
 	numOfNodes := nodesTotal
 	slotsNode, resto := slotsPerNode(numOfNodes, TotalClusterSlots)
 	slotsAsigment := []string{}
-	for i := 0; i < numOfNodes; i++ {
-		if i == 0 {
+	for i := range numOfNodes {
+		switch i {
+		case 0:
 			slotsAsigment = append(slotsAsigment, fmt.Sprintf("0,%s", strconv.Itoa(slotsNode-1)))
-		} else if i == 1 {
+		case 1:
 			slotsAsigment = append(slotsAsigment, fmt.Sprintf("%s,%s", strconv.Itoa(slotsNode*i), strconv.Itoa(slotsNode*(i+1)-1)))
-		} else if i == numOfNodes-1 {
+		case numOfNodes - 1:
 			slotsAsigment = append(slotsAsigment, fmt.Sprintf("%s,%s", strconv.Itoa(slotsNode*i), strconv.Itoa(slotsNode*(i+1)-1+resto)))
-		} else {
+		default:
 			slotsAsigment = append(slotsAsigment, fmt.Sprintf("%s,%s", strconv.Itoa((slotsNode*i)), strconv.Itoa(slotsNode*(i+1)-1)))
 		}
 	}
-	for i := 0; i < numOfNodes; i++ {
+	for i := range numOfNodes {
 		stringRangeSplit := strings.Split(slotsAsigment[i], ",")
 		start, err := strconv.Atoi(stringRangeSplit[0])
 		if err != nil {

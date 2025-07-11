@@ -43,92 +43,6 @@ const (
 	CONFIG_CHECKSUM_ANNOTATION = "inditex.dev/redis-conf"
 )
 
-type RedisClient struct {
-	NodeId      string
-	RedisClient *redisclient.Client
-	IP          string
-}
-
-var redisClients map[string]*RedisClient = make(map[string]*RedisClient)
-
-func (r *RedisClusterReconciler) RefreshRedisClients(ctx context.Context, redisCluster *redisv1.RedisCluster) {
-	nodes, _ := r.GetReadyNodes(ctx, redisCluster)
-	for nodeId, node := range nodes {
-		secret, _ := r.GetRedisSecret(redisCluster)
-		redisClient := r.GetRedisClient(ctx, node.IP, secret)
-		err := redisClient.Ping(ctx).Err()
-		redisClient.Close()
-		if err != nil {
-			r.LogInfo(redisCluster.NamespacedName(), "RefreshRedisClients - Redis client for node is errorring", "node", nodeId, "error", err)
-			redisClients[nodeId] = nil
-		}
-	}
-}
-
-func (r *RedisClusterReconciler) GetRedisClientForNode(ctx context.Context, nodeId string, redisCluster *redisv1.RedisCluster) (*redisclient.Client, error) {
-	nodes, _ := r.GetReadyNodes(ctx, redisCluster)
-	// If redisClient for this node has not been initialized, or the IP has changed
-	if nodes[nodeId] == nil {
-		return nil, fmt.Errorf("node %s does not exist", nodeId)
-	}
-	if redisClients[nodeId] == nil || redisClients[nodeId].IP != nodes[nodeId].IP {
-		secret, _ := r.GetRedisSecret(redisCluster)
-		rdb := r.GetRedisClient(ctx, nodes[nodeId].IP, secret)
-		redisClients[nodeId] = &RedisClient{NodeId: nodeId, RedisClient: rdb, IP: nodes[nodeId].IP}
-	}
-
-	return redisClients[nodeId].RedisClient, nil
-}
-
-func (r *RedisClusterReconciler) RemoveRedisClientForNode(nodeId string, ctx context.Context, redisCluster *redisv1.RedisCluster) {
-	if redisClients[nodeId] == nil {
-		return
-	}
-	redisClients[nodeId].RedisClient.Close()
-	redisClients[nodeId] = nil
-}
-
-func (r *RedisClusterReconciler) ConfigureRedisCluster(ctx context.Context, redisCluster *redisv1.RedisCluster, clusterNodes kubernetes.ClusterNodeList) error {
-	r.LogInfo(redisCluster.NamespacedName(), "ConfigureRedisCluster", "readyNodes", clusterNodes.SimpleNodesObject())
-	err := clusterNodes.LoadInfoForNodes()
-	if err != nil {
-		return err
-	}
-	err = clusterNodes.ClusterMeet(ctx)
-	if err != nil {
-		r.Recorder.Event(redisCluster, "Warning", "ClusterMeet", "Error when attempting ClusterMeet")
-		return err
-	}
-
-	podsReady, err := r.AllPodsReady(ctx, redisCluster)
-	if err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Could not check ready pods")
-	}
-	if redisCluster.Spec.Ephemeral && podsReady {
-		logger := r.GetHelperLogger(redisCluster.NamespacedName())
-		err := clusterNodes.RemoveClusterOutdatedNodes(ctx, redisCluster, logger)
-		if err != nil {
-			r.LogError(redisCluster.NamespacedName(), err, "Could not check outdated nodes")
-		}
-	}
-
-	if podsReady {
-		logger := r.GetHelperLogger(redisCluster.NamespacedName())
-		err := clusterNodes.EnsureClusterRatio(ctx, redisCluster, logger)
-		if err != nil {
-			return err
-		}
-
-		err = clusterNodes.AssignMissingSlots()
-		if err != nil {
-			r.Recorder.Event(redisCluster, "Warning", "SlotAssignment", "Error when attempting AssignSlots")
-			return err
-		}
-	}
-
-	return nil
-}
-
 func (r *RedisClusterReconciler) UpdateScalingStatus(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
 	sset, ssetErr := r.FindExistingStatefulSetFunc(ctx, controllerruntime.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name, Namespace: redisCluster.Namespace}})
 	if ssetErr != nil {
@@ -1591,29 +1505,6 @@ func (r *RedisClusterReconciler) isOwnedByUs(o client.Object) bool {
 	return false
 }
 
-func (r *RedisClusterReconciler) ClusterMeet(ctx context.Context, nodes map[string]*redisv1.RedisNode, redisCluster *redisv1.RedisCluster) error {
-	r.LogInfo(redisCluster.NamespacedName(), "ClusterMeet", "nodes", nodes)
-	var rdb *redisclient.Client
-
-	for srcNodeId, srcnode := range nodes {
-		for trgNodeId, trgnode := range nodes {
-			if trgNodeId == srcNodeId {
-				continue
-			}
-			r.LogInfo(redisCluster.NamespacedName(), "ClusterMeet", "srcnode", srcnode, "trgnode", trgnode)
-			rdb, _ = r.GetRedisClientForNode(ctx, srcNodeId, redisCluster)
-			_, err := rdb.ClusterMeet(ctx, trgnode.IP, strconv.Itoa(redis.RedisCommPort)).Result()
-
-			if err != nil {
-				r.LogError(redisCluster.NamespacedName(), err, "ClusterMeet failed", "nodes", srcnode)
-				return err
-			}
-		}
-
-	}
-	return nil
-}
-
 func (r *RedisClusterReconciler) GetSlotsRanges(nodes int32, redisCluster *redisv1.RedisCluster) []*redisv1.SlotRange {
 	slots := redis.SplitNodeSlots(int(nodes))
 	var apiRedisSlots = make([]*redisv1.SlotRange, 0)
@@ -1638,24 +1529,6 @@ func (r *RedisClusterReconciler) NodesBySequence(nodes map[string]*redisv1.Redis
 		nodesBySequence[nodePodSequence] = nodeId
 	}
 	return nodesBySequence, nil
-}
-
-// TODO: check how many cluster slots have been already assign, and rebalance cluster if necessary
-func (r *RedisClusterReconciler) AssignSlots(ctx context.Context, nodes map[string]*redisv1.RedisNode, redisCluster *redisv1.RedisCluster) error {
-	// when all nodes are formed in a cluster, addslots
-	r.LogInfo(redisCluster.NamespacedName(), "AssignSlots", "nodeslen", len(nodes), "nodes", nodes)
-	slots := redis.SplitNodeSlots(len(nodes))
-	nodesBySequence, _ := r.NodesBySequence(nodes)
-	for i, nodeId := range nodesBySequence {
-		rdb, err := r.GetRedisClientForNode(ctx, nodeId, redisCluster)
-		if err != nil {
-			return err
-		}
-
-		rdb.ClusterAddSlotsRange(ctx, slots[i].Start, slots[i].End)
-		r.LogInfo(redisCluster.NamespacedName(), "Running cluster assign slots", "pods", nodes)
-	}
-	return nil
 }
 
 func (r *RedisClusterReconciler) GetRedisClient(ctx context.Context, ip string, secret string) *redisclient.Client {

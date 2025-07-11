@@ -18,6 +18,7 @@ import (
 
 	"github.com/go-logr/logr"
 	redisv1 "github.com/inditextech/redisoperator/api/v1"
+	"github.com/inditextech/redisoperator/internal/common"
 	"github.com/inditextech/redisoperator/internal/redis"
 	"github.com/inditextech/redisoperator/internal/utils"
 	corev1 "k8s.io/api/core/v1"
@@ -91,7 +92,7 @@ func (clusterNode *ClusterNode) IsReplica() bool {
 }
 
 func (clusterNode *ClusterNode) String() string {
-	out, _ := json.Marshal(map[string]interface{}{
+	out, _ := json.Marshal(map[string]any{
 		"pod":     clusterNode.Pod.Name,
 		"ip":      clusterNode.Pod.Status.PodIP,
 		"node_id": clusterNode.ClusterNode.Name(),
@@ -105,7 +106,7 @@ func GetKubernetesClusterNodes(ctx context.Context, client ctrlClient.Client, re
 	labelSelector := labels.SelectorFromSet(
 		map[string]string{
 			redis.RedisClusterLabel: redisCluster.Name,
-			componentLabel:          "redis",
+			componentLabel:          common.ComponentLabelRedis,
 		},
 	)
 
