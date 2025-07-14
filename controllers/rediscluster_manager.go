@@ -304,7 +304,7 @@ func (r *RedisClusterReconciler) reconcileStatusInitializing(ctx context.Context
 	logger := r.GetHelperLogger(redisCluster.NamespacedName())
 	robin, err := kubernetes.GetRobin(ctx, r.Client, redisCluster, logger)
 	if err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Error getting Robin to check if it's ready")
+		r.LogError(redisCluster.NamespacedName(), err, "Error getting Robin to check its readiness")
 		return true, DEFAULT_REQUEUE_TIMEOUT
 	}
 	flag, err := utils.PodRunningReady(robin.Pod)
@@ -317,7 +317,7 @@ func (r *RedisClusterReconciler) reconcileStatusInitializing(ctx context.Context
 		return true, DEFAULT_REQUEUE_TIMEOUT
 	}
 
-	// Check Robin responding to requests
+	// Check Robin is responding to requests
 	status, err := robin.GetStatus()
 	if err != nil {
 		r.LogInfo(redisCluster.NamespacedName(), "Waiting for Robin accepting requests")
@@ -334,7 +334,26 @@ func (r *RedisClusterReconciler) reconcileStatusInitializing(ctx context.Context
 func (r *RedisClusterReconciler) reconcileStatusConfiguring(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, time.Duration) {
 	var requeue = true
 
-	// AMZ call to Robin GET {{robinBaseUrl}}/v1/cluster/check to verify the cluster is built
+	// Ask Robin for Redis cluster readiness
+	logger := r.GetHelperLogger((redisCluster.NamespacedName()))
+	robin, err := kubernetes.GetRobin(ctx, r.Client, redisCluster, logger)
+	if err != nil {
+		r.LogError(redisCluster.NamespacedName(), err, "Error getting Robin to check the cluster readiness")
+		return true, DEFAULT_REQUEUE_TIMEOUT
+	}
+	check, errors, warnings, err := robin.ClusterCheck()
+	if err != nil {
+		r.LogError(redisCluster.NamespacedName(), err, "Error checking the cluster readiness over Robin")
+		return true, DEFAULT_REQUEUE_TIMEOUT
+	}
+	
+	if !check {
+		r.LogInfo(redisCluster.NamespacedName(), "Waiting for Redis cluster readiness", "errors", errors, "warnings", warnings)
+		return true, DEFAULT_REQUEUE_TIMEOUT
+	}
+
+	// Redis cluster is ok, moving to Ready status
+	redisCluster.Status.Status = redisv1.StatusReady
 
 	return requeue, DEFAULT_REQUEUE_TIMEOUT
 }

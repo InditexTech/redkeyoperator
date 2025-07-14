@@ -72,8 +72,13 @@ type RedisMetricsConfig struct {
 	RedisInfoKeys   []string `yaml:"redis_info_keys"`
 }
 
-type ResponseStatus struct {
+type PayloadStatus struct {
 	Status string `yaml:"status"`
+}
+
+type PayloadClusterCheck struct {
+	Errors   []string `yaml:"errors"`
+	Warnings []string `yaml:"warnings"`
 }
 
 type Robin struct {
@@ -89,7 +94,7 @@ func (r *Robin) GetStatus() (string, error) {
 		return "", fmt.Errorf("getting Robin status: %w", err)
 	}
 
-	var status ResponseStatus
+	var status PayloadStatus
 	err = json.Unmarshal(body, &status)
 	if err != nil {
 		return "", fmt.Errorf("parsing Robin status response: %w", err)
@@ -101,9 +106,9 @@ func (r *Robin) GetStatus() (string, error) {
 func (r *Robin) SetStatus(status string) error {
 	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/rediscluster/status"
 
-	payload, err := json.Marshal(map[string]any{
-		"status": status,
-	})
+	var statusParam PayloadStatus
+	statusParam.Status = status
+	payload, err := json.Marshal(statusParam)
 	if err != nil {
 		return fmt.Errorf("setting Robin status: %w", err)
 	}
@@ -125,9 +130,25 @@ func (r *Robin) SetReplicas(replicas int) error {
 	return nil
 }
 
-// TODO struct with the data gotten from check call
-func (r *Robin) GetClusterCheck() (bool, error) {
-	return true, nil
+func (r *Robin) ClusterCheck() (bool, []string, []string, error) {
+	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/cluster/check"
+
+	body, err := doSimpleGet(url)
+	if err != nil {
+		return false, nil, nil, fmt.Errorf("getting Robin status: %w", err)
+	}
+
+	var clusterCheck PayloadClusterCheck
+	err = json.Unmarshal(body, &clusterCheck)
+	if err != nil {
+		return false, nil, nil, fmt.Errorf("parsing Robin status response: %w", err)
+	}
+
+	checkResult := true
+	if len(clusterCheck.Errors) != 0 || len(clusterCheck.Warnings) != 0 {
+		checkResult = false
+	}
+	return checkResult, clusterCheck.Errors, clusterCheck.Warnings, nil
 }
 
 func (r *Robin) GetClusterNodes() (string, error) {
