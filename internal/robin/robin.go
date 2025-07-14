@@ -72,13 +72,36 @@ type RedisMetricsConfig struct {
 	RedisInfoKeys   []string `yaml:"redis_info_keys"`
 }
 
-type PayloadStatus struct {
+type Status struct {
 	Status string `yaml:"status"`
 }
 
-type PayloadClusterCheck struct {
+type ClusterCheck struct {
 	Errors   []string `yaml:"errors"`
 	Warnings []string `yaml:"warnings"`
+}
+
+type ClusterNodes struct {
+	Nodes []Node `yaml:"nodes"`
+}
+
+type Node struct {
+	Name       string      `yaml:"name"`
+	Id         string      `yaml:"id"`
+	Ip         string      `yaml:"ip"`
+	Flags      string      `yaml:"flags"`
+	Slots      []SlotRange `yaml:"slots"`
+	MasterId   string      `yaml:"masterId"`
+	Failures   int         `yaml:"failures"`
+	Sent       int         `yaml:"sent"`
+	Recv       int         `yaml:"recv"`
+	LinkStatus string      `yaml:"linkStatus"`
+	RedisCLI   string      `yaml:"redisCLI"`
+}
+
+type SlotRange struct {
+	Start int `yaml:"start"`
+	End   int `yaml:"end"`
 }
 
 type Robin struct {
@@ -94,7 +117,7 @@ func (r *Robin) GetStatus() (string, error) {
 		return "", fmt.Errorf("getting Robin status: %w", err)
 	}
 
-	var status PayloadStatus
+	var status Status
 	err = json.Unmarshal(body, &status)
 	if err != nil {
 		return "", fmt.Errorf("parsing Robin status response: %w", err)
@@ -106,7 +129,7 @@ func (r *Robin) GetStatus() (string, error) {
 func (r *Robin) SetStatus(status string) error {
 	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/rediscluster/status"
 
-	var statusParam PayloadStatus
+	var statusParam Status
 	statusParam.Status = status
 	payload, err := json.Marshal(statusParam)
 	if err != nil {
@@ -138,7 +161,7 @@ func (r *Robin) ClusterCheck() (bool, []string, []string, error) {
 		return false, nil, nil, fmt.Errorf("getting Robin status: %w", err)
 	}
 
-	var clusterCheck PayloadClusterCheck
+	var clusterCheck ClusterCheck
 	err = json.Unmarshal(body, &clusterCheck)
 	if err != nil {
 		return false, nil, nil, fmt.Errorf("parsing Robin status response: %w", err)
@@ -151,8 +174,20 @@ func (r *Robin) ClusterCheck() (bool, []string, []string, error) {
 	return checkResult, clusterCheck.Errors, clusterCheck.Warnings, nil
 }
 
-func (r *Robin) GetClusterNodes() (string, error) {
-	return "", nil
+func (r *Robin) GetClusterNodes() (ClusterNodes, error) {
+	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/cluster/nodes"
+	var clusterNodes ClusterNodes
+
+	body, err := doSimpleGet(url)
+	if err != nil {
+		return clusterNodes, fmt.Errorf("getting cluster nodes: %w", err)
+	}
+
+	err = json.Unmarshal(body, &clusterNodes)
+	if err != nil {
+		return clusterNodes, fmt.Errorf("parsing cluster nodes: %w", err)
+	}
+	return clusterNodes, nil
 }
 
 func (r *Robin) ClusterFix() error {

@@ -11,6 +11,7 @@ import (
 	"slices"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	redisv1 "github.com/inditextech/redisoperator/api/v1"
@@ -156,19 +157,21 @@ func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req
 		return ctrl.Result{}, nil
 	}
 
+	if err = r.updateClusterNodes(ctx, redisCluster); err != nil {
+		r.LogError(redisCluster.NamespacedName(), err, "Error updating cluster nodes")
+	}
+
+	var updateErr error
+	if !reflect.DeepEqual(redisCluster.Status, currentStatus) {
+		updateErr = r.updateClusterStatus(ctx, redisCluster)
+	}
+
 	r.LogInfo(redisCluster.NamespacedName(), "RedisCluster reconciler end", "status", redisCluster.Status.Status)
 
-	// AMZ update nodes info in status
-
-	var update_err error
-	if !reflect.DeepEqual(redisCluster.Status, currentStatus) {
-		update_err = r.updateClusterStatus(ctx, redisCluster)
-	}
-
 	if requeue {
-		return ctrl.Result{RequeueAfter: time.Second * requeueAfter}, update_err
+		return ctrl.Result{RequeueAfter: time.Second * requeueAfter}, updateErr
 	}
-	return ctrl.Result{}, update_err
+	return ctrl.Result{}, updateErr
 }
 
 // Checks storage configuration for inconsistencies.
@@ -490,6 +493,36 @@ func (r *RedisClusterReconciler) reconcileStatusError(ctx context.Context, redis
 	}
 
 	return requeue, requeueAfter
+}
+
+func (r *RedisClusterReconciler) updateClusterNodes(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
+
+	// Redis cluster must be in Configuring status (or greater) to be able to query Robin for nodes.
+	if redisCluster.Status.Status == "" || redisCluster.Status.Status == redisv1.StatusInitializing {
+		return nil
+	}
+
+	logger := r.GetHelperLogger((redisCluster.NamespacedName()))
+	robin, err := kubernetes.GetRobin(ctx, r.Client, redisCluster, logger)
+	if err != nil {
+		r.LogError(redisCluster.NamespacedName(), err, "Error getting Robin to get cluster nodes")
+		return err
+	}
+	clusterNodes, err := robin.GetClusterNodes()
+	if err != nil {
+		r.LogError(redisCluster.NamespacedName(), err, "Error getting cluster nodes from Robin")
+		return err
+	}
+
+	updatedNodes := make(map[string]*redisv1.RedisNode, 0)
+	for _, node := range clusterNodes.Nodes {
+		updatedNodes[node.Id] = &redisv1.RedisNode{IP: node.Ip, Name: node.Name, ReplicaOf: node.MasterId, RedisCLI: node.RedisCLI}
+		updatedNodes[node.Id].IsMaster = strings.Contains(node.Flags, "master")
+	}
+
+	redisCluster.Status.Nodes = updatedNodes
+
+	return nil
 }
 
 func (r *RedisClusterReconciler) getClusterNodes(ctx context.Context, redisCluster *redisv1.RedisCluster) (kubernetes.ClusterNodeList, error) {
