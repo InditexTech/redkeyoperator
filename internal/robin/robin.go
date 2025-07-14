@@ -83,7 +83,7 @@ type Robin struct {
 
 func (r *Robin) GetStatus() (string, error) {
 	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/rediscluster/status"
-	
+
 	body, err := doSimpleGet(url)
 	if err != nil {
 		return "", fmt.Errorf("getting Robin status: %w", err)
