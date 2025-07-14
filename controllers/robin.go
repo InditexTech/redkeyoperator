@@ -201,8 +201,6 @@ func (r *RedisClusterReconciler) overrideRobinDeployment(req ctrl.Request, redis
 
 	if changed {
 		r.LogInfo(req.NamespacedName, "Detected robin deployment change")
-	} else {
-		r.LogInfo(req.NamespacedName, "No robin deployment change detected")
 	}
 
 	return *patchedPodTemplateSpec, changed

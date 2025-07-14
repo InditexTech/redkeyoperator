@@ -287,11 +287,48 @@ func (r *RedisClusterReconciler) reconcileStatusNew(redisCluster *redisv1.RedisC
 }
 
 func (r *RedisClusterReconciler) reconcileStatusInitializing(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, time.Duration) {
-	var requeue = true
 
-	// AMZ check redis and robin pods are ready && robin accepting API calls --> Configuring
+	// Check Redis nod pods rediness
+	nodePodsReady, err := r.AllPodsReady(ctx, redisCluster)
+	if err != nil {
+		r.LogError(redisCluster.NamespacedName(), err, "Could not check for Redis node pods being ready")
+		return true, DEFAULT_REQUEUE_TIMEOUT
+	}
+	if !nodePodsReady {
+		r.LogInfo(redisCluster.NamespacedName(), "Waiting for Redis node pods to become ready")
+		return true, DEFAULT_REQUEUE_TIMEOUT
+	}
+	r.LogInfo(redisCluster.NamespacedName(), "Redis node pods are ready")
 
-	return requeue, DEFAULT_REQUEUE_TIMEOUT
+	// Check Robin pod readiness
+	logger := r.GetHelperLogger(redisCluster.NamespacedName())
+	robin, err := kubernetes.GetRobin(ctx, r.Client, redisCluster, logger)
+	if err != nil {
+		r.LogError(redisCluster.NamespacedName(), err, "Error getting Robin to check if it's ready")
+		return true, DEFAULT_REQUEUE_TIMEOUT
+	}
+	flag, err := utils.PodRunningReady(robin.Pod)
+	if err != nil {
+		r.LogError(redisCluster.NamespacedName(), err, "Error checking Robin pod readiness")
+		return true, DEFAULT_REQUEUE_TIMEOUT
+	}
+	if !flag {
+		r.LogInfo(redisCluster.NamespacedName(), "Waiting for Robin pod to become ready")
+		return true, DEFAULT_REQUEUE_TIMEOUT
+	}
+
+	// Check Robin responding to requests
+	status, err := robin.GetStatus()
+	if err != nil {
+		r.LogInfo(redisCluster.NamespacedName(), "Waiting for Robin accepting requests")
+		return true, DEFAULT_REQUEUE_TIMEOUT
+	}
+	r.LogInfo(redisCluster.NamespacedName(), "Status", "status", status)
+
+	// Redis pods and Robin are ok, moving to Configuring status
+	redisCluster.Status.Status = redisv1.StatusConfiguring
+
+	return false, DEFAULT_REQUEUE_TIMEOUT
 }
 
 func (r *RedisClusterReconciler) reconcileStatusConfiguring(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, time.Duration) {
@@ -1010,8 +1047,6 @@ func (r *RedisClusterReconciler) OverrideService(ctx context.Context, req ctrl.R
 
 	if changed {
 		r.LogInfo(req.NamespacedName, "Detected service override change")
-	} else {
-		r.LogInfo(req.NamespacedName, "No service override change detected")
 	}
 
 	return patchedService, changed

@@ -72,18 +72,35 @@ type RedisMetricsConfig struct {
 	RedisInfoKeys   []string `yaml:"redis_info_keys"`
 }
 
+type ResponseStatus struct {
+	Status string `yaml:"status"`
+}
+
 type Robin struct {
 	Pod    *corev1.Pod
 	Logger logr.Logger
 }
 
 func (r *Robin) GetStatus() (string, error) {
-	return "Initializing", nil
+	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/rediscluster/status"
+	
+	body, err := doSimpleGet(url)
+	if err != nil {
+		return "", fmt.Errorf("getting Robin status: %w", err)
+	}
+
+	var status ResponseStatus
+	err = json.Unmarshal(body, &status)
+	if err != nil {
+		return "", fmt.Errorf("parsing Robin status response: %w", err)
+	}
+
+	return status.Status, nil
 }
 
 func (r *Robin) SetStatus(status string) error {
-	// set Robin status
 	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/rediscluster/status"
+
 	payload, err := json.Marshal(map[string]any{
 		"status": status,
 	})
@@ -123,6 +140,20 @@ func (r *Robin) ClusterFix() error {
 
 func (r *Robin) ClusterResetNode(nodeIndex int) error {
 	return nil
+}
+
+func doSimpleGet(url string) ([]byte, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return body, nil
 }
 
 func doPut(url string, payload []byte) ([]byte, error) {
