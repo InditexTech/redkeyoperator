@@ -346,7 +346,7 @@ func (r *RedisClusterReconciler) reconcileStatusConfiguring(ctx context.Context,
 		r.LogError(redisCluster.NamespacedName(), err, "Error checking the cluster readiness over Robin")
 		return true, DEFAULT_REQUEUE_TIMEOUT
 	}
-	
+
 	if !check {
 		r.LogInfo(redisCluster.NamespacedName(), "Waiting for Redis cluster readiness", "errors", errors, "warnings", warnings)
 		return true, DEFAULT_REQUEUE_TIMEOUT
