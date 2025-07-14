@@ -17,7 +17,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -56,7 +55,7 @@ func GetRobin(ctx context.Context, client ctrlClient.Client, redisCluster *redis
 }
 
 // Updates configuration in Robin ConfigMap with the new state from the RedisCluster object.
-func PersistRobinStatut(ctx context.Context, client client.Client, redisCluster *redisv1.RedisCluster) error {
+func PersistRobinStatut(ctx context.Context, client ctrlClient.Client, redisCluster *redisv1.RedisCluster) error {
 	cmap := &corev1.ConfigMap{}
 	err := client.Get(ctx, types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}, cmap)
 	if err != nil {
