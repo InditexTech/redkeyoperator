@@ -13,6 +13,8 @@ import (
 
 	redisv1 "github.com/inditextech/redisoperator/api/v1"
 	redis "github.com/inditextech/redisoperator/internal/redis"
+	"github.com/inditextech/redisoperator/internal/robin"
+	"gopkg.in/yaml.v3"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -23,7 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (r *RedisClusterReconciler) checkAndCreateRobin(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) {
+func (r *RedisClusterReconciler) checkAndCreateRobin(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) error {
 	// Populate robin spec if not provided. This to handle the case where the user removes the robin spec of an existing cluster. The robin objects will be deleted.
 	if redisCluster.Spec.Robin == nil {
 		redisCluster.Spec.Robin = &redisv1.RobinSpec{
@@ -33,20 +35,24 @@ func (r *RedisClusterReconciler) checkAndCreateRobin(ctx context.Context, req ct
 	}
 
 	// Robin configmap
-	r.handleRobinConfig(ctx, req, redisCluster)
+	if err := r.handleRobinConfig(ctx, req, redisCluster); err != nil {
+		return err
+	}
 
 	// Robin deployment
 	r.handleRobinDeployment(ctx, req, redisCluster)
+
+	return nil
 }
 
-func (r *RedisClusterReconciler) handleRobinConfig(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) {
+func (r *RedisClusterReconciler) handleRobinConfig(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) error {
 	// Get robin configmap
-	configmap, err := r.FindExistingConfigMapFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}})
+	existingConfigMap, err := r.FindExistingConfigMapFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}})
 
 	// Robin configmap not provided: delete configmap if exists
 	if redisCluster.Spec.Robin.Config == nil {
-		r.deleteRobinObject(ctx, configmap, redisCluster, "configmap")
-		return
+		r.deleteRobinObject(ctx, existingConfigMap, redisCluster, "configmap")
+		return nil
 	}
 
 	// Robin configmap not found: create configmap
@@ -54,25 +60,33 @@ func (r *RedisClusterReconciler) handleRobinConfig(ctx context.Context, req ctrl
 		// Return if the error is not a NotFound error
 		if !errors.IsNotFound(err) {
 			r.LogError(redisCluster.NamespacedName(), err, "Getting robin configmap failed")
-			return
+			return nil
 		}
 
 		// Create Robin ConfigMap
-		robinCM := r.createRobinConfigMap(req, redisCluster.Spec, *redisCluster.Spec.Labels)
-		r.createRobinObject(ctx, robinCM, redisCluster, "configmap")
-		return
+		newConfigMap := r.createRobinConfigMap(req, redisCluster.Spec, *redisCluster.Spec.Labels)
+		r.createRobinObject(ctx, newConfigMap, redisCluster, "configmap")
+		return nil
 	}
 
-	// AMZ status updates force to rewrite config
-
 	// Robin configmap found: check if it needs to be updated
-	if *redisCluster.Spec.Robin.Config == configmap.Data["application-configmap.yml"] {
-		return
+	var existingConfig, declaredConfig robin.Configuration
+	if err := yaml.Unmarshal([]byte(existingConfigMap.Data["application-configmap.yml"]), &existingConfig); err != nil {
+		r.LogError(redisCluster.NamespacedName(), err, "Error parsing existing Robin configuration")
+		return err
+	}
+	if err := yaml.Unmarshal([]byte(*redisCluster.Spec.Robin.Config), &declaredConfig); err != nil {
+		r.LogError(redisCluster.NamespacedName(), err, "Error parsing declared Robin configuration")
+		return err
+	}
+
+	if robin.CompareConfigurations(&declaredConfig, &existingConfig) {
+		return nil
 	}
 
 	// Robin configmap changed: update configmap
-	configmap.Data["application-configmap.yml"] = *redisCluster.Spec.Robin.Config
-	r.updateRobinObject(ctx, configmap, redisCluster, "configmap")
+	existingConfigMap.Data["application-configmap.yml"] = *redisCluster.Spec.Robin.Config
+	r.updateRobinObject(ctx, existingConfigMap, redisCluster, "configmap")
 
 	// Add checksum to the deployment annotations to force the deployment rollout
 	if redisCluster.Spec.Robin.Template != nil {
@@ -81,6 +95,8 @@ func (r *RedisClusterReconciler) handleRobinConfig(ctx context.Context, req ctrl
 		}
 		redisCluster.Spec.Robin.Template.Annotations["checksum/config"] = fmt.Sprintf("%x", md5.Sum([]byte(*redisCluster.Spec.Robin.Config)))
 	}
+
+	return nil
 }
 
 func (r *RedisClusterReconciler) handleRobinDeployment(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) {

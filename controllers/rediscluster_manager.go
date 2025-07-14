@@ -17,7 +17,6 @@ import (
 	finalizer "github.com/inditextech/redisoperator/internal/finalizers"
 	"github.com/inditextech/redisoperator/internal/kubernetes"
 	redis "github.com/inditextech/redisoperator/internal/redis"
-	"github.com/inditextech/redisoperator/internal/robin"
 	"github.com/inditextech/redisoperator/internal/utils"
 
 	"k8s.io/apimachinery/pkg/labels"
@@ -1081,7 +1080,7 @@ func (r *RedisClusterReconciler) updateClusterStatus(ctx context.Context, redisC
 		// time to be ready to accept API requests.
 		if redisCluster.Status.Status != redisv1.StatusInitializing {
 			logger := r.GetHelperLogger(redisCluster.NamespacedName())
-			robin, err := robin.GetRobin(ctx, r.Client, redisCluster, logger)
+			robin, err := kubernetes.GetRobin(ctx, r.Client, redisCluster, logger)
 			if err != nil {
 				r.LogError(redisCluster.NamespacedName(), err, "Error getting Robin to update the status")
 				return err

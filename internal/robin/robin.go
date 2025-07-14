@@ -6,21 +6,17 @@ package robin
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"reflect"
 	"strconv"
+	"time"
 
 	"github.com/go-logr/logr"
-	redisv1 "github.com/inditextech/redisoperator/api/v1"
-	"github.com/inditextech/redisoperator/internal/common"
-	"github.com/inditextech/redisoperator/internal/kubernetes"
-	"github.com/inditextech/redisoperator/internal/redis"
+
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -36,43 +32,49 @@ const (
 	Port               = 8080
 )
 
-type Robin struct {
-	pod    *corev1.Pod
-	logger logr.Logger
+// Configuration is the top-level configuration struct.
+type Configuration struct {
+	Metadata map[string]string `yaml:"metadata"`
+	Redis    RedisConfig       `yaml:"redis"`
 }
 
-// Gets Robin initialized with the existing pod.
-func GetRobin(ctx context.Context, client ctrlClient.Client, redisCluster *redisv1.RedisCluster, logger logr.Logger) (Robin, error) {
-	componentLabel := kubernetes.GetStatefulSetSelectorLabel(ctx, client, redisCluster)
-	labelSelector := labels.SelectorFromSet(
-		map[string]string{
-			redis.RedisClusterLabel: redisCluster.Name,
-			componentLabel:          common.ComponentLabelRobin,
-		},
-	)
+// RedisConfig groups all Redis related configuration.
+type RedisConfig struct {
+	Standalone bool                  `yaml:"standalone"`
+	Reconciler RedisReconcilerConfig `yaml:"reconciler"`
+	Cluster    RedisClusterConfig    `yaml:"cluster"`
+	Metrics    RedisMetricsConfig    `yaml:"metrics"`
+}
 
-	robin := Robin{}
-	robin.logger = logger
+// RedisOperatorConfig holds operator-level Redis configuration.
+type RedisReconcilerConfig struct {
+	IntervalSeconds                 int `yaml:"interval_seconds"`
+	OperationCleanupIntervalSeconds int `yaml:"operation_cleanup_interval_seconds"`
+}
 
-	pods := &corev1.PodList{}
-	err := client.List(ctx, pods, &ctrlClient.ListOptions{
-		Namespace:     redisCluster.Namespace,
-		LabelSelector: labelSelector,
-	})
-	if err != nil {
-		return robin, err
-	}
+// RedisClusterConfig holds cluster-level Redis configuration.
+type RedisClusterConfig struct {
+	Namespace                string        `yaml:"namespace"`
+	Name                     string        `yaml:"name"`
+	Replicas                 int           `yaml:"replicas"`
+	ReplicasPerMaster        int           `yaml:"replicas_per_master"`
+	Status                   string        `yaml:"status"`
+	Ephemeral                bool          `yaml:"ephemeral"`
+	HealthProbePeriodSeconds int           `yaml:"health_probe_interval_seconds"`
+	HealingTimeSeconds       int           `yaml:"healing_time_seconds"`
+	MaxRetries               int           `yaml:"max_retries"`
+	BackOff                  time.Duration `yaml:"back_off"`
+}
 
-	switch len(pods.Items) {
-	case 1:
-		robin.pod = pods.Items[0].DeepCopy()
-	case 0:
-		return robin, fmt.Errorf("robin pod not found")
-	default:
-		return robin, fmt.Errorf("more than one Robin pods where found, which is not allowed")
-	}
+// RedisMetricsConfig holds metrics-related Redis configuration.
+type RedisMetricsConfig struct {
+	IntervalSeconds int      `yaml:"interval_seconds"`
+	RedisInfoKeys   []string `yaml:"redis_info_keys"`
+}
 
-	return robin, nil
+type Robin struct {
+	Pod    *corev1.Pod
+	Logger logr.Logger
 }
 
 func (r *Robin) GetStatus() (string, error) {
@@ -81,7 +83,7 @@ func (r *Robin) GetStatus() (string, error) {
 
 func (r *Robin) SetStatus(status string) error {
 	// set Robin status
-	url := "http://" + r.pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/rediscluster/status"
+	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/rediscluster/status"
 	payload, err := json.Marshal(map[string]any{
 		"status": status,
 	})
@@ -93,7 +95,7 @@ func (r *Robin) SetStatus(status string) error {
 	if err != nil {
 		return fmt.Errorf("setting Robin status: %w", err)
 	}
-	r.logger.Info("Robin status updated", "status", status, "response body", string(body))
+	r.Logger.Info("Robin status updated", "status", status, "response body", string(body))
 
 	return nil
 }
@@ -143,4 +145,12 @@ func doPut(url string, payload []byte) ([]byte, error) {
 		return nil, err
 	}
 	return body, nil
+}
+
+// Compares two configurations, excluding `Redis.Cluster.Status` value.
+func CompareConfigurations(a, b *Configuration) bool {
+	a2 := new(Configuration)
+	*a2 = *a
+	a2.Redis.Cluster.Status = b.Redis.Cluster.Status
+	return reflect.DeepEqual(a2, b)
 }
