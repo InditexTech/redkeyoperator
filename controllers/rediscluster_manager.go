@@ -361,34 +361,9 @@ func (r *RedisClusterReconciler) reconcileStatusConfiguring(ctx context.Context,
 func (r *RedisClusterReconciler) reconcileStatusReady(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, time.Duration) {
 	var requeue = true
 	var requeueAfter time.Duration = READY_REQUEUE_TIMEOUT
-	podsReady, err := r.AllPodsReady(ctx, redisCluster)
-	if err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Could not check ready pods")
-	}
-	if podsReady {
-		clusterNodes, err := r.getClusterNodes(ctx, redisCluster)
-		if err != nil {
-			r.LogError(redisCluster.NamespacedName(), err, "Could not get cluster nodes")
-			return requeue, requeueAfter
-		}
-		// Free cluster nodes to avoid memory consumption
-		defer r.freeClusterNodes(clusterNodes, redisCluster.NamespacedName())
-
-		requeueAfter = READY_REQUEUE_TIMEOUT
-		logger := r.GetHelperLogger(redisCluster.NamespacedName())
-		err = clusterNodes.EnsureClusterRatio(ctx, redisCluster, logger)
-		if err != nil {
-			r.LogError(redisCluster.NamespacedName(), err, "Could not assign missing slots")
-		}
-		// We want to check if any slots are missing
-		err = r.AssignMissingSlots(ctx, redisCluster)
-		if err != nil {
-			r.LogError(redisCluster.NamespacedName(), err, "Could not assign missing slots")
-		}
-	}
 
 	// Reconcile PDB
-	err = r.checkAndUpdatePodDisruptionBudget(ctx, redisCluster)
+	err := r.checkAndUpdatePodDisruptionBudget(ctx, redisCluster)
 	if err != nil {
 		r.LogError(redisCluster.NamespacedName(), err, "Error checking PDB changes")
 	}
