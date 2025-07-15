@@ -46,19 +46,22 @@ import (
 //   - Scaling up when in StatusScalingUp status goes wrong.
 //   - Scaling down when in StatusScalingDown status goes wrong.
 //     The operator tries to recover the cluster from error checking the configuration and/or scaling the cluster.
-var StatusUpgrading = "Upgrading"
-var StatusScalingDown = "ScalingDown"
-var StatusScalingUp = "ScalingUp"
+const (
+	StatusUpgrading    = "Upgrading"
+	StatusScalingDown  = "ScalingDown"
+	StatusScalingUp    = "ScalingUp"
+	StatusReady        = "Ready"
+	StatusConfiguring  = "Configuring"
+	StatusInitializing = "Initializing"
+	StatusError        = "Error"
 
-var StatusReady = "Ready"
-var StatusConfiguring = "Configuring"
-var StatusInitializing = "Initializing"
-var StatusError = "Error"
+	SubstatusFastUpgrading         = "FastUpgrading"
+	SubstatusFastUpgradeFinalizing = "FastUpgradeFinalizing"
+	SubstatusSlowUpgrading         = "SlowUpgrading"
 
-var SubstatusFastUpgrading = "FastUpgrading"
-var SubstatusScalingUp = "ScalingUp"
-var SubstatusSlowUpgrading = "SlowUpgrading"
-var SubstatusScalingDown = "ScalingDown"
+	SubstatusScalingUp   = "ScalingUp"
+	SubstatusScalingDown = "ScalingDown"
+)
 
 var ConditionUpgrading = metav1.Condition{
 	Type:               "Upgrading",
