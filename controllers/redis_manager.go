@@ -13,7 +13,6 @@ import (
 	"maps"
 	"math"
 	"reflect"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,16 +21,15 @@ import (
 	redisv1 "github.com/inditextech/redisoperator/api/v1"
 	"github.com/inditextech/redisoperator/internal/kubernetes"
 	redis "github.com/inditextech/redisoperator/internal/redis"
+	"github.com/inditextech/redisoperator/internal/robin"
 	"github.com/inditextech/redisoperator/internal/utils"
 
 	"github.com/go-logr/logr"
 	errors2 "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 
 	redisclient "github.com/redis/go-redis/v9"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
@@ -45,209 +43,45 @@ const (
 	ConfigChecksumAnnotation = "inditex.dev/redis-conf"
 )
 
-func (r *RedisClusterReconciler) updateScalingStatus(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
-	sset, ssetErr := r.FindExistingStatefulSet(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name, Namespace: redisCluster.Namespace}})
-	if ssetErr != nil {
-		return ssetErr
-	}
-	currSsetReplicas := *(sset.Spec.Replicas)
-	realExpectedReplicas := int32(redisCluster.NodesNeeded())
-
-	logger := r.getHelperLogger(redisCluster.NamespacedName())
-
-	if realExpectedReplicas < currSsetReplicas {
-		redisCluster.Status.Status = redisv1.StatusScalingDown
-		setConditionFalse(logger, redisCluster, redisv1.ConditionScalingUp)
-		r.setConditionTrue(redisCluster, redisv1.ConditionScalingDown, fmt.Sprintf("Scaling down from %d to %d nodes", currSsetReplicas, redisCluster.Spec.Replicas))
-	}
-	if realExpectedReplicas > currSsetReplicas {
-		redisCluster.Status.Status = redisv1.StatusScalingUp
-		r.setConditionTrue(redisCluster, redisv1.ConditionScalingUp, fmt.Sprintf("Scaling up from %d to %d nodes", currSsetReplicas, redisCluster.Spec.Replicas))
-		setConditionFalse(logger, redisCluster, redisv1.ConditionScalingDown)
-	}
-	if realExpectedReplicas == currSsetReplicas {
-		if redisCluster.Status.Status == redisv1.StatusScalingDown {
-			redisCluster.Status.Status = redisv1.StatusReady
-			setConditionFalse(logger, redisCluster, redisv1.ConditionScalingDown)
-		}
-		if redisCluster.Status.Status == redisv1.StatusScalingUp {
-			if len(redisCluster.Status.Nodes) == int(currSsetReplicas) {
-				redisCluster.Status.Status = redisv1.StatusReady
-				setConditionFalse(logger, redisCluster, redisv1.ConditionScalingUp)
-			}
-		}
-	}
-
-	// initialize scaling up and down conditions if they haven't been set yet
-	c := meta.FindStatusCondition(redisCluster.Status.Conditions, redisv1.StatusScalingDown)
-	if c == nil {
-		setConditionFalse(logger, redisCluster, redisv1.ConditionScalingDown)
-	}
-
-	c = meta.FindStatusCondition(redisCluster.Status.Conditions, redisv1.StatusScalingUp)
-	if c == nil {
-		setConditionFalse(logger, redisCluster, redisv1.ConditionScalingUp)
-	}
-
-	return nil
-}
-
-func (r *RedisClusterReconciler) updateUpgradingStatus(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
-	req := ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name, Namespace: redisCluster.Namespace}}
-	statefulSet, err := r.FindExistingStatefulSet(ctx, req)
+// Redis cluster is set to 0 replicas
+//
+//	 -> terminate all cluster pods (StatefulSet replicas set to 0)
+//	 -> terminate robin pod (Deployment replicas set to 0)
+//	 -> delete pdb
+//	 -> Redis cluster status set to 'Ready'
+//		-> All conditions set to false
+func (r *RedisClusterReconciler) clusterScaledToZeroReplicas(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
+	r.logInfo(redisCluster.NamespacedName(), "Cluster spec replicas is set to 0", "SpecReplicas", redisCluster.Spec.Replicas)
+	sset, err := r.FindExistingStatefulSet(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name, Namespace: redisCluster.Namespace}})
 	if err != nil {
-		return err
+		r.logError(redisCluster.NamespacedName(), err, "Cannot find exists statefulset maybe is deleted.")
 	}
-
-	// Handle changes in spec.override
-	_, changed := r.overrideStatefulSet(req, redisCluster, statefulSet)
-
-	if changed {
-		r.logInfo(redisCluster.NamespacedName(), "Cluster Upgrade Issued", "reason", "Override changed")
-		redisCluster.Status.Status = redisv1.StatusUpgrading
-		r.setConditionTrue(redisCluster, redisv1.ConditionUpgrading, "Override changed")
-		return nil
-	}
-
-	ns := redisCluster.NamespacedName()
-
-	configMap, err := r.FindExistingConfigMapFunc(ctx, ctrl.Request{NamespacedName: ns})
-	if err != nil {
-		return err
-	}
-
-	if !reflect.DeepEqual(statefulSet.Spec.UpdateStrategy, v1.StatefulSetUpdateStrategy{}) {
-		// An UpdateStrategy is already set.
-		// We can reuse the partition as the starting partition
-		// We should only do this for partitions higher than zero,
-		// as we cannot unset the partition after an upgrade, and the default will be zero.
-		//
-		// So 0 partition will trigger a bad thing, where the whole cluster will be immediately applied,
-		// and all pods destroyed simultaneously.
-		// We need to only set the starting partition if it is higher than 0,
-		// otherwise use the replica count one from before.
-		if int(*(statefulSet.Spec.UpdateStrategy.RollingUpdate.Partition)) > 0 {
-			r.logInfo(redisCluster.NamespacedName(), "Cluster Upgrade Issued", "reason", "Previous upgrade not complete")
-			redisCluster.Status.Status = redisv1.StatusUpgrading
-			return nil
+	if sset != nil {
+		if *(sset.Spec.Replicas) != 0 {
+			r.logInfo(redisCluster.NamespacedName(), "Cluster scaled to 0 replicas")
+			r.Recorder.Event(redisCluster, "Normal", "RedisClusterScaledToZero", fmt.Sprintf("Scaling down from %d to 0", *(sset.Spec.Replicas)))
 		}
-	}
-
-	if redisCluster.Spec.Labels != nil {
-		// get the actual value of labels configured in the redisCluster object
-		desiredLabels := make(map[string]string)
-		maps.Copy(desiredLabels, *redisCluster.Spec.Labels)
-
-		// Add labels from override
-		if redisCluster.Spec.Override != nil && redisCluster.Spec.Override.StatefulSet != nil && redisCluster.Spec.Override.StatefulSet.Spec.Template.Labels != nil {
-			for k2, v2 := range redisCluster.Spec.Override.StatefulSet.Spec.Template.Labels {
-				desiredLabels[k2] = v2
-			}
+		*sset.Spec.Replicas = 0
+		sset, err = r.UpdateStatefulSet(ctx, sset, redisCluster)
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Failed to update StatefulSet")
 		}
-
-		r.logInfo(redisCluster.NamespacedName(), "Expected real labels configured in RedisCluster object", "Spec.Labels", desiredLabels)
-
-		// get the current value of labels configured in the statefulset object
-		observedLabels := statefulSet.Spec.Template.Labels
-		r.logInfo(redisCluster.NamespacedName(), "Current statefulset configuration", "Spec.Template.Labels", observedLabels)
-
-		// Validate if were added new labels
-		for key, value := range desiredLabels {
-			// check if key exists in the map element
-			// and get the value from spec template statefulset
-			val, exists := statefulSet.Spec.Template.Labels[key]
-			if !exists {
-				r.logInfo(redisCluster.NamespacedName(), "Cluster Upgrade Issued", "reason", "Redis Labels Changed", "observed", observedLabels, "desired", desiredLabels)
-				redisCluster.Status.Status = redisv1.StatusUpgrading
-				r.setConditionTrue(redisCluster, redisv1.ConditionUpgrading, "Redis Labels Changed")
-				return nil
-			} else {
-				if value != val {
-					r.logInfo(redisCluster.NamespacedName(), "Cluster Upgrade Issued", "reason", "Redis Labels Changed", "observed", observedLabels, "desired", desiredLabels)
-					redisCluster.Status.Status = redisv1.StatusUpgrading
-					r.setConditionTrue(redisCluster, redisv1.ConditionUpgrading, "Redis Labels Changed")
-					return nil
-				}
-			}
-		}
-
-		defaultLabels := map[string]string{
-			redis.RedisClusterLabel:                     redisCluster.Name,
-			r.getStatefulSetSelectorLabel(redisCluster): "redis",
-		}
-
-		// add defaultLabels
-		maps.Copy(desiredLabels, defaultLabels)
-
-		// Validate if  were deleted existing labels
-		for key := range observedLabels {
-			// check if key exists in the map element
-			// and get the value from spec template statefulset
-			_, exists := desiredLabels[key]
-
-			if !exists {
-				r.logInfo(redisCluster.NamespacedName(), "Cluster Upgrade Issued", "reason", "Redis Labels Changed", "observed", observedLabels, "desired", desiredLabels)
-				redisCluster.Status.Status = redisv1.StatusUpgrading
-				r.setConditionTrue(redisCluster, redisv1.ConditionUpgrading, "Redis Labels Changed")
-				return nil
-			}
-		}
+		r.logInfo(redisCluster.NamespacedName(), "StatefulSet updated", "Replicas", sset.Spec.Replicas)
 	}
 
-	// Check whether the redis configuration has changed,
-	// as this will constitute a cluster upgrade
-	configChanged, reason := r.isConfigChanged(redisCluster, statefulSet, configMap)
-	if configChanged {
-		r.logInfo(redisCluster.NamespacedName(), "Cluster Upgrade Issued", "reason", reason)
-		redisCluster.Status.Status = redisv1.StatusUpgrading
-		r.setConditionTrue(redisCluster, redisv1.ConditionUpgrading, "Configuration in redis.conf is being updated")
-		return nil
+	r.scaleDownRobin(ctx, redisCluster)
+
+	r.deletePodDisruptionBudget(ctx, redisCluster)
+
+	// All conditions set to false. Status set to Ready.
+	var update_err error
+	if !reflect.DeepEqual(redisCluster.Status, redisv1.StatusReady) {
+		redisCluster.Status.Status = redisv1.StatusReady
+		setAllConditionsFalse(r.getHelperLogger(redisCluster.NamespacedName()), redisCluster)
+		update_err = r.updateClusterStatus(ctx, redisCluster)
 	}
 
-	if redisCluster.Spec.Resources != nil {
-		// Check whether any upgradeable object changes have been made.
-		// Any change in these attributes or properties will constitute a live upgrade.
-		desiredResources := *(redisCluster.Spec.Resources)
-		observedResources := statefulSet.Spec.Template.Spec.Containers[0].Resources
-
-		// We need to individually compare the resources we care about,
-		// as DeepEqual gets it wrong for CPU quantities
-		if !reflect.DeepEqual(observedResources.Limits.Cpu().String(), desiredResources.Limits.Cpu().String()) ||
-			!reflect.DeepEqual(observedResources.Limits.Memory().String(), desiredResources.Limits.Memory().String()) ||
-			!reflect.DeepEqual(observedResources.Requests.Cpu().String(), desiredResources.Requests.Cpu().String()) ||
-			!reflect.DeepEqual(observedResources.Requests.Memory().String(), desiredResources.Requests.Memory().String()) {
-			r.logInfo(redisCluster.NamespacedName(), "Cluster Upgrade Issued", "reason", "Redis Resource Requests & Limits Changed", "observed", observedResources, "desired", desiredResources)
-
-			redisCluster.Status.Status = redisv1.StatusUpgrading
-
-			r.setConditionTrue(redisCluster, redisv1.ConditionUpgrading, "Redis Resource Requests & Limits Changed")
-
-			return nil
-		}
-	}
-
-	// Check whether any upgradeable object changes have been made.
-	// Any change in these attributes or properties will constitute a live upgrade.
-	desiredImage := redisCluster.Spec.Image
-	observedImage := statefulSet.Spec.Template.Spec.Containers[0].Image
-	if observedImage != desiredImage {
-		r.logInfo(redisCluster.NamespacedName(), "Cluster Upgrade Issued", "reason", "Redis Image Changed", "observed", observedImage, "desired", desiredImage)
-		redisCluster.Status.Status = redisv1.StatusUpgrading
-
-		r.setConditionTrue(redisCluster, redisv1.ConditionUpgrading, fmt.Sprintf("Redis Image Changed: observed %s desired %s", observedImage, desiredImage))
-
-		return nil
-	}
-
-	redisCluster.Status.Status = redisv1.StatusReady
-	redisCluster.Status.Substatus.Status = ""
-
-	c := meta.FindStatusCondition(redisCluster.Status.Conditions, redisv1.StatusUpgrading)
-	if c != nil && c.Status == metav1.ConditionTrue {
-		setConditionFalse(r.getHelperLogger(redisCluster.NamespacedName()), redisCluster, redisv1.ConditionUpgrading)
-	}
-
-	return nil
+	return update_err
 }
 
 func (r *RedisClusterReconciler) upgradeCluster(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
@@ -266,22 +100,22 @@ func (r *RedisClusterReconciler) upgradeCluster(ctx context.Context, redisCluste
 // If PurgeKeysOnRebalance flag is active and Redis cluster is not configures as master-replica we can
 // do a Fast Upgrade, applying the changes to the StatefulSet and recreaing it. Slots move will be avoided.
 func (r *RedisClusterReconciler) doFastUpgrade(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, error) {
-	req := ctrl.Request{
-		NamespacedName: types.NamespacedName{
-			Name:      redisCluster.Name,
-			Namespace: redisCluster.Namespace,
-		},
-	}
-
-	existingStatefulSet, err := r.FindExistingStatefulSet(ctx, req)
-	if err != nil {
-		return false, err
-	}
-	logger := r.getHelperLogger(redisCluster.NamespacedName())
-
-	// Already Fast upgrading. Check if still in progress or rebuild the cluster if finished.
-	if redisCluster.Status.Substatus.Status == redisv1.SubstatusFastUpgrading {
+	switch redisCluster.Status.Substatus.Status {
+	case redisv1.SubstatusFastUpgrading:
+		// Already Fast upgrading. Check if the node pods are ready to start rebuilding the cluster.
 		r.logInfo(redisCluster.NamespacedName(), "Retaking Fast Upgrade")
+
+		req := ctrl.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      redisCluster.Name,
+				Namespace: redisCluster.Namespace,
+			},
+		}
+		existingStatefulSet, err := r.FindExistingStatefulSet(ctx, req)
+		if err != nil {
+			return false, err
+		}
+		logger := r.getHelperLogger(redisCluster.NamespacedName())
 
 		podsReady, err := r.allPodsReady(ctx, redisCluster)
 		if err != nil {
@@ -294,9 +128,41 @@ func (r *RedisClusterReconciler) doFastUpgrade(ctx context.Context, redisCluster
 		}
 
 		// Rebuild the cluster
-		err = r.fastUpgradeRebuildCluster(ctx, redisCluster, logger)
+		robin, err := robin.NewRobin(ctx, r.Client, redisCluster, logger)
 		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error getting Robin to check its readiness")
 			return true, err
+		}
+		err = robin.ClusterFix()
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error performing a cluster fix through Robin")
+			return true, err
+		}
+
+		err = r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusFastUpgradeFinalizing, 0)
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error updating substatus")
+			return true, err
+		}
+
+		return true, nil
+
+	case redisv1.SubstatusFastUpgradeFinalizing:
+		// Rebuilding the cluster after recreating all node pods. Check if the cluster is ready to end the Fast upgrade.
+		logger := r.getHelperLogger(redisCluster.NamespacedName())
+		robin, err := robin.NewRobin(ctx, r.Client, redisCluster, logger)
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error getting Robin to check its readiness")
+			return true, err
+		}
+		check, errors, warnings, err := robin.ClusterCheck()
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error checking the cluster readiness over Robin")
+			return true, err
+		}
+		if !check {
+			r.logInfo(redisCluster.NamespacedName(), "Waiting for Redis cluster readiness before ending the fast upgrade", "errors", errors, "warnings", warnings)
+			return true, nil
 		}
 
 		// The cluster is now upgraded, and we can set the Cluster Status as Ready again and remove the Substatus.
@@ -305,30 +171,30 @@ func (r *RedisClusterReconciler) doFastUpgrade(ctx context.Context, redisCluster
 		setConditionFalse(logger, redisCluster, redisv1.ConditionUpgrading)
 
 		return true, nil
-	}
+	default:
+		// Fast upgrade start: If purgeKeysOnRebalance property is set to 'true' and we have no replicas. No need to iterate over the partitions.
+		// If fast upgrade is not allowed but we have no replicas, the cluster must be scaled up adding one extra
+		// node to be able to move slots and keys in order to ensure keys are preserved.
+		if redisCluster.Spec.PurgeKeysOnRebalance && redisCluster.Spec.ReplicasPerMaster == 0 {
+			r.logInfo(redisCluster.NamespacedName(), "Fast upgrade will be performed")
 
-	// Fast upgrade: If purgeKeysOnRebalance property is set to 'true' and we have no replicas. No need to iterate over the partitions.
-	// If fast upgrade is not allowed but we have no replicas, the cluster must be scaled up adding one extra
-	// node to be able to move slots and keys in order to ensure keys are preserved.
-	if redisCluster.Spec.PurgeKeysOnRebalance && redisCluster.Spec.ReplicasPerMaster == 0 && redisCluster.Status.Substatus.Status != redisv1.SubstatusFastUpgrading {
-		r.logInfo(redisCluster.NamespacedName(), "Fast upgrade will be performed")
+			err := r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusFastUpgrading, 0)
+			if err != nil {
+				r.logError(redisCluster.NamespacedName(), err, "Error updating substatus")
+				return true, err
+			}
 
-		err := r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusFastUpgrading, 0)
-		if err != nil {
-			r.logError(redisCluster.NamespacedName(), err, "Error updating substatus")
-			return true, err
+			// Update configuration: changes in configuration, labels and overrides are persisted before upgrading
+			existingStatefulSet, err := r.upgradeClusterConfigurationUpdate(ctx, redisCluster)
+			if err != nil {
+				return true, err
+			}
+
+			// ** FAST UPGRADE start **
+			r.Client.Delete(ctx, existingStatefulSet)
+
+			return true, nil
 		}
-
-		// Update configuration
-		existingStatefulSet, err = r.upgradeClusterConfigurationUpdate(ctx, redisCluster)
-		if err != nil {
-			return true, err
-		}
-
-		// ** FAST UPGRADE **
-		r.Client.Delete(ctx, existingStatefulSet)
-
-		return true, nil
 	}
 
 	return false, nil
@@ -580,39 +446,6 @@ func (r *RedisClusterReconciler) upgradeClusterConfigurationUpdate(ctx context.C
 	existingStatefulSet, _ = r.overrideStatefulSet(req, redisCluster, existingStatefulSet)
 
 	return existingStatefulSet, nil
-}
-
-func (r *RedisClusterReconciler) fastUpgradeRebuildCluster(ctx context.Context, redisCluster *redisv1.RedisCluster, logger logr.Logger) error {
-	clusterNodes, err := r.getClusterNodes(ctx, redisCluster)
-	if err != nil {
-		r.logError(redisCluster.NamespacedName(), err, "Could not get cluster nodes")
-		return err
-	}
-	// Free cluster nodes to avoid memory consumption
-	defer r.freeClusterNodes(clusterNodes, redisCluster.NamespacedName())
-
-	err = clusterNodes.ClusterMeet(ctx)
-	if err != nil {
-		return err
-	}
-
-	err = clusterNodes.EnsureClusterRatio(ctx, redisCluster, logger)
-	if err != nil {
-		return err
-	}
-
-	// We want to check if any slots are missing
-	err = r.AssignMissingSlots(ctx, redisCluster)
-	if err != nil {
-		return err
-	}
-
-	err = clusterNodes.EnsureClusterSlotsStable(ctx, logger)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (r *RedisClusterReconciler) UpgradePartition(ctx context.Context, redisCluster *redisv1.RedisCluster, existingStateFulSet *v1.StatefulSet, partition int, logger logr.Logger) error {
@@ -1631,15 +1464,6 @@ func makeRange(min int, max int) []int {
 	return a
 }
 
-func makeRangeMap(min int, max int) map[int]struct{} {
-	result := map[int]struct{}{}
-	a := make([]int, max-min+1)
-	for i := range a {
-		result[min+i] = struct{}{}
-	}
-	return result
-}
-
 func calculateRCConfigChecksum(redisCluster *redisv1.RedisCluster) string {
 	hash := md5.Sum([]byte(redisCluster.Spec.Config))
 	return hex.EncodeToString(hash[:])
@@ -1708,157 +1532,6 @@ func (r *RedisClusterReconciler) getClusterNodes(ctx context.Context, redisClust
 func (r *RedisClusterReconciler) freeClusterNodes(clusterNodes kubernetes.ClusterNodeList, RCNamespacedName types.NamespacedName) {
 	for i := range clusterNodes.Nodes {
 		err := kubernetes.FreeKubernetesClusterNode(clusterNodes.Nodes[i])
-		if err != nil {
-			// Log error and keep trying with the other nodes
-			r.logError(RCNamespacedName, err, "Error releasing cluster node")
-		}
-	}
-}
-
-func (r *RedisClusterReconciler) AssignMissingSlots(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
-
-	// First we need to get all the nodes
-	// Then calculate which slots are assigned
-	// We then need to subtract this from all the slots.
-	// Then we need to loop over the unassigned slots,
-	// and add them to the nodes with the least amount of assigned slots
-
-	nodes, err := r.GetReadyNodes(ctx, redisCluster)
-	if err != nil {
-		return err
-	}
-
-	unassignedSlots := makeRangeMap(0, 16383)
-
-	clusterNodes := map[string]*redis.ClusterNode{}
-	defer r.releaseClusterNodes(clusterNodes, redisCluster.NamespacedName())
-	for nodeId, node := range nodes {
-		clusterNode, err := redis.NewClusterNode(fmt.Sprintf("%s:%d", node.IP, redis.RedisCommPort))
-		if err != nil {
-			r.logError(redisCluster.NamespacedName(), err, "Failed to connect Cluster Node Info", "IP", node.IP)
-			return err
-		}
-		err = clusterNode.LoadInfo(true)
-		if err != nil {
-			return err
-		}
-		clusterNodes[nodeId] = clusterNode
-
-		for _, slot := range clusterNode.Slots() {
-			// We want to remove any assigned slots from our list so we end up with unassigned slots
-			delete(unassignedSlots, slot)
-		}
-	}
-	var masterLen int
-	for _, v := range clusterNodes {
-		if v.HasFlag("master") {
-			masterLen++
-		}
-	}
-
-	slotsPerNode := kubernetes.CalculateMaxSlotsPerMaster(kubernetes.RedisClusterTotalSlots, masterLen)
-
-	// We look for the slots to be assigned:
-	// - Slots not already assigned to master nodes
-	// - Keeping the slots not assigned but known by friends to treat them separately.
-	//   Trying to assign these slots would end in a busy slot error.
-	var slotsToAssign []int
-	slotsKnown := make(map[string][]int)
-	for slot := range unassignedSlots {
-		slotKnown, nodeId := isSlotKnownByFriends(clusterNodes, slot)
-		if slotKnown {
-			slotsKnown[nodeId] = append(slotsKnown[nodeId], slot)
-		}
-		slotsToAssign = append(slotsToAssign, slot)
-	}
-	sort.Ints(slotsToAssign)
-
-	// First, we delete all not assigned to master nodes slots known by their friends
-	// to be able to assign them in the next step without errors.
-	for _, node := range clusterNodes {
-		if node.HasFlag("master") {
-			slots, ok := slotsKnown[node.Info().NodeID()]
-			if ok {
-				err := clusterDelSlots(node, slots)
-				if err != nil {
-					return err
-				}
-			}
-		}
-	}
-
-	for _, node := range clusterNodes {
-		if node.HasFlag("master") {
-			slotAmountToAssign := slotsPerNode - len(node.Slots())
-			if slotAmountToAssign <= 0 {
-				continue
-			}
-			// If the length of slots left is within 3 of the amount needed,
-			// we can assume it's the last or only node left to get slots,
-			// and assign all the remaining slots
-			var slotList []int
-			if len(slotsToAssign) <= (slotAmountToAssign + 15) {
-				slotList = slotsToAssign[0:]
-				slotsToAssign = []int{}
-			} else {
-				slotList = slotsToAssign[0:slotAmountToAssign]
-				slotsToAssign = slotsToAssign[slotAmountToAssign:]
-			}
-
-			err := clusterAddSlots(node, slotList)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
-func clusterDelSlots(node *redis.ClusterNode, slotList []int) error {
-	var strSlotList []interface{}
-	for _, slot := range slotList {
-		strSlotList = append(strSlotList, strconv.Itoa(slot))
-	}
-
-	if len(strSlotList) > 0 {
-		_, err := node.ClusterDelSlots(strSlotList...)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func clusterAddSlots(node *redis.ClusterNode, slotList []int) error {
-	var strSlotList []interface{}
-	for _, slot := range slotList {
-		strSlotList = append(strSlotList, strconv.Itoa(slot))
-	}
-
-	if len(strSlotList) > 0 {
-		_, err := node.ClusterAddSlots(strSlotList...)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func isSlotKnownByFriends(clusterNodes map[string]*redis.ClusterNode, slot int) (bool, string) {
-	for _, node := range clusterNodes {
-		for _, friend := range node.Friends() {
-			if slices.Contains(friend.Slots(), slot) {
-				return true, node.Info().NodeID()
-			}
-		}
-	}
-	return false, ""
-}
-
-func (r *RedisClusterReconciler) releaseClusterNodes(clusterNodes map[string]*redis.ClusterNode, RCNamespacedName types.NamespacedName) {
-	for i := range clusterNodes {
-		err := redis.ReleaseClusterNode(clusterNodes[i])
 		if err != nil {
 			// Log error and keep trying with the other nodes
 			r.logError(RCNamespacedName, err, "Error releasing cluster node")

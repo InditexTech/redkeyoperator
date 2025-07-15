@@ -6,7 +6,6 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"slices"
 	"strings"
@@ -23,7 +22,6 @@ import (
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	pv1 "k8s.io/api/policy/v1"
-	"k8s.io/client-go/util/retry"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 
@@ -31,7 +29,6 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
@@ -127,7 +124,7 @@ func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req
 		return ctrl.Result{}, nil
 	}
 
-	if err = r.updateClusterNodes(ctx, redisCluster); err != nil {
+	if err = r.refreshClusterNodesInfo(ctx, redisCluster); err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Error updating cluster nodes")
 	}
 
@@ -142,111 +139,6 @@ func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req
 		return ctrl.Result{RequeueAfter: time.Second * requeueAfter}, updateErr
 	}
 	return ctrl.Result{}, updateErr
-}
-
-// Checks storage configuration for inconsistencies.
-// If the parameter is set to true if a check fail the function returns issuing log info, generating an event and setting the Redis cluster Status to Error.
-// Returns true if all checks pass or false if any checks fail.
-func (r *RedisClusterReconciler) checkStorageConfigConsistency(ctx context.Context, redisCluster *redisv1.RedisCluster, updateRDCL bool) bool {
-	var stsStorage, stsStorageClassName string
-
-	sts, err := r.FindExistingStatefulSet(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name, Namespace: redisCluster.Namespace}})
-	if err != nil {
-		r.logError(redisCluster.NamespacedName(), err, "Cannot find existing statefulset, maybe it was deleted.")
-		return false
-	}
-	if sts == nil {
-		err = errors.NewNotFound(schema.GroupResource{Group: "", Resource: "Statefulset"}, "StatefulSet not found")
-		r.logError(redisCluster.NamespacedName(), err, "Cannot find existing statefulset, maybe it was deleted.")
-		return false
-	}
-
-	// Get configured Storage and StorageClassName from StatefulSet
-	if len(sts.Spec.VolumeClaimTemplates) > 0 {
-		stsStorage = sts.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests.Storage().String()
-		r.logInfo(redisCluster.NamespacedName(), "Current StatefulSet Storage configuration", "Spec.VolumeClaimTemplates[0].Spec.Resources.Requests.Storage", stsStorage)
-		if sts.Spec.VolumeClaimTemplates[0].Spec.StorageClassName != nil {
-			stsStorageClassName = *sts.Spec.VolumeClaimTemplates[0].Spec.StorageClassName
-			r.logInfo(redisCluster.NamespacedName(), "Currect StatefulSet Storage configuration", "Spec.VolumeClaimTemplates[0].Spec.StorageClassName", stsStorageClassName)
-		} else {
-			r.logInfo(redisCluster.NamespacedName(), "Currect StatefulSet Storage configuration", "Spec.VolumeClaimTemplates[0].Spec.StorageClassName", "Not set")
-		}
-	}
-
-	// Non ephemeral cluster checks:
-	// - Updates to redisCluster.Spec.Storage are not allowed
-	if !redisCluster.Spec.Ephemeral && redisCluster.Spec.Storage != "" && stsStorage != "" && redisCluster.Spec.Storage != stsStorage {
-		err = errors.NewBadRequest("spec: Forbidden: updates to redisCluster.Spec.Storage field are not allowed")
-		r.logError(redisCluster.NamespacedName(), err, "Redis cluster storage configuration updates are forbidden", "STS storage", stsStorage, "RDCL storage", redisCluster.Spec.Storage)
-		if updateRDCL {
-			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
-			redisCluster.Status.Status = redisv1.StatusError
-		}
-		return false
-	}
-	// - Unset redisCluster.Spec.Storage is not allowed
-	if !redisCluster.Spec.Ephemeral && redisCluster.Spec.Storage == "" && stsStorage != "" {
-		err = errors.NewBadRequest("spec: Forbidden: updates to redisCluster.Spec.Storage field are not allowed")
-		r.logError(redisCluster.NamespacedName(), err, "Redis cluster storage configuration updates are forbidden", "STS storage", stsStorage, "RDCL storage", redisCluster.Spec.Storage)
-		if updateRDCL {
-			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
-			redisCluster.Status.Status = redisv1.StatusError
-		}
-		return false
-	}
-	// - Updates to redisCluster.Spec.StorageClassName are not allowed
-	if !redisCluster.Spec.Ephemeral && redisCluster.Spec.StorageClassName != "" && stsStorageClassName != "" && redisCluster.Spec.StorageClassName != stsStorageClassName {
-		err = errors.NewBadRequest("spec: Forbidden: updates to redisCluster.Spec.StorageClassName field are not allowed")
-		r.logError(redisCluster.NamespacedName(), err, "Redis cluster storage configuration updates are forbidden", "STS storageClassName", stsStorageClassName, "RDCL storageClassName", redisCluster.Spec.StorageClassName)
-		if updateRDCL {
-			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
-			redisCluster.Status.Status = redisv1.StatusError
-		}
-		return false
-	}
-	// - Set redisCluster.Spec.StorageClassName is not allowed
-	if !redisCluster.Spec.Ephemeral && redisCluster.Spec.StorageClassName != "" && stsStorageClassName == "" {
-		err = errors.NewBadRequest("spec: Forbidden: updates to redisCluster.Spec.StorageClassName field are not allowed")
-		r.logError(redisCluster.NamespacedName(), err, "Redis cluster storage configuration updates are forbidden", "STS storageClassName", stsStorageClassName, "RDCL storageClassName", redisCluster.Spec.StorageClassName)
-		if updateRDCL {
-			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
-			redisCluster.Status.Status = redisv1.StatusError
-		}
-		return false
-	}
-	// - Unset redisClusterSpec.StorageClassName is not allowed
-	if !redisCluster.Spec.Ephemeral && redisCluster.Spec.StorageClassName == "" && stsStorageClassName != "" {
-		err = errors.NewBadRequest("spec: Forbidden: updates to redisCluster.Spec.StorageClassName field are not allowed")
-		r.logError(redisCluster.NamespacedName(), err, "Redis cluster storage configuration updates are forbidden", "STS stsStorageClassName", stsStorageClassName, "RDCL stsStorageClassName", redisCluster.Spec.StorageClassName)
-		if updateRDCL {
-			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
-			redisCluster.Status.Status = redisv1.StatusError
-		}
-		return false
-	}
-	// - Moving from ephemeral to non ephemeral is not allowed
-	if !redisCluster.Spec.Ephemeral && len(sts.Spec.VolumeClaimTemplates) == 0 {
-		err = errors.NewBadRequest("spec: Error: non ephemeral cluster without VolumeClaimTemplates defined in the StatefulSet")
-		r.logError(redisCluster.NamespacedName(), err, "Redis cluster misconfigured (probably trying to change from ephemeral to non ephemeral)")
-		if updateRDCL {
-			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
-			redisCluster.Status.Status = redisv1.StatusError
-		}
-		return false
-	}
-	// Ephemeral cluster checks:
-	// - Moving from non ephemeral to ephemeral is not allowed
-	if redisCluster.Spec.Ephemeral && len(sts.Spec.VolumeClaimTemplates) > 0 {
-		err = errors.NewBadRequest("spec: Error: ephemeral cluster with VolumeClaimTemplates defined in the StatefulSet")
-		r.logError(redisCluster.NamespacedName(), err, "Redis cluster misconfigured (probably trying to change from non ephemeral to ephemeral)")
-		if updateRDCL {
-			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
-			redisCluster.Status.Status = redisv1.StatusError
-		}
-		return false
-	}
-
-	return true
 }
 
 func (r *RedisClusterReconciler) reconcileStatusNew(redisCluster *redisv1.RedisCluster) (bool, time.Duration) {
@@ -465,7 +357,7 @@ func (r *RedisClusterReconciler) reconcileStatusError(ctx context.Context, redis
 	return requeue, requeueAfter
 }
 
-func (r *RedisClusterReconciler) updateClusterNodes(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
+func (r *RedisClusterReconciler) refreshClusterNodesInfo(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
 
 	// Redis cluster must be in Configuring status (or greater) to be able to query Robin for nodes.
 	if redisCluster.Status.Status == "" || redisCluster.Status.Status == redisv1.StatusInitializing {
@@ -495,128 +387,109 @@ func (r *RedisClusterReconciler) updateClusterNodes(ctx context.Context, redisCl
 	return nil
 }
 
-func (r *RedisClusterReconciler) updateClusterStatus(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
-	var req reconcile.Request
-	req.NamespacedName.Namespace = redisCluster.Namespace
-	req.NamespacedName.Name = redisCluster.Name
+// Checks storage configuration for inconsistencies.
+// If the parameter is set to true if a check fail the function returns issuing log info, generating an event and setting the Redis cluster Status to Error.
+// Returns true if all checks pass or false if any checks fail.
+func (r *RedisClusterReconciler) checkStorageConfigConsistency(ctx context.Context, redisCluster *redisv1.RedisCluster, updateRDCL bool) bool {
+	var stsStorage, stsStorageClassName string
 
-	r.logInfo(redisCluster.NamespacedName(), "New cluster status", "status", redisCluster.Status.Status)
-
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		time.Sleep(time.Second * 1)
-
-		// Update RedisCluster status first
-
-		// get a fresh rediscluster to minimize conflicts
-		refreshedRedisCluster := redisv1.RedisCluster{}
-		err := r.Client.Get(ctx, types.NamespacedName{Namespace: redisCluster.Namespace, Name: redisCluster.Name}, &refreshedRedisCluster)
-		if err != nil {
-			r.logError(redisCluster.NamespacedName(), err, "Error getting a refreshed RedisCluster before updating it. It may have been deleted?")
-			return err
-		}
-		// update the slots
-		refreshedRedisCluster.Status.Nodes = redisCluster.Status.Nodes
-		refreshedRedisCluster.Status.Status = redisCluster.Status.Status
-		refreshedRedisCluster.Status.Conditions = redisCluster.Status.Conditions
-		refreshedRedisCluster.Status.Substatus = redisCluster.Status.Substatus
-
-		err = r.Client.Status().Update(ctx, &refreshedRedisCluster)
-		if err != nil {
-			r.logError(redisCluster.NamespacedName(), err, "Error updating RedisCluster object with new status")
-			return err
-		}
-		r.logInfo(redisCluster.NamespacedName(), "RedisCluster has been updated with the new status", "status", redisCluster.Status.Status)
-
-		// Update Robin status
-		// Do not update if we are switching to Initializing status because Robin needs some
-		// time to be ready to accept API requests.
-		if redisCluster.Status.Status != redisv1.StatusInitializing {
-			logger := r.getHelperLogger(redisCluster.NamespacedName())
-			robin, err := robin.NewRobin(ctx, r.Client, redisCluster, logger)
-			if err != nil {
-				r.logError(redisCluster.NamespacedName(), err, "Error getting Robin to update the status")
-				return err
-			}
-
-			err = robin.SetStatus(redisCluster.Status.Status)
-			if err != nil {
-				r.logError(redisCluster.NamespacedName(), err, "Error setting the new status to Robin", "status", redisCluster.Status.Status)
-				return err
-			}
-			r.logInfo(redisCluster.NamespacedName(), "Robin has been notified of the new status", "status", redisCluster.Status.Status)
-		}
-
-		// Update Robin ConfigMap status
-		err = robin.PersistRobinStatut(ctx, r.Client, redisCluster)
-		if err != nil {
-			r.logError(redisCluster.NamespacedName(), err, "Error updating the new status in Robin ConfigMap", "status", redisCluster.Status.Status)
-			return err
-		}
-		r.logInfo(redisCluster.NamespacedName(), "Robin ConfigMap has been updated with the new status", "status", redisCluster.Status.Status)
-
-		return nil
-	})
-}
-
-func (r *RedisClusterReconciler) updateClusterSubStatus(ctx context.Context, redisCluster *redisv1.RedisCluster, substatus string, partition int) error {
-	refreshedRedisCluster := redisv1.RedisCluster{}
-	err := r.Client.Get(ctx, types.NamespacedName{Namespace: redisCluster.Namespace, Name: redisCluster.Name}, &refreshedRedisCluster)
+	sts, err := r.FindExistingStatefulSet(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name, Namespace: redisCluster.Namespace}})
 	if err != nil {
-		r.logError(redisCluster.NamespacedName(), err, "Error getting a refreshed RedisCluster before updating it. It may have been deleted?")
-		return err
+		r.logError(redisCluster.NamespacedName(), err, "Cannot find existing statefulset, maybe it was deleted.")
+		return false
 	}
-	refreshedRedisCluster.Status.Substatus.Status = substatus
-	refreshedRedisCluster.Status.Substatus.UpgradingPartition = partition
-	redisCluster.Status.Substatus.Status = substatus
-	redisCluster.Status.Substatus.UpgradingPartition = partition
+	if sts == nil {
+		err = errors.NewNotFound(schema.GroupResource{Group: "", Resource: "Statefulset"}, "StatefulSet not found")
+		r.logError(redisCluster.NamespacedName(), err, "Cannot find existing statefulset, maybe it was deleted.")
+		return false
+	}
 
-	err = r.Client.Status().Update(ctx, &refreshedRedisCluster)
-	if err != nil {
-		r.logError(redisCluster.NamespacedName(), err, "Error updating substatus")
-		return err
-	}
-	return nil
-}
-
-// Redis cluster is set to 0 replicas
-//
-//	 -> terminate all cluster pods (StatefulSet replicas set to 0)
-//	 -> terminate robin pod (Deployment replicas set to 0)
-//	 -> delete pdb
-//	 -> Redis cluster status set to 'Ready'
-//		-> All conditions set to false
-func (r *RedisClusterReconciler) clusterScaledToZeroReplicas(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
-	r.logInfo(redisCluster.NamespacedName(), "Cluster spec replicas is set to 0", "SpecReplicas", redisCluster.Spec.Replicas)
-	sset, err := r.FindExistingStatefulSet(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name, Namespace: redisCluster.Namespace}})
-	if err != nil {
-		r.logError(redisCluster.NamespacedName(), err, "Cannot find exists statefulset maybe is deleted.")
-	}
-	if sset != nil {
-		if *(sset.Spec.Replicas) != 0 {
-			r.logInfo(redisCluster.NamespacedName(), "Cluster scaled to 0 replicas")
-			r.Recorder.Event(redisCluster, "Normal", "RedisClusterScaledToZero", fmt.Sprintf("Scaling down from %d to 0", *(sset.Spec.Replicas)))
+	// Get configured Storage and StorageClassName from StatefulSet
+	if len(sts.Spec.VolumeClaimTemplates) > 0 {
+		stsStorage = sts.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests.Storage().String()
+		r.logInfo(redisCluster.NamespacedName(), "Current StatefulSet Storage configuration", "Spec.VolumeClaimTemplates[0].Spec.Resources.Requests.Storage", stsStorage)
+		if sts.Spec.VolumeClaimTemplates[0].Spec.StorageClassName != nil {
+			stsStorageClassName = *sts.Spec.VolumeClaimTemplates[0].Spec.StorageClassName
+			r.logInfo(redisCluster.NamespacedName(), "Currect StatefulSet Storage configuration", "Spec.VolumeClaimTemplates[0].Spec.StorageClassName", stsStorageClassName)
+		} else {
+			r.logInfo(redisCluster.NamespacedName(), "Currect StatefulSet Storage configuration", "Spec.VolumeClaimTemplates[0].Spec.StorageClassName", "Not set")
 		}
-		*sset.Spec.Replicas = 0
-		sset, err = r.UpdateStatefulSet(ctx, sset, redisCluster)
-		if err != nil {
-			r.logError(redisCluster.NamespacedName(), err, "Failed to update StatefulSet")
+	}
+
+	// Non ephemeral cluster checks:
+	// - Updates to redisCluster.Spec.Storage are not allowed
+	if !redisCluster.Spec.Ephemeral && redisCluster.Spec.Storage != "" && stsStorage != "" && redisCluster.Spec.Storage != stsStorage {
+		err = errors.NewBadRequest("spec: Forbidden: updates to redisCluster.Spec.Storage field are not allowed")
+		r.logError(redisCluster.NamespacedName(), err, "Redis cluster storage configuration updates are forbidden", "STS storage", stsStorage, "RDCL storage", redisCluster.Spec.Storage)
+		if updateRDCL {
+			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
+			redisCluster.Status.Status = redisv1.StatusError
 		}
-		r.logInfo(redisCluster.NamespacedName(), "StatefulSet updated", "Replicas", sset.Spec.Replicas)
+		return false
+	}
+	// - Unset redisCluster.Spec.Storage is not allowed
+	if !redisCluster.Spec.Ephemeral && redisCluster.Spec.Storage == "" && stsStorage != "" {
+		err = errors.NewBadRequest("spec: Forbidden: updates to redisCluster.Spec.Storage field are not allowed")
+		r.logError(redisCluster.NamespacedName(), err, "Redis cluster storage configuration updates are forbidden", "STS storage", stsStorage, "RDCL storage", redisCluster.Spec.Storage)
+		if updateRDCL {
+			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
+			redisCluster.Status.Status = redisv1.StatusError
+		}
+		return false
+	}
+	// - Updates to redisCluster.Spec.StorageClassName are not allowed
+	if !redisCluster.Spec.Ephemeral && redisCluster.Spec.StorageClassName != "" && stsStorageClassName != "" && redisCluster.Spec.StorageClassName != stsStorageClassName {
+		err = errors.NewBadRequest("spec: Forbidden: updates to redisCluster.Spec.StorageClassName field are not allowed")
+		r.logError(redisCluster.NamespacedName(), err, "Redis cluster storage configuration updates are forbidden", "STS storageClassName", stsStorageClassName, "RDCL storageClassName", redisCluster.Spec.StorageClassName)
+		if updateRDCL {
+			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
+			redisCluster.Status.Status = redisv1.StatusError
+		}
+		return false
+	}
+	// - Set redisCluster.Spec.StorageClassName is not allowed
+	if !redisCluster.Spec.Ephemeral && redisCluster.Spec.StorageClassName != "" && stsStorageClassName == "" {
+		err = errors.NewBadRequest("spec: Forbidden: updates to redisCluster.Spec.StorageClassName field are not allowed")
+		r.logError(redisCluster.NamespacedName(), err, "Redis cluster storage configuration updates are forbidden", "STS storageClassName", stsStorageClassName, "RDCL storageClassName", redisCluster.Spec.StorageClassName)
+		if updateRDCL {
+			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
+			redisCluster.Status.Status = redisv1.StatusError
+		}
+		return false
+	}
+	// - Unset redisClusterSpec.StorageClassName is not allowed
+	if !redisCluster.Spec.Ephemeral && redisCluster.Spec.StorageClassName == "" && stsStorageClassName != "" {
+		err = errors.NewBadRequest("spec: Forbidden: updates to redisCluster.Spec.StorageClassName field are not allowed")
+		r.logError(redisCluster.NamespacedName(), err, "Redis cluster storage configuration updates are forbidden", "STS stsStorageClassName", stsStorageClassName, "RDCL stsStorageClassName", redisCluster.Spec.StorageClassName)
+		if updateRDCL {
+			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
+			redisCluster.Status.Status = redisv1.StatusError
+		}
+		return false
+	}
+	// - Moving from ephemeral to non ephemeral is not allowed
+	if !redisCluster.Spec.Ephemeral && len(sts.Spec.VolumeClaimTemplates) == 0 {
+		err = errors.NewBadRequest("spec: Error: non ephemeral cluster without VolumeClaimTemplates defined in the StatefulSet")
+		r.logError(redisCluster.NamespacedName(), err, "Redis cluster misconfigured (probably trying to change from ephemeral to non ephemeral)")
+		if updateRDCL {
+			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
+			redisCluster.Status.Status = redisv1.StatusError
+		}
+		return false
+	}
+	// Ephemeral cluster checks:
+	// - Moving from non ephemeral to ephemeral is not allowed
+	if redisCluster.Spec.Ephemeral && len(sts.Spec.VolumeClaimTemplates) > 0 {
+		err = errors.NewBadRequest("spec: Error: ephemeral cluster with VolumeClaimTemplates defined in the StatefulSet")
+		r.logError(redisCluster.NamespacedName(), err, "Redis cluster misconfigured (probably trying to change from non ephemeral to ephemeral)")
+		if updateRDCL {
+			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
+			redisCluster.Status.Status = redisv1.StatusError
+		}
+		return false
 	}
 
-	r.scaleDownRobin(ctx, redisCluster)
-
-	r.deletePodDisruptionBudget(ctx, redisCluster)
-
-	// All conditions set to false. Status set to Ready.
-	var update_err error
-	if !reflect.DeepEqual(redisCluster.Status, redisv1.StatusReady) {
-		redisCluster.Status.Status = redisv1.StatusReady
-		setAllConditionsFalse(r.getHelperLogger(redisCluster.NamespacedName()), redisCluster)
-		update_err = r.updateClusterStatus(ctx, redisCluster)
-	}
-
-	return update_err
+	return true
 }
 
 func (r *RedisClusterReconciler) checkFinalizers(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, error) {
