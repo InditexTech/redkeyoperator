@@ -32,9 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/util/retry"
 
-	// controllerruntime "sigs.k8s.io/controller-runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -62,7 +60,7 @@ func (r *RedisClusterReconciler) clusterScaledToZeroReplicas(ctx context.Context
 			r.Recorder.Event(redisCluster, "Normal", "RedisClusterScaledToZero", fmt.Sprintf("Scaling down from %d to 0", *(sset.Spec.Replicas)))
 		}
 		*sset.Spec.Replicas = 0
-		sset, err = r.UpdateStatefulSet(ctx, sset, redisCluster)
+		sset, err = r.updateStatefulSet(ctx, sset, redisCluster)
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Failed to update StatefulSet")
 		}
@@ -373,7 +371,7 @@ func (r *RedisClusterReconciler) doSlowUpgrade(ctx context.Context, redisCluster
 	return nil
 }
 
-// Updates the StatefulSet configuration and labels, including overrides.
+// Updates and persists the StatefulSet configuration and labels, including overrides.
 func (r *RedisClusterReconciler) upgradeClusterConfigurationUpdate(ctx context.Context, redisCluster *redisv1.RedisCluster) (*v1.StatefulSet, error) {
 	req := ctrl.Request{
 		NamespacedName: types.NamespacedName{
@@ -504,7 +502,7 @@ func (r *RedisClusterReconciler) UpgradePartition(ctx context.Context, redisClus
 		Type:          v1.RollingUpdateStatefulSetStrategyType,
 		RollingUpdate: &v1.RollingUpdateStatefulSetStrategy{Partition: &localPartition},
 	}
-	existingStateFulSet, err = r.UpdateStatefulSet(ctx, existingStateFulSet, redisCluster)
+	existingStateFulSet, err = r.updateStatefulSet(ctx, existingStateFulSet, redisCluster)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Could not update partition for Statefulset")
 		return err
@@ -652,7 +650,7 @@ func (r *RedisClusterReconciler) UpgradePartitionWithReplicas(ctx context.Contex
 		Type:          v1.RollingUpdateStatefulSetStrategyType,
 		RollingUpdate: &v1.RollingUpdateStatefulSetStrategy{Partition: &localPartition},
 	}
-	existingStateFulSet, err = r.UpdateStatefulSet(ctx, existingStateFulSet, redisCluster)
+	existingStateFulSet, err = r.updateStatefulSet(ctx, existingStateFulSet, redisCluster)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Could not update partition for Statefulset")
 		return err
@@ -725,48 +723,6 @@ func (r *RedisClusterReconciler) UpgradePartitionWithReplicas(ctx context.Contex
 	time.Sleep(time.Second * 10)
 
 	return nil
-}
-
-func (r *RedisClusterReconciler) UpdateStatefulSet(ctx context.Context, statefulSet *v1.StatefulSet, redisCluster *redisv1.RedisCluster) (*v1.StatefulSet, error) {
-	refreshedStatefulSet := &v1.StatefulSet{}
-	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		// get a fresh rediscluster to minimize conflicts
-		err := r.Client.Get(ctx, types.NamespacedName{Namespace: statefulSet.Namespace, Name: statefulSet.Name}, refreshedStatefulSet)
-		if err != nil {
-			r.logError(redisCluster.NamespacedName(), err, "Error getting a refreshed RedisCluster before updating it. It may have been deleted?")
-			return err
-		}
-		// update the slots
-		refreshedStatefulSet.Labels = statefulSet.Labels
-		refreshedStatefulSet.Spec = statefulSet.Spec
-		var updateErr = r.Client.Update(ctx, refreshedStatefulSet)
-		return updateErr
-	})
-	if err != nil {
-		return nil, err
-	}
-	return refreshedStatefulSet, nil
-}
-
-func (r *RedisClusterReconciler) UpdateDeployment(ctx context.Context, deployment *v1.Deployment, redisCluster *redisv1.RedisCluster) (*v1.Deployment, error) {
-	refreshedDeployment := &v1.Deployment{}
-	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		// get a fresh rediscluster to minimize conflicts
-		err := r.Client.Get(ctx, types.NamespacedName{Namespace: deployment.Namespace, Name: deployment.Name}, refreshedDeployment)
-		if err != nil {
-			r.logError(redisCluster.NamespacedName(), err, "Error getting a refreshed RedisCluster before updating it. It may have been deleted?")
-			return err
-		}
-		// update the slots
-		refreshedDeployment.Labels = deployment.Labels
-		refreshedDeployment.Spec = deployment.Spec
-		var updateErr = r.Client.Update(ctx, refreshedDeployment)
-		return updateErr
-	})
-	if err != nil {
-		return nil, err
-	}
-	return refreshedDeployment, nil
 }
 
 // GetSidedNodesForScaleDown splits the cluster nodes into two sides. Left and Right.
@@ -1145,7 +1101,7 @@ func (r *RedisClusterReconciler) ScaleCluster(ctx context.Context, redisCluster 
 
 		// and scale the statefulset
 		sset.Spec.Replicas = &realExpectedReplicas
-		_, err = r.UpdateStatefulSet(ctx, sset, redisCluster)
+		_, err = r.updateStatefulSet(ctx, sset, redisCluster)
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Failed to update StatefulSet")
 			return err
@@ -1178,7 +1134,7 @@ func (r *RedisClusterReconciler) ScaleCluster(ctx context.Context, redisCluster 
 		return err
 	}
 	sset.Spec.Replicas = &realExpectedReplicas
-	sset, err = r.UpdateStatefulSet(ctx, sset, redisCluster)
+	sset, err = r.updateStatefulSet(ctx, sset, redisCluster)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Failed to update StatefulSet")
 		return err
@@ -1197,7 +1153,7 @@ func (r *RedisClusterReconciler) ScaleCluster(ctx context.Context, redisCluster 
 				}
 				if *mdep.Spec.Replicas != desiredReplicas {
 					mdep.Spec.Replicas = &desiredReplicas
-					mdep, err = r.UpdateDeployment(ctx, mdep, redisCluster)
+					mdep, err = r.updateDeployment(ctx, mdep, redisCluster)
 					if err != nil {
 						r.logError(redisCluster.NamespacedName(), err, "ScaleCluster - Failed to update Deployment replicas")
 					} else {
@@ -1327,32 +1283,6 @@ func (r *RedisClusterReconciler) isOwnedByUs(o client.Object) bool {
 	return false
 }
 
-func (r *RedisClusterReconciler) GetSlotsRanges(nodes int32, redisCluster *redisv1.RedisCluster) []*redisv1.SlotRange {
-	slots := redis.SplitNodeSlots(int(nodes))
-	var apiRedisSlots = make([]*redisv1.SlotRange, 0)
-	for _, node := range slots {
-		apiRedisSlots = append(apiRedisSlots, &redisv1.SlotRange{Start: node.Start, End: node.End})
-	}
-	r.logInfo(redisCluster.NamespacedName(), "GetSlotsRanges", "slots", slots, "ranges", apiRedisSlots)
-	return apiRedisSlots
-}
-
-func (r *RedisClusterReconciler) NodesBySequence(nodes map[string]*redisv1.RedisNode) ([]string, error) {
-	nodesBySequence := make([]string, len(nodes))
-	for nodeId, node := range nodes {
-		nodeNameElements := strings.Split(node.Name, "-")
-		nodePodSequence, err := strconv.Atoi(nodeNameElements[len(nodeNameElements)-1])
-		if err != nil {
-			return nil, err
-		}
-		if len(nodes) <= nodePodSequence {
-			return nil, fmt.Errorf("race condition with pod sequence: seq:%d, butlen: %d", nodePodSequence, len(nodes))
-		}
-		nodesBySequence[nodePodSequence] = nodeId
-	}
-	return nodesBySequence, nil
-}
-
 func (r *RedisClusterReconciler) GetRedisClient(ctx context.Context, ip string, secret string) *redisclient.Client {
 	redisclient.NewClusterClient(&redisclient.ClusterOptions{})
 	rdb := redisclient.NewClient(&redisclient.Options{
@@ -1361,27 +1291,6 @@ func (r *RedisClusterReconciler) GetRedisClient(ctx context.Context, ip string, 
 		DB:       0,
 	})
 	return rdb
-}
-
-func (r *RedisClusterReconciler) GetRedisClusterPods(ctx context.Context, redisCluster *redisv1.RedisCluster) *corev1.PodList {
-	allPods := &corev1.PodList{}
-
-	labelSelector := labels.SelectorFromSet(
-		map[string]string{
-			redis.RedisClusterLabel:                     redisCluster.Name,
-			r.getStatefulSetSelectorLabel(redisCluster): "redis",
-		},
-	)
-
-	err := r.Client.List(ctx, allPods, &client.ListOptions{
-		Namespace:     redisCluster.Namespace,
-		LabelSelector: labelSelector,
-	})
-	if err != nil {
-		r.logError(redisCluster.NamespacedName(), err, "Could not list pods")
-	}
-
-	return allPods
 }
 
 func (r *RedisClusterReconciler) GetReadyNodes(ctx context.Context, redisCluster *redisv1.RedisCluster) (map[string]*redisv1.RedisNode, error) {

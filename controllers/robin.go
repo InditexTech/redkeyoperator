@@ -271,7 +271,7 @@ func (r *RedisClusterReconciler) scaleDownRobin(ctx context.Context, redisCluste
 			} else {
 				// Scaledown
 				*mdep.Spec.Replicas = 0
-				mdep, err = r.UpdateDeployment(ctx, mdep, redisCluster)
+				mdep, err = r.updateDeployment(ctx, mdep, redisCluster)
 				if err != nil {
 					r.logError(redisCluster.NamespacedName(), err, "Failed to update Deployment replicas")
 				} else {

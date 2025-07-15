@@ -20,6 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -201,7 +202,7 @@ func (r *RedisClusterReconciler) checkAndCreateStatefulSet(ctx context.Context, 
 				r.logInfo(redisCluster.NamespacedName(), "Replicas updated before reaching Configuring status: aligning StatefulSet <-> RedisCluster replicas",
 					"StatefulSet replicas", currSsetReplicas, "RedisCluster replicas", realExpectedReplicas)
 				statefulSet.Spec.Replicas = &realExpectedReplicas
-				_, err = r.UpdateStatefulSet(ctx, statefulSet, redisCluster)
+				_, err = r.updateStatefulSet(ctx, statefulSet, redisCluster)
 				if err != nil {
 					r.logError(redisCluster.NamespacedName(), err, "Failed to update StatefulSet replicas")
 				}
@@ -215,7 +216,7 @@ func (r *RedisClusterReconciler) checkAndCreateStatefulSet(ctx context.Context, 
 			r.logInfo(redisCluster.NamespacedName(), "Not all required pods instantiated: aligning StatefulSet <-> RedisCluster replicas",
 				"StatefulSet replicas", currSsetReplicas, "RedisCluster replicas", realExpectedReplicas)
 			statefulSet.Spec.Replicas = &realExpectedReplicas
-			_, err = r.UpdateStatefulSet(ctx, statefulSet, redisCluster)
+			_, err = r.updateStatefulSet(ctx, statefulSet, redisCluster)
 			if err != nil {
 				r.logError(redisCluster.NamespacedName(), err, "Failed to update StatefulSet replicas")
 			}
@@ -486,4 +487,46 @@ func (ef *RedisClusterReconciler) deletePVC(ctx context.Context, client client.C
 // The implementation has been moved, and this exists merely as an alias for backward compatibility
 func (r *RedisClusterReconciler) getStatefulSetSelectorLabel(rdcl *redisv1.RedisCluster) string {
 	return kubernetes.GetStatefulSetSelectorLabel(context.TODO(), r.Client, rdcl)
+}
+
+func (r *RedisClusterReconciler) updateStatefulSet(ctx context.Context, statefulSet *v1.StatefulSet, redisCluster *redisv1.RedisCluster) (*v1.StatefulSet, error) {
+	refreshedStatefulSet := &v1.StatefulSet{}
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// get a fresh rediscluster to minimize conflicts
+		err := r.Client.Get(ctx, types.NamespacedName{Namespace: statefulSet.Namespace, Name: statefulSet.Name}, refreshedStatefulSet)
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error getting a refreshed RedisCluster before updating it. It may have been deleted?")
+			return err
+		}
+		// update the slots
+		refreshedStatefulSet.Labels = statefulSet.Labels
+		refreshedStatefulSet.Spec = statefulSet.Spec
+		var updateErr = r.Client.Update(ctx, refreshedStatefulSet)
+		return updateErr
+	})
+	if err != nil {
+		return nil, err
+	}
+	return refreshedStatefulSet, nil
+}
+
+func (r *RedisClusterReconciler) updateDeployment(ctx context.Context, deployment *v1.Deployment, redisCluster *redisv1.RedisCluster) (*v1.Deployment, error) {
+	refreshedDeployment := &v1.Deployment{}
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// get a fresh rediscluster to minimize conflicts
+		err := r.Client.Get(ctx, types.NamespacedName{Namespace: deployment.Namespace, Name: deployment.Name}, refreshedDeployment)
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error getting a refreshed RedisCluster before updating it. It may have been deleted?")
+			return err
+		}
+		// update the slots
+		refreshedDeployment.Labels = deployment.Labels
+		refreshedDeployment.Spec = deployment.Spec
+		var updateErr = r.Client.Update(ctx, refreshedDeployment)
+		return updateErr
+	})
+	if err != nil {
+		return nil, err
+	}
+	return refreshedDeployment, nil
 }
