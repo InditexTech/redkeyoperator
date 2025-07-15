@@ -6,6 +6,7 @@ package robin
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,8 +16,16 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/inditextech/redisoperator/internal/common"
+	"github.com/inditextech/redisoperator/internal/kubernetes"
+	"github.com/inditextech/redisoperator/internal/redis"
+	"gopkg.in/yaml.v3"
 
+	redisv1 "github.com/inditextech/redisoperator/api/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
+	ctrlClient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -106,6 +115,64 @@ type SlotRange struct {
 type Robin struct {
 	Pod    *corev1.Pod
 	Logger logr.Logger
+}
+
+// Gets Robin initialized with the existing pod.
+func NewRobin(ctx context.Context, client ctrlClient.Client, redisCluster *redisv1.RedisCluster, logger logr.Logger) (Robin, error) {
+	componentLabel := kubernetes.GetStatefulSetSelectorLabel(ctx, client, redisCluster)
+	labelSelector := labels.SelectorFromSet(
+		map[string]string{
+			redis.RedisClusterLabel: redisCluster.Name,
+			componentLabel:          common.ComponentLabelRobin,
+		},
+	)
+
+	robin := Robin{}
+	robin.Logger = logger
+
+	pods := &corev1.PodList{}
+	err := client.List(ctx, pods, &ctrlClient.ListOptions{
+		Namespace:     redisCluster.Namespace,
+		LabelSelector: labelSelector,
+	})
+	if err != nil {
+		return robin, err
+	}
+
+	switch len(pods.Items) {
+	case 1:
+		robin.Pod = pods.Items[0].DeepCopy()
+	case 0:
+		return robin, fmt.Errorf("robin pod not found")
+	default:
+		return robin, fmt.Errorf("more than one Robin pods where found, which is not allowed")
+	}
+
+	return robin, nil
+}
+
+// Updates configuration in Robin ConfigMap with the new state from the RedisCluster object.
+func PersistRobinStatut(ctx context.Context, client ctrlClient.Client, redisCluster *redisv1.RedisCluster) error {
+	cmap := &corev1.ConfigMap{}
+	err := client.Get(ctx, types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}, cmap)
+	if err != nil {
+		return err
+	}
+	var config Configuration
+	if err := yaml.Unmarshal([]byte(cmap.Data["application-configmap.yml"]), &config); err != nil {
+		return fmt.Errorf("persist Robin status: %w", err)
+	}
+	config.Redis.Cluster.Status = redisCluster.Status.Status
+	confUpdated, err := yaml.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("persist Robin status: %w", err)
+	}
+	cmap.Data["application-configmap.yml"] = string(confUpdated)
+	if err = client.Update(ctx, cmap); err != nil {
+		return fmt.Errorf("persist Robin status: %w", err)
+	}
+
+	return nil
 }
 
 func (r *Robin) GetStatus() (string, error) {

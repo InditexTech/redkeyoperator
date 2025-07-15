@@ -15,6 +15,7 @@ import (
 	redisv1 "github.com/inditextech/redisoperator/api/v1"
 	finalizer "github.com/inditextech/redisoperator/internal/finalizers"
 	"github.com/inditextech/redisoperator/internal/kubernetes"
+	"github.com/inditextech/redisoperator/internal/robin"
 	"github.com/inditextech/redisoperator/internal/utils"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -298,7 +299,7 @@ func (r *RedisClusterReconciler) reconcileStatusInitializing(ctx context.Context
 
 	// Check Robin pod readiness
 	logger := r.getHelperLogger(redisCluster.NamespacedName())
-	robin, err := kubernetes.GetRobin(ctx, r.Client, redisCluster, logger)
+	robin, err := robin.NewRobin(ctx, r.Client, redisCluster, logger)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Error getting Robin to check its readiness")
 		return true, DEFAULT_REQUEUE_TIMEOUT
@@ -332,7 +333,7 @@ func (r *RedisClusterReconciler) reconcileStatusConfiguring(ctx context.Context,
 
 	// Ask Robin for Redis cluster readiness
 	logger := r.getHelperLogger((redisCluster.NamespacedName()))
-	robin, err := kubernetes.GetRobin(ctx, r.Client, redisCluster, logger)
+	robin, err := robin.NewRobin(ctx, r.Client, redisCluster, logger)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Error getting Robin to check the cluster readiness")
 		return true, DEFAULT_REQUEUE_TIMEOUT
@@ -496,7 +497,7 @@ func (r *RedisClusterReconciler) updateClusterNodes(ctx context.Context, redisCl
 	}
 
 	logger := r.getHelperLogger((redisCluster.NamespacedName()))
-	robin, err := kubernetes.GetRobin(ctx, r.Client, redisCluster, logger)
+	robin, err := robin.NewRobin(ctx, r.Client, redisCluster, logger)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Error getting Robin to get cluster nodes")
 		return err
@@ -555,7 +556,7 @@ func (r *RedisClusterReconciler) updateClusterStatus(ctx context.Context, redisC
 		// time to be ready to accept API requests.
 		if redisCluster.Status.Status != redisv1.StatusInitializing {
 			logger := r.getHelperLogger(redisCluster.NamespacedName())
-			robin, err := kubernetes.GetRobin(ctx, r.Client, redisCluster, logger)
+			robin, err := robin.NewRobin(ctx, r.Client, redisCluster, logger)
 			if err != nil {
 				r.logError(redisCluster.NamespacedName(), err, "Error getting Robin to update the status")
 				return err
@@ -570,7 +571,7 @@ func (r *RedisClusterReconciler) updateClusterStatus(ctx context.Context, redisC
 		}
 
 		// Update Robin ConfigMap status
-		err = kubernetes.PersistRobinStatut(ctx, r.Client, redisCluster)
+		err = robin.PersistRobinStatut(ctx, r.Client, redisCluster)
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Error updating the new status in Robin ConfigMap", "status", redisCluster.Status.Status)
 			return err
