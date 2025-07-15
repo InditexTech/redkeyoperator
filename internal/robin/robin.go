@@ -117,7 +117,7 @@ type Robin struct {
 	Logger logr.Logger
 }
 
-// Gets Robin initialized with the existing pod.
+// Gets Robin initialized from a RedisCluster.
 func NewRobin(ctx context.Context, client ctrlClient.Client, redisCluster *redisv1.RedisCluster, logger logr.Logger) (Robin, error) {
 	componentLabel := kubernetes.GetStatefulSetSelectorLabel(ctx, client, redisCluster)
 	labelSelector := labels.SelectorFromSet(

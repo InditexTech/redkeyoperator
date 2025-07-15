@@ -35,10 +35,9 @@ import (
 )
 
 const (
-	MIGRATE_TIMEOUT                       = 6000
-	DEFAULT_REQUEUE_TIMEOUT time.Duration = 5
-	READY_REQUEUE_TIMEOUT   time.Duration = 30
-	ERROR_REQUEUE_TIMEOUT   time.Duration = 30
+	DefaultRequeueTimeout time.Duration = 5
+	ReadyRequeueTimeout   time.Duration = 30
+	ErrorRequeueTimeout   time.Duration = 30
 )
 
 func NewRedisClusterReconciler(mgr ctrl.Manager, maxConcurrentReconciles int, concurrentMigrates int) *RedisClusterReconciler {
@@ -69,7 +68,7 @@ func NewRedisClusterReconciler(mgr ctrl.Manager, maxConcurrentReconciles int, co
 func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) (ctrl.Result, error) {
 	var pvcFinalizer = (&finalizer.DeletePVCFinalizer{}).GetId()
 	var err error
-	var requeueAfter time.Duration = DEFAULT_REQUEUE_TIMEOUT
+	var requeueAfter time.Duration = DefaultRequeueTimeout
 	currentStatus := redisCluster.Status
 
 	r.logInfo(redisCluster.NamespacedName(), "RedisCluster reconciler start", "status", redisCluster.Status.Status)
@@ -98,7 +97,7 @@ func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req
 
 		// Requeue to recheck, reconciliation ends here!
 		r.logInfo(redisCluster.NamespacedName(), "RedisCluster reconciler end", "status", redisCluster.Status.Status)
-		return ctrl.Result{RequeueAfter: time.Second * READY_REQUEUE_TIMEOUT}, err
+		return ctrl.Result{RequeueAfter: time.Second * ReadyRequeueTimeout}, err
 	}
 
 	if redisCluster.Spec.DeletePVC && !redisCluster.Spec.Ephemeral {
@@ -280,7 +279,7 @@ func (r *RedisClusterReconciler) reconcileStatusNew(redisCluster *redisv1.RedisC
 		redisCluster.Status.Nodes = make(map[string]*redisv1.RedisNode, 0)
 	}
 	redisCluster.Status.Status = redisv1.StatusInitializing
-	return requeue, DEFAULT_REQUEUE_TIMEOUT
+	return requeue, DefaultRequeueTimeout
 }
 
 func (r *RedisClusterReconciler) reconcileStatusInitializing(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, time.Duration) {
@@ -289,11 +288,11 @@ func (r *RedisClusterReconciler) reconcileStatusInitializing(ctx context.Context
 	nodePodsReady, err := r.allPodsReady(ctx, redisCluster)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Could not check for Redis node pods being ready")
-		return true, DEFAULT_REQUEUE_TIMEOUT
+		return true, DefaultRequeueTimeout
 	}
 	if !nodePodsReady {
 		r.logInfo(redisCluster.NamespacedName(), "Waiting for Redis node pods to become ready")
-		return true, DEFAULT_REQUEUE_TIMEOUT
+		return true, DefaultRequeueTimeout
 	}
 	r.logInfo(redisCluster.NamespacedName(), "Redis node pods are ready")
 
@@ -302,30 +301,30 @@ func (r *RedisClusterReconciler) reconcileStatusInitializing(ctx context.Context
 	robin, err := robin.NewRobin(ctx, r.Client, redisCluster, logger)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Error getting Robin to check its readiness")
-		return true, DEFAULT_REQUEUE_TIMEOUT
+		return true, DefaultRequeueTimeout
 	}
 	flag, err := utils.PodRunningReady(robin.Pod)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Error checking Robin pod readiness")
-		return true, DEFAULT_REQUEUE_TIMEOUT
+		return true, DefaultRequeueTimeout
 	}
 	if !flag {
 		r.logInfo(redisCluster.NamespacedName(), "Waiting for Robin pod to become ready")
-		return true, DEFAULT_REQUEUE_TIMEOUT
+		return true, DefaultRequeueTimeout
 	}
 
 	// Check Robin is responding to requests
 	status, err := robin.GetStatus()
 	if err != nil {
 		r.logInfo(redisCluster.NamespacedName(), "Waiting for Robin accepting requests")
-		return true, DEFAULT_REQUEUE_TIMEOUT
+		return true, DefaultRequeueTimeout
 	}
 	r.logInfo(redisCluster.NamespacedName(), "Status", "status", status)
 
 	// Redis pods and Robin are ok, moving to Configuring status
 	redisCluster.Status.Status = redisv1.StatusConfiguring
 
-	return false, DEFAULT_REQUEUE_TIMEOUT
+	return false, DefaultRequeueTimeout
 }
 
 func (r *RedisClusterReconciler) reconcileStatusConfiguring(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, time.Duration) {
@@ -336,28 +335,28 @@ func (r *RedisClusterReconciler) reconcileStatusConfiguring(ctx context.Context,
 	robin, err := robin.NewRobin(ctx, r.Client, redisCluster, logger)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Error getting Robin to check the cluster readiness")
-		return true, DEFAULT_REQUEUE_TIMEOUT
+		return true, DefaultRequeueTimeout
 	}
 	check, errors, warnings, err := robin.ClusterCheck()
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Error checking the cluster readiness over Robin")
-		return true, DEFAULT_REQUEUE_TIMEOUT
+		return true, DefaultRequeueTimeout
 	}
 
 	if !check {
 		r.logInfo(redisCluster.NamespacedName(), "Waiting for Redis cluster readiness", "errors", errors, "warnings", warnings)
-		return true, DEFAULT_REQUEUE_TIMEOUT
+		return true, DefaultRequeueTimeout
 	}
 
 	// Redis cluster is ok, moving to Ready status
 	redisCluster.Status.Status = redisv1.StatusReady
 
-	return requeue, DEFAULT_REQUEUE_TIMEOUT
+	return requeue, DefaultRequeueTimeout
 }
 
 func (r *RedisClusterReconciler) reconcileStatusReady(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, time.Duration) {
 	var requeue = true
-	var requeueAfter time.Duration = READY_REQUEUE_TIMEOUT
+	var requeueAfter time.Duration = ReadyRequeueTimeout
 
 	// Reconcile PDB
 	err := r.checkAndUpdatePodDisruptionBudget(ctx, redisCluster)
@@ -394,7 +393,7 @@ func (r *RedisClusterReconciler) reconcileStatusUpgrading(ctx context.Context, r
 		r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
 	}
 
-	return requeue, DEFAULT_REQUEUE_TIMEOUT
+	return requeue, DefaultRequeueTimeout
 }
 
 func (r *RedisClusterReconciler) reconcileStatusScalingDown(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, time.Duration) {
@@ -404,14 +403,14 @@ func (r *RedisClusterReconciler) reconcileStatusScalingDown(ctx context.Context,
 		r.logError(redisCluster.NamespacedName(), err, "Error when scaling down")
 		r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
 		redisCluster.Status.Status = redisv1.StatusError
-		return requeue, DEFAULT_REQUEUE_TIMEOUT
+		return requeue, DefaultRequeueTimeout
 	}
 	err = r.UpdateScalingStatus(ctx, redisCluster)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Error when updating scaling status")
 		r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
 	}
-	return requeue, DEFAULT_REQUEUE_TIMEOUT
+	return requeue, DefaultRequeueTimeout
 }
 
 func (r *RedisClusterReconciler) reconcileStatusScalingUp(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, time.Duration) {
@@ -421,19 +420,19 @@ func (r *RedisClusterReconciler) reconcileStatusScalingUp(ctx context.Context, r
 		r.logError(redisCluster.NamespacedName(), err, "Error when scaling up")
 		r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
 		redisCluster.Status.Status = redisv1.StatusError
-		return requeue, DEFAULT_REQUEUE_TIMEOUT
+		return requeue, DefaultRequeueTimeout
 	}
 	err = r.UpdateScalingStatus(ctx, redisCluster)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Error when updating scaling status")
 		r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
 	}
-	return requeue, DEFAULT_REQUEUE_TIMEOUT
+	return requeue, DefaultRequeueTimeout
 }
 
 func (r *RedisClusterReconciler) reconcileStatusError(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, time.Duration) {
 	var requeue = true
-	var requeueAfter = ERROR_REQUEUE_TIMEOUT
+	var requeueAfter = ErrorRequeueTimeout
 	var stsStorage, stsStorageClassName string
 
 	// If storage config is not consistent do not try to recover from Error.
@@ -465,7 +464,7 @@ func (r *RedisClusterReconciler) reconcileStatusError(ctx context.Context, redis
 			r.logError(redisCluster.NamespacedName(), err, "Error when scaling cluster")
 			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
 		}
-		requeueAfter = DEFAULT_REQUEUE_TIMEOUT
+		requeueAfter = DefaultRequeueTimeout
 	}
 
 	// Check and update RedisCluster status value accordingly to its configuration and status
