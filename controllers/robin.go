@@ -59,7 +59,7 @@ func (r *RedisClusterReconciler) handleRobinConfig(ctx context.Context, req ctrl
 	if err != nil {
 		// Return if the error is not a NotFound error
 		if !errors.IsNotFound(err) {
-			r.LogError(redisCluster.NamespacedName(), err, "Getting robin configmap failed")
+			r.logError(redisCluster.NamespacedName(), err, "Getting robin configmap failed")
 			return nil
 		}
 
@@ -72,11 +72,11 @@ func (r *RedisClusterReconciler) handleRobinConfig(ctx context.Context, req ctrl
 	// Robin configmap found: check if it needs to be updated
 	var existingConfig, declaredConfig robin.Configuration
 	if err := yaml.Unmarshal([]byte(existingConfigMap.Data["application-configmap.yml"]), &existingConfig); err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Error parsing existing Robin configuration")
+		r.logError(redisCluster.NamespacedName(), err, "Error parsing existing Robin configuration")
 		return err
 	}
 	if err := yaml.Unmarshal([]byte(*redisCluster.Spec.Robin.Config), &declaredConfig); err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Error parsing declared Robin configuration")
+		r.logError(redisCluster.NamespacedName(), err, "Error parsing declared Robin configuration")
 		return err
 	}
 
@@ -113,7 +113,7 @@ func (r *RedisClusterReconciler) handleRobinDeployment(ctx context.Context, req 
 	if err != nil {
 		// Return if the error is not a NotFound error
 		if !errors.IsNotFound(err) {
-			r.LogError(redisCluster.NamespacedName(), err, "Getting robin deployment failed")
+			r.logError(redisCluster.NamespacedName(), err, "Getting robin deployment failed")
 			return
 		}
 
@@ -141,18 +141,18 @@ func (r *RedisClusterReconciler) createRobinObject(ctx context.Context, obj clie
 
 	ctrl.SetControllerReference(redisCluster, obj, r.Scheme)
 
-	r.LogInfo(redisCluster.NamespacedName(), "Creating robin "+kind)
+	r.logInfo(redisCluster.NamespacedName(), "Creating robin "+kind)
 	err := r.Client.Create(ctx, obj)
 	if err != nil {
 		if !errors.IsAlreadyExists(err) {
-			r.LogError(redisCluster.NamespacedName(), err, "Error creating robin "+kind)
+			r.logError(redisCluster.NamespacedName(), err, "Error creating robin "+kind)
 			return err
 		}
-		r.LogInfo(redisCluster.NamespacedName(), "robin "+kind+" already exists")
+		r.logInfo(redisCluster.NamespacedName(), "robin "+kind+" already exists")
 		return nil
 	}
 
-	r.LogInfo(redisCluster.NamespacedName(), "Successfully created robin "+kind, kind, redisCluster.Name+"-robin")
+	r.logInfo(redisCluster.NamespacedName(), "Successfully created robin "+kind, kind, redisCluster.Name+"-robin")
 	return nil
 }
 
@@ -161,14 +161,14 @@ func (r *RedisClusterReconciler) updateRobinObject(ctx context.Context, obj clie
 		return nil
 	}
 
-	r.LogInfo(redisCluster.NamespacedName(), "Updating robin "+kind)
+	r.logInfo(redisCluster.NamespacedName(), "Updating robin "+kind)
 	err := r.Client.Update(ctx, obj)
 	if err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Error updating robin "+kind)
+		r.logError(redisCluster.NamespacedName(), err, "Error updating robin "+kind)
 		return err
 	}
 
-	r.LogInfo(redisCluster.NamespacedName(), "Successfully updated robin "+kind, kind, redisCluster.Name+"-robin")
+	r.logInfo(redisCluster.NamespacedName(), "Successfully updated robin "+kind, kind, redisCluster.Name+"-robin")
 	return nil
 }
 
@@ -177,14 +177,14 @@ func (r *RedisClusterReconciler) deleteRobinObject(ctx context.Context, obj clie
 		return nil
 	}
 
-	r.LogInfo(redisCluster.NamespacedName(), "Deleting robin "+kind)
+	r.logInfo(redisCluster.NamespacedName(), "Deleting robin "+kind)
 	err := r.Client.Delete(ctx, obj)
 	if err != nil {
-		r.LogError(redisCluster.NamespacedName(), err, "Error deleting robin "+kind)
+		r.logError(redisCluster.NamespacedName(), err, "Error deleting robin "+kind)
 		return err
 	}
 
-	r.LogInfo(redisCluster.NamespacedName(), "Successfully deleted robin "+kind, kind, redisCluster.Name+"-robin")
+	r.logInfo(redisCluster.NamespacedName(), "Successfully deleted robin "+kind, kind, redisCluster.Name+"-robin")
 	return nil
 }
 
@@ -200,7 +200,7 @@ func (r *RedisClusterReconciler) overrideRobinDeployment(req ctrl.Request, redis
 	changed := !reflect.DeepEqual(podTemplateSpec.Labels, patchedPodTemplateSpec.Labels) || !reflect.DeepEqual(podTemplateSpec.Annotations, patchedPodTemplateSpec.Annotations) || !reflect.DeepEqual(podTemplateSpec.Spec, patchedPodTemplateSpec.Spec)
 
 	if changed {
-		r.LogInfo(req.NamespacedName, "Detected robin deployment change")
+		r.logInfo(req.NamespacedName, "Detected robin deployment change")
 	}
 
 	return *patchedPodTemplateSpec, changed
@@ -217,7 +217,7 @@ func (r *RedisClusterReconciler) createRobinDeployment(req ctrl.Request, rediscl
 		Spec: v1.DeploymentSpec{
 			Template: *rediscluster.Spec.Robin.Template,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{redis.RedisClusterLabel: req.Name, r.GetStatefulSetSelectorLabel(rediscluster): "robin"},
+				MatchLabels: map[string]string{redis.RedisClusterLabel: req.Name, r.getStatefulSetSelectorLabel(rediscluster): "robin"},
 			},
 			Replicas: &replicas,
 		},
@@ -258,7 +258,7 @@ func (r *RedisClusterReconciler) createRobinConfigMap(req ctrl.Request, spec red
 		Data: map[string]string{"application-configmap.yml": *spec.Robin.Config},
 	}
 
-	r.LogInfo(req.NamespacedName, "Generated robin configmap")
+	r.logInfo(req.NamespacedName, "Generated robin configmap")
 	return &cm
 }
 
@@ -267,15 +267,15 @@ func (r *RedisClusterReconciler) scaleDownRobin(ctx context.Context, redisCluste
 		if redisCluster.Spec.Robin.Template != nil {
 			mdep, err := r.FindExistingDeployment(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}})
 			if err != nil {
-				r.LogError(redisCluster.NamespacedName(), err, "Cannot find existing robin deployment", "deployment", redisCluster.Name+"-robin")
+				r.logError(redisCluster.NamespacedName(), err, "Cannot find existing robin deployment", "deployment", redisCluster.Name+"-robin")
 			} else {
 				// Scaledown
 				*mdep.Spec.Replicas = 0
 				mdep, err = r.UpdateDeployment(ctx, mdep, redisCluster)
 				if err != nil {
-					r.LogError(redisCluster.NamespacedName(), err, "Failed to update Deployment replicas")
+					r.logError(redisCluster.NamespacedName(), err, "Failed to update Deployment replicas")
 				} else {
-					r.LogInfo(redisCluster.NamespacedName(), "Robin Deployment updated", "Replicas", mdep.Spec.Replicas)
+					r.logInfo(redisCluster.NamespacedName(), "Robin Deployment updated", "Replicas", mdep.Spec.Replicas)
 				}
 			}
 		}

@@ -7,8 +7,6 @@ package controllers
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -95,23 +93,16 @@ func (r *RedisClusterReconciler) PreFilter() predicate.Predicate {
 	}
 }
 
-func (r *RedisClusterReconciler) SetConditionTrue(rc *redisv1.RedisCluster, condition metav1.Condition, message string) {
-	if !meta.IsStatusConditionTrue(rc.Status.Conditions, condition.Type) {
-		meta.SetStatusCondition(&rc.Status.Conditions, condition)
-		r.Recorder.Event(rc, "Normal", condition.Reason, message)
-	}
-}
-
-func (r *RedisClusterReconciler) LogInfo(RCNamespacedName types.NamespacedName, msg string, keysAndValues ...interface{}) {
-	redisClusterInfo := []interface{}{"redis-cluster", RCNamespacedName}
+func (r *RedisClusterReconciler) logInfo(RCNamespacedName types.NamespacedName, msg string, keysAndValues ...any) {
+	redisClusterInfo := []any{"redis-cluster", RCNamespacedName}
 	r.Log.Info(msg, append(redisClusterInfo, keysAndValues...)...)
 }
 
-func (r *RedisClusterReconciler) LogError(RCNamespacedName types.NamespacedName, err error, msg string, keysAndValues ...interface{}) {
-	redisClusterInfo := []interface{}{"redis-cluster", RCNamespacedName}
+func (r *RedisClusterReconciler) logError(RCNamespacedName types.NamespacedName, err error, msg string, keysAndValues ...any) {
+	redisClusterInfo := []any{"redis-cluster", RCNamespacedName}
 	r.Log.Error(err, msg, append(redisClusterInfo, keysAndValues...)...)
 }
 
-func (r *RedisClusterReconciler) GetHelperLogger(RCNamespacedName types.NamespacedName) logr.Logger {
+func (r *RedisClusterReconciler) getHelperLogger(RCNamespacedName types.NamespacedName) logr.Logger {
 	return r.Log.WithValues("redis-cluster", RCNamespacedName)
 }

@@ -275,7 +275,7 @@ func TestSetConditionTrue(t *testing.T) {
 
 	condition := redisv1.ConditionUpgrading
 
-	reconciler.SetConditionTrue(rc, condition, "upgrading")
+	reconciler.setConditionTrue(rc, condition, "upgrading")
 
 	assert.True(t, meta.IsStatusConditionTrue(rc.Status.Conditions, condition.Type))
 }
@@ -286,7 +286,7 @@ func TestSetConditionTrue_recordEvent(t *testing.T) {
 
 	message := "Updating resource requests"
 
-	reconciler.SetConditionTrue(rc, redisv1.ConditionUpgrading, message)
+	reconciler.setConditionTrue(rc, redisv1.ConditionUpgrading, message)
 
 	select {
 	case event := <-recorder.Events:
@@ -308,7 +308,7 @@ func TestSetConditionTrue_dontRecordEvent(t *testing.T) {
 
 	rc.Status.Conditions = []metav1.Condition{condition}
 
-	reconciler.SetConditionTrue(rc, condition, "Upgrading")
+	reconciler.setConditionTrue(rc, condition, "Upgrading")
 
 	select {
 	case <-recorder.Events:

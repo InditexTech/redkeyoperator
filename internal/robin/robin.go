@@ -96,7 +96,6 @@ type Node struct {
 	Sent       int         `yaml:"sent"`
 	Recv       int         `yaml:"recv"`
 	LinkStatus string      `yaml:"linkStatus"`
-	RedisCLI   string      `yaml:"redisCLI"`
 }
 
 type SlotRange struct {

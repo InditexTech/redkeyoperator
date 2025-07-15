@@ -215,7 +215,6 @@ type RedisNode struct {
 	IP        string `json:"ip"`
 	IsMaster  bool   `json:"isMaster"`
 	ReplicaOf string `json:"replicaOf"`
-	RedisCLI  string `json:"redisCLI,omitempty"`
 }
 
 type RedisAuth struct {
