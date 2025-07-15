@@ -66,7 +66,6 @@ func NewRedisClusterReconciler(mgr ctrl.Manager, maxConcurrentReconciles int, co
 }
 
 func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) (ctrl.Result, error) {
-	var pvcFinalizer = (&finalizer.DeletePVCFinalizer{}).GetId()
 	var err error
 	var requeueAfter time.Duration = DefaultRequeueTimeout
 	currentStatus := redisCluster.Status
@@ -100,31 +99,9 @@ func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req
 		return ctrl.Result{RequeueAfter: time.Second * ReadyRequeueTimeout}, err
 	}
 
-	if redisCluster.Spec.DeletePVC && !redisCluster.Spec.Ephemeral {
-		r.logInfo(redisCluster.NamespacedName(), "Delete PVCs feature enabled in cluster spec")
-		if !controllerutil.ContainsFinalizer(redisCluster, pvcFinalizer) {
-			controllerutil.AddFinalizer(redisCluster, pvcFinalizer)
-			r.Update(ctx, redisCluster)
-			r.logInfo(redisCluster.NamespacedName(), "Added finalizer. Deleting PVCs after scale down or cluster deletion")
-		}
-	} else {
-		r.logInfo(redisCluster.NamespacedName(), "Delete PVCs feature disabled in cluster spec or not specified. PVCs won't be deleted after scaling down or cluster deletion")
-	}
-
-	if !redisCluster.GetDeletionTimestamp().IsZero() {
-		for _, f := range r.Finalizers {
-			if slices.Contains(redisCluster.GetFinalizers(), f.GetId()) {
-				r.logInfo(redisCluster.NamespacedName(), "Running finalizer", "id", f.GetId(), "finalizer", f)
-				finalizerError := f.DeleteMethod(ctx, redisCluster, r.Client)
-				if finalizerError != nil {
-					r.logError(redisCluster.NamespacedName(), finalizerError, "Finalizer returned error", "id", f.GetId(), "finalizer", f)
-				}
-				controllerutil.RemoveFinalizer(redisCluster, f.GetId())
-				if err := r.Update(ctx, redisCluster); err != nil {
-					return ctrl.Result{}, err
-				}
-			}
-		}
+	immediateRequeue, err = r.checkFinalizers(ctx, redisCluster)
+	if immediateRequeue {
+		return ctrl.Result{RequeueAfter: time.Second * requeueAfter}, err
 	}
 
 	requeue := false
@@ -367,14 +344,14 @@ func (r *RedisClusterReconciler) reconcileStatusReady(ctx context.Context, redis
 	// Check and update RedisCluster status value accordingly to its configuration and status
 	// -> Cluster needs to be scaled?
 	if redisCluster.Status.Status == redisv1.StatusReady {
-		err = r.UpdateScalingStatus(ctx, redisCluster)
+		err = r.updateScalingStatus(ctx, redisCluster)
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Error when updating scaling status")
 		}
 	}
 	// -> Cluster needs to be upgraded?
 	if redisCluster.Status.Status == redisv1.StatusReady {
-		err = r.UpdateUpgradingStatus(ctx, redisCluster)
+		err = r.updateUpgradingStatus(ctx, redisCluster)
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Error when updating upgrading status")
 		}
@@ -387,7 +364,7 @@ func (r *RedisClusterReconciler) reconcileStatusReady(ctx context.Context, redis
 func (r *RedisClusterReconciler) reconcileStatusUpgrading(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, time.Duration) {
 	var requeue = true
 
-	err := r.UpgradeCluster(ctx, redisCluster)
+	err := r.upgradeCluster(ctx, redisCluster)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Error when upgrading cluster")
 		r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
@@ -405,7 +382,7 @@ func (r *RedisClusterReconciler) reconcileStatusScalingDown(ctx context.Context,
 		redisCluster.Status.Status = redisv1.StatusError
 		return requeue, DefaultRequeueTimeout
 	}
-	err = r.UpdateScalingStatus(ctx, redisCluster)
+	err = r.updateScalingStatus(ctx, redisCluster)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Error when updating scaling status")
 		r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
@@ -422,7 +399,7 @@ func (r *RedisClusterReconciler) reconcileStatusScalingUp(ctx context.Context, r
 		redisCluster.Status.Status = redisv1.StatusError
 		return requeue, DefaultRequeueTimeout
 	}
-	err = r.UpdateScalingStatus(ctx, redisCluster)
+	err = r.updateScalingStatus(ctx, redisCluster)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Error when updating scaling status")
 		r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
@@ -455,7 +432,7 @@ func (r *RedisClusterReconciler) reconcileStatusError(ctx context.Context, redis
 	if redisCluster.Spec.Storage == stsStorage && redisCluster.Spec.StorageClassName == stsStorageClassName {
 		err := r.ScaleCluster(ctx, redisCluster)
 		if err == nil {
-			err = r.UpdateScalingStatus(ctx, redisCluster)
+			err = r.updateScalingStatus(ctx, redisCluster)
 			if err != nil {
 				r.logError(redisCluster.NamespacedName(), err, "Error when updating scaling status")
 				r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
@@ -470,7 +447,7 @@ func (r *RedisClusterReconciler) reconcileStatusError(ctx context.Context, redis
 	// Check and update RedisCluster status value accordingly to its configuration and status
 	// -> Cluster needs to be scaled?
 	if redisCluster.Status.Status == redisv1.StatusError {
-		err = r.UpdateScalingStatus(ctx, redisCluster)
+		err = r.updateScalingStatus(ctx, redisCluster)
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Error when updating scaling status")
 			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
@@ -478,7 +455,7 @@ func (r *RedisClusterReconciler) reconcileStatusError(ctx context.Context, redis
 	}
 	// -> Cluster needs to be upgraded?
 	if redisCluster.Status.Status == redisv1.StatusError {
-		err = r.UpdateUpgradingStatus(ctx, redisCluster)
+		err = r.updateUpgradingStatus(ctx, redisCluster)
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Error when updating upgrading status")
 			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
@@ -640,6 +617,38 @@ func (r *RedisClusterReconciler) clusterScaledToZeroReplicas(ctx context.Context
 	}
 
 	return update_err
+}
+
+func (r *RedisClusterReconciler) checkFinalizers(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, error) {
+	var pvcFinalizer = (&finalizer.DeletePVCFinalizer{}).GetId()
+	if redisCluster.Spec.DeletePVC && !redisCluster.Spec.Ephemeral {
+		r.logInfo(redisCluster.NamespacedName(), "Delete PVCs feature enabled in cluster spec")
+		if !controllerutil.ContainsFinalizer(redisCluster, pvcFinalizer) {
+			controllerutil.AddFinalizer(redisCluster, pvcFinalizer)
+			r.Update(ctx, redisCluster)
+			r.logInfo(redisCluster.NamespacedName(), "Added finalizer. Deleting PVCs after scale down or cluster deletion")
+		}
+	} else {
+		r.logInfo(redisCluster.NamespacedName(), "Delete PVCs feature disabled in cluster spec or not specified. PVCs won't be deleted after scaling down or cluster deletion")
+	}
+
+	if !redisCluster.GetDeletionTimestamp().IsZero() {
+		for _, f := range r.Finalizers {
+			if slices.Contains(redisCluster.GetFinalizers(), f.GetId()) {
+				r.logInfo(redisCluster.NamespacedName(), "Running finalizer", "id", f.GetId(), "finalizer", f)
+				finalizerError := f.DeleteMethod(ctx, redisCluster, r.Client)
+				if finalizerError != nil {
+					r.logError(redisCluster.NamespacedName(), finalizerError, "Finalizer returned error", "id", f.GetId(), "finalizer", f)
+				}
+				controllerutil.RemoveFinalizer(redisCluster, f.GetId())
+				if err := r.Update(ctx, redisCluster); err != nil {
+					return true, err
+				}
+			}
+		}
+	}
+
+	return false, nil
 }
 
 func (r *RedisClusterReconciler) FindExistingStatefulSet(ctx context.Context, req ctrl.Request) (*v1.StatefulSet, error) {

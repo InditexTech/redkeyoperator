@@ -27,7 +27,6 @@ import (
 	"github.com/go-logr/logr"
 	errors2 "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/util/intstr"
 
 	redisclient "github.com/redis/go-redis/v9"
 	v1 "k8s.io/api/apps/v1"
@@ -43,11 +42,11 @@ import (
 )
 
 const (
-	CONFIG_CHECKSUM_ANNOTATION = "inditex.dev/redis-conf"
+	ConfigChecksumAnnotation = "inditex.dev/redis-conf"
 )
 
-func (r *RedisClusterReconciler) UpdateScalingStatus(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
-	sset, ssetErr := r.FindExistingStatefulSetFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name, Namespace: redisCluster.Namespace}})
+func (r *RedisClusterReconciler) updateScalingStatus(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
+	sset, ssetErr := r.FindExistingStatefulSet(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name, Namespace: redisCluster.Namespace}})
 	if ssetErr != nil {
 		return ssetErr
 	}
@@ -93,7 +92,7 @@ func (r *RedisClusterReconciler) UpdateScalingStatus(ctx context.Context, redisC
 	return nil
 }
 
-func (r *RedisClusterReconciler) UpdateUpgradingStatus(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
+func (r *RedisClusterReconciler) updateUpgradingStatus(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
 	req := ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name, Namespace: redisCluster.Namespace}}
 	statefulSet, err := r.FindExistingStatefulSet(ctx, req)
 	if err != nil {
@@ -251,7 +250,7 @@ func (r *RedisClusterReconciler) UpdateUpgradingStatus(ctx context.Context, redi
 	return nil
 }
 
-func (r *RedisClusterReconciler) UpgradeCluster(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
+func (r *RedisClusterReconciler) upgradeCluster(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
 
 	// If a Fast Upgrade is possible or already en progress, start it or check if it's already finished.
 	// In both situations we return here.
@@ -295,7 +294,7 @@ func (r *RedisClusterReconciler) doFastUpgrade(ctx context.Context, redisCluster
 		}
 
 		// Rebuild the cluster
-		err = r.FastUpgradeRebuildCluster(ctx, redisCluster, logger)
+		err = r.fastUpgradeRebuildCluster(ctx, redisCluster, logger)
 		if err != nil {
 			return true, err
 		}
@@ -311,21 +310,22 @@ func (r *RedisClusterReconciler) doFastUpgrade(ctx context.Context, redisCluster
 	// Fast upgrade: If purgeKeysOnRebalance property is set to 'true' and we have no replicas. No need to iterate over the partitions.
 	// If fast upgrade is not allowed but we have no replicas, the cluster must be scaled up adding one extra
 	// node to be able to move slots and keys in order to ensure keys are preserved.
-	if redisCluster.Spec.PurgeKeysOnRebalance && redisCluster.Spec.ReplicasPerMaster == 0 &&
-		redisCluster.Status.Substatus.Status != redisv1.SubstatusFastUpgrading {
+	if redisCluster.Spec.PurgeKeysOnRebalance && redisCluster.Spec.ReplicasPerMaster == 0 && redisCluster.Status.Substatus.Status != redisv1.SubstatusFastUpgrading {
 		r.logInfo(redisCluster.NamespacedName(), "Fast upgrade will be performed")
+
 		err := r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusFastUpgrading, 0)
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Error updating substatus")
 			return true, err
 		}
 
-		// ** FAST UPGRADE **
-		existingStatefulSet, err = r.UpgradeClusterConfigurationUpdate(ctx, redisCluster)
+		// Update configuration
+		existingStatefulSet, err = r.upgradeClusterConfigurationUpdate(ctx, redisCluster)
 		if err != nil {
 			return true, err
 		}
 
+		// ** FAST UPGRADE **
 		r.Client.Delete(ctx, existingStatefulSet)
 
 		return true, nil
@@ -353,7 +353,7 @@ func (r *RedisClusterReconciler) doSlowUpgrade(ctx context.Context, redisCluster
 	// We need to ensure that the upgrade is really necessary,
 	// and we are not just host to a double reconciliation attempt
 	if redisCluster.Status.Substatus.Status == "" {
-		err = r.UpdateUpgradingStatus(ctx, redisCluster)
+		err = r.updateUpgradingStatus(ctx, redisCluster)
 		if err != nil {
 			return fmt.Errorf("could not update upgrading status: %w", err)
 		}
@@ -399,7 +399,7 @@ func (r *RedisClusterReconciler) doSlowUpgrade(ctx context.Context, redisCluster
 	if redisCluster.Status.Substatus.Status == redisv1.SubstatusSlowUpgrading {
 
 		// Update labels, configuration, annotations, overrides, etc.
-		existingStatefulSet, err = r.UpgradeClusterConfigurationUpdate(ctx, redisCluster)
+		existingStatefulSet, err = r.upgradeClusterConfigurationUpdate(ctx, redisCluster)
 		if err != nil {
 			return err
 		}
@@ -507,7 +507,8 @@ func (r *RedisClusterReconciler) doSlowUpgrade(ctx context.Context, redisCluster
 	return nil
 }
 
-func (r *RedisClusterReconciler) UpgradeClusterConfigurationUpdate(ctx context.Context, redisCluster *redisv1.RedisCluster) (*v1.StatefulSet, error) {
+// Updates the StatefulSet configuration and labels, including overrides.
+func (r *RedisClusterReconciler) upgradeClusterConfigurationUpdate(ctx context.Context, redisCluster *redisv1.RedisCluster) (*v1.StatefulSet, error) {
 	req := ctrl.Request{
 		NamespacedName: types.NamespacedName{
 			Name:      redisCluster.Name,
@@ -581,22 +582,7 @@ func (r *RedisClusterReconciler) UpgradeClusterConfigurationUpdate(ctx context.C
 	return existingStatefulSet, nil
 }
 
-func (r *RedisClusterReconciler) FastUpgradeRollingUpdate(ctx context.Context, redisCluster *redisv1.RedisCluster, existingStatefulSet *v1.StatefulSet) error {
-	localPartition := int32(0)
-	maxUnavailable := intstr.FromString("100%")
-	existingStatefulSet.Spec.UpdateStrategy = v1.StatefulSetUpdateStrategy{
-		Type:          v1.RollingUpdateStatefulSetStrategyType,
-		RollingUpdate: &v1.RollingUpdateStatefulSetStrategy{Partition: &localPartition, MaxUnavailable: &maxUnavailable},
-	}
-	_, err := r.UpdateStatefulSet(ctx, existingStatefulSet, redisCluster)
-	if err != nil {
-		r.logError(redisCluster.NamespacedName(), err, "Could not update partition for Statefulset")
-		return err
-	}
-	return nil
-}
-
-func (r *RedisClusterReconciler) FastUpgradeRebuildCluster(ctx context.Context, redisCluster *redisv1.RedisCluster, logger logr.Logger) error {
+func (r *RedisClusterReconciler) fastUpgradeRebuildCluster(ctx context.Context, redisCluster *redisv1.RedisCluster, logger logr.Logger) error {
 	clusterNodes, err := r.getClusterNodes(ctx, redisCluster)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Could not get cluster nodes")
@@ -1671,21 +1657,21 @@ func (r *RedisClusterReconciler) addConfigChecksumAnnotation(statefulSet *v1.Sta
 		updatedAnnotations = statefulSet.Spec.Template.Annotations
 	}
 
-	updatedAnnotations[CONFIG_CHECKSUM_ANNOTATION] = checksum
+	updatedAnnotations[ConfigChecksumAnnotation] = checksum
 	statefulSet.Spec.Template.Annotations = updatedAnnotations
 
 	return statefulSet
 }
 
 // Checks if the configuration has changed.
-// If the annotation StatefulSet.Spec.Template.Annotations[CONFIG_CHECKSUM_ANNOTATION]  exists, we check first if the
+// If the annotation StatefulSet.Spec.Template.Annotations[ConfigChecksumAnnotation]  exists, we check first if the
 // configuration checksum has changed.
 // If not, we compare the configuration properties.
 func (r *RedisClusterReconciler) isConfigChanged(redisCluster *redisv1.RedisCluster, statefulSet *v1.StatefulSet,
 	configMap *corev1.ConfigMap) (bool, string) {
 	// Comparing config checksums
 	if statefulSet.Spec.Template.Annotations != nil {
-		checksum, exists := statefulSet.Spec.Template.Annotations[CONFIG_CHECKSUM_ANNOTATION]
+		checksum, exists := statefulSet.Spec.Template.Annotations[ConfigChecksumAnnotation]
 		if exists {
 			calculatedChecksum := calculateRCConfigChecksum(redisCluster)
 			if checksum != calculatedChecksum {

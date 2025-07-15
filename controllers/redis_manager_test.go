@@ -34,7 +34,7 @@ func TestUpdateScalingStatus_ScalingDown(t *testing.T) {
 
 	reconciler.FindExistingStatefulSetFunc = mockStatefulSet(newStatefulSet(rc, numStatefulSetReplicas))
 
-	_ = reconciler.UpdateScalingStatus(newContext(), rc)
+	_ = reconciler.updateScalingStatus(newContext(), rc)
 
 	assertStatusEqual(t, rc, redisv1.StatusScalingDown)
 	assertConditionTrue(t, rc, redisv1.ConditionScalingDown)
@@ -46,7 +46,7 @@ func TestUpdateScalingStatus_ScalingUp(t *testing.T) {
 
 	reconciler.FindExistingStatefulSetFunc = mockStatefulSet(newStatefulSet(rc, numStatefulSetReplicas))
 
-	_ = reconciler.UpdateScalingStatus(newContext(), rc)
+	_ = reconciler.updateScalingStatus(newContext(), rc)
 
 	assertStatusEqual(t, rc, redisv1.StatusScalingUp)
 	assertConditionFalse(t, rc, redisv1.ConditionScalingDown)
@@ -61,7 +61,7 @@ func TestUpdateScalingStatus_ScalingDown_Completed(t *testing.T) {
 
 	reconciler.FindExistingStatefulSetFunc = mockStatefulSet(newStatefulSet(rc, numStatefulSetReplicas))
 
-	_ = reconciler.UpdateScalingStatus(newContext(), rc)
+	_ = reconciler.updateScalingStatus(newContext(), rc)
 
 	assertStatusEqual(t, rc, redisv1.StatusReady)
 	assertConditionFalse(t, rc, redisv1.ConditionScalingDown)
@@ -81,7 +81,7 @@ func TestUpdateScalingStatus_ScalingUp_Completed(t *testing.T) {
 	reconciler.FindExistingStatefulSetFunc = mockStatefulSet(newStatefulSet(rc, numStatefulSetReplicas))
 	reconciler.GetReadyNodesFunc = mockReadyNodes(readyNodes)
 
-	_ = reconciler.UpdateScalingStatus(newContext(), rc)
+	_ = reconciler.updateScalingStatus(newContext(), rc)
 
 	assertStatusEqual(t, rc, redisv1.StatusReady)
 	assertConditionFalse(t, rc, redisv1.ConditionScalingDown)
@@ -99,7 +99,7 @@ func TestUpdateScalingStatus_ScalingUp_In_Progress(t *testing.T) {
 	reconciler.FindExistingStatefulSetFunc = mockStatefulSet(newStatefulSet(rc, numStatefulSetReplicas))
 	reconciler.GetReadyNodesFunc = mockReadyNodes(readyNodes)
 
-	_ = reconciler.UpdateScalingStatus(newContext(), rc)
+	_ = reconciler.updateScalingStatus(newContext(), rc)
 
 	assertStatusEqual(t, rc, redisv1.StatusScalingUp)
 	assertConditionFalse(t, rc, redisv1.ConditionScalingDown)
@@ -121,7 +121,7 @@ func TestUpdateUpgradingStatus_Upgrading_Config_Not_Changed(t *testing.T) {
 	reconciler.FindExistingStatefulSetFunc = mockStatefulSet(sset)
 	reconciler.FindExistingConfigMapFunc = mockConfigMap(configMap)
 
-	_ = reconciler.UpdateUpgradingStatus(newContext(), rc)
+	_ = reconciler.updateUpgradingStatus(newContext(), rc)
 
 	assertStatusEqual(t, rc, redisv1.StatusReady)
 	assertConditionFalse(t, rc, redisv1.ConditionUpgrading)
@@ -138,7 +138,7 @@ func TestUpdateUpgradingStatus_Upgrading_Completed(t *testing.T) {
 	reconciler.FindExistingStatefulSetFunc = mockStatefulSet(newStatefulSet(rc, rc.Spec.Replicas))
 	reconciler.FindExistingConfigMapFunc = mockConfigMap(configMap)
 
-	_ = reconciler.UpdateUpgradingStatus(newContext(), rc)
+	_ = reconciler.updateUpgradingStatus(newContext(), rc)
 
 	assertStatusEqual(t, rc, redisv1.StatusReady)
 	assertConditionFalse(t, rc, redisv1.ConditionUpgrading)
@@ -159,7 +159,7 @@ func TestUpdateUpgradingStatus_Upgrading_Config_Changed(t *testing.T) {
 	reconciler.FindExistingStatefulSetFunc = mockStatefulSet(newStatefulSet(rc, numStatefulSetReplicas))
 	reconciler.FindExistingConfigMapFunc = mockConfigMap(configMap)
 
-	_ = reconciler.UpdateUpgradingStatus(newContext(), rc)
+	_ = reconciler.updateUpgradingStatus(newContext(), rc)
 
 	assertStatusEqual(t, rc, redisv1.StatusUpgrading)
 	assertConditionTrue(t, rc, redisv1.ConditionUpgrading)
@@ -180,7 +180,7 @@ func TestUpdateUpgradingStatus_Upgrading_Limits_Cpu_Changed(t *testing.T) {
 	reconciler.FindExistingStatefulSetFunc = mockStatefulSet(sset)
 	reconciler.FindExistingConfigMapFunc = mockConfigMap(configMap)
 
-	_ = reconciler.UpdateUpgradingStatus(newContext(), rc)
+	_ = reconciler.updateUpgradingStatus(newContext(), rc)
 
 	assertStatusEqual(t, rc, redisv1.StatusUpgrading)
 	assertConditionTrue(t, rc, redisv1.ConditionUpgrading)
@@ -201,7 +201,7 @@ func TestUpdateUpgradingStatus_Upgrading_Requests_Cpu_Changed(t *testing.T) {
 	reconciler.FindExistingStatefulSetFunc = mockStatefulSet(sset)
 	reconciler.FindExistingConfigMapFunc = mockConfigMap(configMap)
 
-	_ = reconciler.UpdateUpgradingStatus(newContext(), rc)
+	_ = reconciler.updateUpgradingStatus(newContext(), rc)
 
 	assertStatusEqual(t, rc, redisv1.StatusUpgrading)
 	assertConditionTrue(t, rc, redisv1.ConditionUpgrading)
@@ -222,7 +222,7 @@ func TestUpdateUpgradingStatus_Upgrading_Limits_Memory_Changed(t *testing.T) {
 	reconciler.FindExistingStatefulSetFunc = mockStatefulSet(sset)
 	reconciler.FindExistingConfigMapFunc = mockConfigMap(configMap)
 
-	_ = reconciler.UpdateUpgradingStatus(newContext(), rc)
+	_ = reconciler.updateUpgradingStatus(newContext(), rc)
 
 	assertStatusEqual(t, rc, redisv1.StatusUpgrading)
 	assertConditionTrue(t, rc, redisv1.ConditionUpgrading)
@@ -243,7 +243,7 @@ func TestUpdateUpgradingStatus_Upgrading_Requests_Memory_Changed(t *testing.T) {
 	reconciler.FindExistingStatefulSetFunc = mockStatefulSet(sset)
 	reconciler.FindExistingConfigMapFunc = mockConfigMap(configMap)
 
-	_ = reconciler.UpdateUpgradingStatus(newContext(), rc)
+	_ = reconciler.updateUpgradingStatus(newContext(), rc)
 
 	assertStatusEqual(t, rc, redisv1.StatusUpgrading)
 	assertConditionTrue(t, rc, redisv1.ConditionUpgrading)
@@ -263,7 +263,7 @@ func TestUpdateUpgradingStatus_Upgrading_Image_Changed(t *testing.T) {
 	reconciler.FindExistingStatefulSetFunc = mockStatefulSet(sset)
 	reconciler.FindExistingConfigMapFunc = mockConfigMap(configMap)
 
-	_ = reconciler.UpdateUpgradingStatus(newContext(), rc)
+	_ = reconciler.updateUpgradingStatus(newContext(), rc)
 
 	assertStatusEqual(t, rc, redisv1.StatusUpgrading)
 	assertConditionTrue(t, rc, redisv1.ConditionUpgrading)
