@@ -206,7 +206,7 @@ func (r *RedisClusterReconciler) checkAndCreateStatefulSet(ctx context.Context, 
 				if err != nil {
 					r.logError(redisCluster.NamespacedName(), err, "Failed to update StatefulSet replicas")
 				}
-				return true, err
+				return immediateRequeue, err
 			}
 		}
 		if realExpectedReplicas < currSsetReplicas {
@@ -220,10 +220,6 @@ func (r *RedisClusterReconciler) checkAndCreateStatefulSet(ctx context.Context, 
 			if err != nil {
 				r.logError(redisCluster.NamespacedName(), err, "Failed to update StatefulSet replicas")
 			}
-		} else {
-			r.logInfo(redisCluster.NamespacedName(), "StatefulSet - Not all pods Ready", "StatefulSet replicas", currSsetReplicas,
-				"RedisCluster replicas", realExpectedReplicas)
-			immediateRequeue = true
 		}
 		return immediateRequeue, err
 	}
