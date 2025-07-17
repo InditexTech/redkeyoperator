@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -110,6 +111,11 @@ type Node struct {
 type SlotRange struct {
 	Start int `yaml:"start"`
 	End   int `yaml:"end"`
+}
+
+type ClusterReplicas struct {
+	Replicas          int `json:"replicas"`
+	ReplicasPerMaster int `json:"replicas_per_master"`
 }
 
 type Robin struct {
@@ -211,11 +217,40 @@ func (r *Robin) SetStatus(status string) error {
 	return nil
 }
 
-func (r *Robin) GetReplicas() (int, error) {
-	return 3, nil
+func (r *Robin) GetReplicas() (int, int, error) {
+	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/rediscluster/replicas"
+
+	body, err := doSimpleGet(url)
+	if err != nil {
+		return 0, 0, fmt.Errorf("getting Robin status: %w", err)
+	}
+
+	var clusterReplicas ClusterReplicas
+	err = json.Unmarshal(body, &clusterReplicas)
+	if err != nil {
+		return 0, 0, fmt.Errorf("parsing Robin status response: %w", err)
+	}
+
+	return clusterReplicas.Replicas, clusterReplicas.ReplicasPerMaster, nil
 }
 
-func (r *Robin) SetReplicas(replicas int) error {
+func (r *Robin) SetReplicas(clusterReplicas int, clusterReplicasPerMaster int) error {
+	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/rediscluster/replicas"
+
+	var replicas ClusterReplicas
+	replicas.Replicas = clusterReplicas
+	replicas.ReplicasPerMaster = clusterReplicasPerMaster
+	payload, err := json.Marshal(replicas)
+	if err != nil {
+		return fmt.Errorf("setting Robin status: %w", err)
+	}
+
+	body, err := doPut(url, payload)
+	if err != nil {
+		return fmt.Errorf("setting Robin status: %w", err)
+	}
+	r.Logger.Info("Robin cluster replicas updated", "replicas", replicas.Replicas, "replicas per master", replicas.ReplicasPerMaster, "response body", string(body))
+
 	return nil
 }
 
@@ -306,4 +341,14 @@ func CompareConfigurations(a, b *Configuration) bool {
 	*a2 = *a
 	a2.Redis.Cluster.Status = b.Redis.Cluster.Status
 	return reflect.DeepEqual(a2, b)
+}
+
+func (cn *ClusterNodes) GetMasterNodes() []*Node {
+	masterNodes := make([]*Node, 0)
+	for _, node := range cn.Nodes {
+		if strings.Contains(node.Flags, "master") {
+			masterNodes = append(masterNodes, &node)
+		}
+	}
+	return masterNodes
 }

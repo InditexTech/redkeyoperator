@@ -1,5 +1,5 @@
 # Robin base URL. Update the IP before launching any of the requests.
-@robinBaseUrl = http://10.244.0.84:8080
+@robinBaseUrl = http://10.244.0.67:8080
 
 # Metrics
 
@@ -51,6 +51,16 @@ GET {{robinBaseUrl}}/v1/cluster/nodes
 ### Fix
 
 PUT {{robinBaseUrl}}/v1/cluster/fix
+
+### Move
+
+PUT {{robinBaseUrl}}/v1/cluster/move
+
+{
+    "from": "1",
+    "to": "0",
+    "slots": 0
+}
 
 ### ResetNode
 

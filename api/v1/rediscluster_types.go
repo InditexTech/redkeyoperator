@@ -58,9 +58,12 @@ const (
 	SubstatusFastUpgrading         = "FastUpgrading"
 	SubstatusFastUpgradeFinalizing = "FastUpgradeFinalizing"
 	SubstatusSlowUpgrading         = "SlowUpgrading"
+	SubstatusUpgradingScaleUp      = "ScalingUp"
+	SubstatusUpgradingScaleDown    = "ScalingDown"
 
-	SubstatusScalingUp   = "ScalingUp"
-	SubstatusScalingDown = "ScalingDown"
+	SubstatusScalingPods       = "ScalingPods"
+	SubstatusScalingRobin      = "ScalingRobin"
+	SubstatusScalingFinalizing = "ScaleFinalizing"
 )
 
 var ConditionUpgrading = metav1.Condition{

@@ -267,12 +267,16 @@ func (r *RedisClusterReconciler) reconcileStatusUpgrading(ctx context.Context, r
 
 func (r *RedisClusterReconciler) reconcileStatusScalingDown(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, time.Duration) {
 	var requeue = true
-	err := r.ScaleCluster(ctx, redisCluster)
+	immediateRequeue, err := r.scaleCluster(ctx, redisCluster)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Error when scaling down")
 		r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
 		redisCluster.Status.Status = redisv1.StatusError
 		return requeue, DefaultRequeueTimeout
+	}
+	if immediateRequeue {
+		// Scaling the cluster may require requeues to wait for operations being done
+		return true, DefaultRequeueTimeout
 	}
 	err = r.updateScalingStatus(ctx, redisCluster)
 	if err != nil {
@@ -284,12 +288,16 @@ func (r *RedisClusterReconciler) reconcileStatusScalingDown(ctx context.Context,
 
 func (r *RedisClusterReconciler) reconcileStatusScalingUp(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, time.Duration) {
 	var requeue = true
-	err := r.ScaleCluster(ctx, redisCluster)
+	immediateRequeue, err := r.scaleCluster(ctx, redisCluster)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Error when scaling up")
 		r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
 		redisCluster.Status.Status = redisv1.StatusError
 		return requeue, DefaultRequeueTimeout
+	}
+	if immediateRequeue {
+		// Scaling the cluster may require requeues to wait for operations being done
+		return true, DefaultRequeueTimeout
 	}
 	err = r.updateScalingStatus(ctx, redisCluster)
 	if err != nil {
@@ -302,44 +310,16 @@ func (r *RedisClusterReconciler) reconcileStatusScalingUp(ctx context.Context, r
 func (r *RedisClusterReconciler) reconcileStatusError(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, time.Duration) {
 	var requeue = true
 	var requeueAfter = ErrorRequeueTimeout
-	var stsStorage, stsStorageClassName string
 
 	// If storage config is not consistent do not try to recover from Error.
 	if !r.checkStorageConfigConsistency(ctx, redisCluster, false) {
 		return requeue, requeueAfter
 	}
 
-	sset, err := r.FindExistingStatefulSet(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name, Namespace: redisCluster.Namespace}})
-	if err == nil {
-		// validate forbidden properties
-		if sset != nil && sset.Spec.VolumeClaimTemplates != nil && len(sset.Spec.VolumeClaimTemplates) > 0 {
-			stsStorage = sset.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests.Storage().String()
-			if sset.Spec.VolumeClaimTemplates[0].Spec.StorageClassName != nil {
-				stsStorageClassName = *sset.Spec.VolumeClaimTemplates[0].Spec.StorageClassName
-			}
-		}
-	}
-
-	// Try to recover from Error status if storage configuration led to this but it has been now fixed.
-	if redisCluster.Spec.Storage == stsStorage && redisCluster.Spec.StorageClassName == stsStorageClassName {
-		err := r.ScaleCluster(ctx, redisCluster)
-		if err == nil {
-			err = r.updateScalingStatus(ctx, redisCluster)
-			if err != nil {
-				r.logError(redisCluster.NamespacedName(), err, "Error when updating scaling status")
-				r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
-			}
-		} else {
-			r.logError(redisCluster.NamespacedName(), err, "Error when scaling cluster")
-			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
-		}
-		requeueAfter = DefaultRequeueTimeout
-	}
-
 	// Check and update RedisCluster status value accordingly to its configuration and status
 	// -> Cluster needs to be scaled?
 	if redisCluster.Status.Status == redisv1.StatusError {
-		err = r.updateScalingStatus(ctx, redisCluster)
+		err := r.updateScalingStatus(ctx, redisCluster)
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Error when updating scaling status")
 			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
@@ -347,7 +327,7 @@ func (r *RedisClusterReconciler) reconcileStatusError(ctx context.Context, redis
 	}
 	// -> Cluster needs to be upgraded?
 	if redisCluster.Status.Status == redisv1.StatusError {
-		err = r.updateUpgradingStatus(ctx, redisCluster)
+		err := r.updateUpgradingStatus(ctx, redisCluster)
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Error when updating upgrading status")
 			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())

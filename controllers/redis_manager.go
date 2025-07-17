@@ -251,7 +251,7 @@ func (r *RedisClusterReconciler) doSlowUpgrade(ctx context.Context, redisCluster
 		scaledBeforeUpgrade = true
 	}
 
-	if redisCluster.Status.Substatus.Status == "" || redisCluster.Status.Substatus.Status == redisv1.SubstatusScalingUp {
+	if redisCluster.Status.Substatus.Status == "" || redisCluster.Status.Substatus.Status == redisv1.SubstatusUpgradingScaleUp {
 		// Do not update substatus if we are resuming an upgrade
 		err = r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusSlowUpgrading, 0)
 		if err != nil {
@@ -295,7 +295,7 @@ func (r *RedisClusterReconciler) doSlowUpgrade(ctx context.Context, redisCluster
 			// otherwise use the replica count one from before.
 			// Unless we are resuming an upgrade after an error when scaling down.
 			if int(*(existingStatefulSet.Spec.UpdateStrategy.RollingUpdate.Partition)) > 0 ||
-				redisCluster.Status.Substatus.Status == redisv1.SubstatusScalingDown {
+				redisCluster.Status.Substatus.Status == redisv1.SubstatusUpgradingScaleDown {
 				r.logInfo(redisCluster.NamespacedName(), "Update Strategy already set. Reusing partition", "partition", existingStatefulSet.Spec.UpdateStrategy.RollingUpdate.Partition)
 				startingPartition = int(*(existingStatefulSet.Spec.UpdateStrategy.RollingUpdate.Partition))
 			}
@@ -324,13 +324,13 @@ func (r *RedisClusterReconciler) doSlowUpgrade(ctx context.Context, redisCluster
 	// Scale down the cluster if an extra node where added before upgrading
 	if scaledBeforeUpgrade {
 		r.logInfo(redisCluster.NamespacedName(), "Scaling down after the upgrade")
-		err = r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusScalingDown, 0)
+		err = r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusUpgradingScaleDown, 0)
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Error updating substatus")
 			return err
 		}
 		redisCluster.Spec.Replicas--
-		err = r.ScaleCluster(ctx, redisCluster)
+		_, err = r.scaleCluster(ctx, redisCluster)
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Error scaling down after the upgrade")
 			return err
@@ -725,6 +725,235 @@ func (r *RedisClusterReconciler) UpgradePartitionWithReplicas(ctx context.Contex
 	return nil
 }
 
+func (r *RedisClusterReconciler) scaleCluster(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, error) {
+	var err error
+
+	// By introducing master-replica cluster, the replicas returned by statefulset (which includes replica nodes) and
+	// redisCluster's replicas (which is just masters) may not match if replicasPerMaster != 0
+	realExpectedReplicas := int32(redisCluster.NodesNeeded())
+	r.logInfo(redisCluster.NamespacedName(), "Expected cluster nodes", "Master nodes", redisCluster.Spec.Replicas, "Total nodes (including replicas)", realExpectedReplicas)
+
+	sset, sset_err := r.FindExistingStatefulSet(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name, Namespace: redisCluster.Namespace}})
+	if sset_err != nil {
+		return true, err
+	}
+	currSsetReplicas := *(sset.Spec.Replicas)
+
+	if realExpectedReplicas == currSsetReplicas {
+		// Complete scaling
+		immediateRequeue, err := r.completeClusterScale(ctx, redisCluster)
+		if err != nil || immediateRequeue {
+			return immediateRequeue, err
+		}
+	} else if realExpectedReplicas < currSsetReplicas {
+		// Scaling down
+		err := r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusScalingPods, 0)
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error updating substatus")
+			return true, err
+		}
+		err = r.scaleDownCluster(ctx, redisCluster)
+		if err != nil {
+			return true, err
+		}
+	} else {
+		// Scaling up
+		err := r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusScalingPods, 0)
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error updating substatus")
+			return true, err
+		}
+		err = r.scaleUpCluster(ctx, redisCluster, realExpectedReplicas)
+		if err != nil {
+			return true, err
+		}
+	}
+
+	// PodDisruptionBudget update
+	// We use currSsetReplicas to check the configured number of replicas (not taking int account the extra pod if created)
+	if redisCluster.Spec.Pdb.Enabled && math.Min(float64(redisCluster.Spec.Replicas), float64(currSsetReplicas)) > 1 {
+		err = r.updatePodDisruptionBudget(ctx, redisCluster)
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "ScaleCluster - Failed to update PodDisruptionBudget")
+		} else {
+			r.logInfo(redisCluster.NamespacedName(), "ScaleCluster - PodDisruptionBudget updated ", "Name", redisCluster.Name+"-pdb")
+		}
+	}
+
+	return false, nil
+
+	// // scaling down: if data migration takes place, move slots
+	// if realExpectedReplicas < currSsetReplicas {
+	// 	err = r.ReOrientClusterForScaleDown(ctx, redisCluster)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+
+	// 	// and scale the statefulset
+	// 	sset.Spec.Replicas = &realExpectedReplicas
+	// 	_, err = r.updateStatefulSet(ctx, sset, redisCluster)
+	// 	if err != nil {
+	// 		r.logError(redisCluster.NamespacedName(), err, "Failed to update StatefulSet")
+	// 		return err
+	// 	}
+
+	// 	if redisCluster.Spec.DeletePVC && !redisCluster.Spec.Ephemeral {
+	// 		err = r.scaleDownClusterNodes(ctx, redisCluster, realExpectedReplicas)
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 	}
+	// }
+
+	// readyNodes, err := r.GetReadyNodes(ctx, redisCluster)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// // Scaling up and all pods became ready
+	// r.logInfo(redisCluster.NamespacedName(), "Review state to scale Up ", "desiredReplicas:", strconv.Itoa(int(redisCluster.Spec.Replicas)), "numReadyNodes: ", strconv.Itoa(len(readyNodes)), "statefulReplicas", strconv.Itoa(int(currSsetReplicas)))
+
+	// if int32(redisCluster.NodesNeeded()) == currSsetReplicas && int(realExpectedReplicas) == len(readyNodes) {
+	// 	r.logInfo(redisCluster.NamespacedName(), "Scaling is completed. Running forget unnecessary nodes, clustermeet, rebalance")
+	// 	err = r.scaleUpClusterNodes(ctx, redisCluster)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// }
+
+	// // If we scaled up, we need to reload the statefulset,
+	// // as it'sbeen a while since we loaded it, and the status could have changed.
+	// r.logInfo(redisCluster.NamespacedName(), "ScaleCluster - updating statefulset replicas", "newsize", realExpectedReplicas)
+	// sset, err = r.FindExistingStatefulSet(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name, Namespace: redisCluster.Namespace}})
+	// if err != nil {
+	// 	return err
+	// }
+	// sset.Spec.Replicas = &realExpectedReplicas
+	// sset, err = r.updateStatefulSet(ctx, sset, redisCluster)
+	// if err != nil {
+	// 	r.logError(redisCluster.NamespacedName(), err, "Failed to update StatefulSet")
+	// 	return err
+	// }
+
+}
+
+func (r *RedisClusterReconciler) scaleDownCluster(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
+
+	// r.scaleDownClusterNodes(ctx, redisCluster, realExpectedReplicas)
+	// borrado de pvcs
+
+	return nil
+}
+
+func (r *RedisClusterReconciler) scaleUpCluster(ctx context.Context, redisCluster *redisv1.RedisCluster, realExpectedReplicas int32) error {
+	r.logInfo(redisCluster.NamespacedName(), "ScaleCluster - updating statefulset replicas", "newsize", realExpectedReplicas)
+
+	sset, err := r.FindExistingStatefulSet(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name, Namespace: redisCluster.Namespace}})
+	if err != nil {
+		return err
+	}
+
+	sset.Spec.Replicas = &realExpectedReplicas
+	_, err = r.updateStatefulSet(ctx, sset, redisCluster)
+	if err != nil {
+		r.logError(redisCluster.NamespacedName(), err, "Failed to update StatefulSet")
+		return err
+	}
+
+	return nil
+}
+
+func (r *RedisClusterReconciler) completeClusterScale(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, error) {
+	logger := r.getHelperLogger((redisCluster.NamespacedName()))
+	robin, err := robin.NewRobin(ctx, r.Client, redisCluster, logger)
+	if err != nil {
+		r.logError(redisCluster.NamespacedName(), err, "Error getting Robin to get cluster nodes")
+		return true, err
+	}
+
+	switch redisCluster.Status.Substatus.Status {
+	case redisv1.SubstatusScalingPods:
+		// StatefulSet has been updated with new replicas/replicasPerMaster at this point.
+		// We will ensure all pods are Ready and, then, update the new replicas in Robin.
+
+		// If not all pods ready requeue to keep waiting
+		podsReady, err := r.allPodsReady(ctx, redisCluster)
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Could not check for pods being ready")
+			return true, err
+		}
+		if !podsReady {
+			r.logInfo(redisCluster.NamespacedName(), "Waiting for pods to become ready to end Fast Upgrade", "expected nodes", redisCluster.NodesNeeded())
+			return true, nil
+		}
+
+		// Update Robin with new replicas/replicasPerMaster
+		err = robin.SetReplicas(int(redisCluster.Spec.Replicas), int(redisCluster.Spec.ReplicasPerMaster))
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error updating replicas in Robin", "replicas", redisCluster.Spec.Replicas, "replicasPerMaster", redisCluster.Spec.ReplicasPerMaster)
+			return true, err
+		}
+
+		// Update the status to continue completing the cluster scaling
+		err = r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusScalingRobin, 0)
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error updating substatus")
+			return true, err
+		}
+
+		return true, nil // Cluster scaling not completed -> requeue
+
+	case redisv1.SubstatusScalingRobin:
+		// Robin was already updated with new replicas/replicasPerMaster.
+		// We will ensure that all cluster nodes are initialized before asking Robin to meet all new nodes,
+		// forget outdated nodes, ensure slots coverage and rebalance.
+
+		clusterNodes, err := robin.GetClusterNodes()
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error getting cluster nodes from Robin")
+			return true, err
+		}
+		masterNodes := clusterNodes.GetMasterNodes()
+		if len(masterNodes) != int(redisCluster.Spec.Replicas) {
+			r.logInfo(redisCluster.NamespacedName(), "ScaleCluster - Inconsistency. Statefulset replicas equals to RedisCluster replicas but we have a different number of cluster nodes. Trying to fix it...",
+				"RedisCluster replicas", redisCluster.Spec.Replicas, "Cluster nodes", masterNodes)
+		}
+		err = robin.ClusterFix()
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error asking to Robin to ensure the cluster is ok")
+			return true, err
+		}
+		err = r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusScalingFinalizing, 0)
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error updating substatus")
+			return true, err
+		}
+
+		return true, nil // Cluster scaling not completed -> requeue
+
+	case redisv1.SubstatusScalingFinalizing:
+		// Final step: ensure the cluster is Ok.
+
+		check, errors, warnings, err := robin.ClusterCheck()
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error checking the cluster readiness over Robin")
+			return true, err
+		}
+		if !check {
+			// Cluster scaling not completed -> requeue
+			r.logInfo(redisCluster.NamespacedName(), "ScaleCluster - Waiting for Redis cluster readiness before ending the cluster scaling", "errors", errors, "warnings", warnings)
+			return true, nil
+		}
+
+	default:
+		r.logError(redisCluster.NamespacedName(), nil, "Substatus not coherent", "substatus", redisCluster.Status.Substatus.Status)
+		return true, nil
+	}
+
+	// Cluster scaling completed!
+	return false, nil
+}
+
 // GetSidedNodesForScaleDown splits the cluster nodes into two sides. Left and Right.
 // This is usually used when a cluster is about to scale down.
 // We can work out which nodes will be left after we have scaled down, and which will have bee cut off.
@@ -1057,126 +1286,6 @@ func (r *RedisClusterReconciler) ReOrientClusterForScaleDown(ctx context.Context
 	return nil
 }
 
-func (r *RedisClusterReconciler) ScaleCluster(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
-	var err error
-
-	sset, sset_err := r.FindExistingStatefulSet(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name, Namespace: redisCluster.Namespace}})
-	if sset_err != nil {
-		return err
-	}
-
-	// When scaling up the cluster and one or more pods are evicted by K8s the cluster can stuck on ScalingUp
-	// status. To solve this issue we forget outdated nodes.
-	clusterNodes, err := r.getClusterNodes(ctx, redisCluster)
-	if err != nil {
-		r.logError(redisCluster.NamespacedName(), err, "Could not get cluster nodes")
-		return err
-	}
-	// Free cluster nodes to avoid memory consumption
-	defer r.freeClusterNodes(clusterNodes, redisCluster.NamespacedName())
-	err = clusterNodes.RemoveClusterOutdatedNodes(ctx, redisCluster, r.getHelperLogger(redisCluster.NamespacedName()))
-	if err != nil {
-		r.logError(redisCluster.NamespacedName(), err, "Could not check outdated nodes")
-	}
-
-	// @TODO Cleanup
-	readyNodes, err := r.GetReadyNodes(ctx, redisCluster)
-	if err != nil {
-		return err
-	}
-
-	currSsetReplicas := *(sset.Spec.Replicas)
-
-	// By introducing master-replica cluster, the replicas returned by statefulset (which includes replica nodes) and
-	// redisCluster's replicas (which is just masters) may not match if replicasPerMaster != 0
-	realExpectedReplicas := int32(redisCluster.NodesNeeded())
-	r.logInfo(redisCluster.NamespacedName(), "Expected real replicas", "Master Replicas", redisCluster.Spec.Replicas, "Real Replicas", realExpectedReplicas)
-
-	// scaling down: if data migration takes place, move slots
-	if realExpectedReplicas < currSsetReplicas {
-		err = r.ReOrientClusterForScaleDown(ctx, redisCluster)
-		if err != nil {
-			return err
-		}
-
-		// and scale the statefulset
-		sset.Spec.Replicas = &realExpectedReplicas
-		_, err = r.updateStatefulSet(ctx, sset, redisCluster)
-		if err != nil {
-			r.logError(redisCluster.NamespacedName(), err, "Failed to update StatefulSet")
-			return err
-		}
-
-		if redisCluster.Spec.DeletePVC && !redisCluster.Spec.Ephemeral {
-			err = r.scaleDownClusterNodes(ctx, redisCluster, realExpectedReplicas)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	// Scaling up and all pods became ready
-	r.logInfo(redisCluster.NamespacedName(), "Review state to scale Up ", "desiredReplicas:", strconv.Itoa(int(redisCluster.Spec.Replicas)), "numReadyNodes: ", strconv.Itoa(len(readyNodes)), "statefulReplicas", strconv.Itoa(int(currSsetReplicas)))
-
-	if int32(redisCluster.NodesNeeded()) == currSsetReplicas && int(realExpectedReplicas) == len(readyNodes) {
-		r.logInfo(redisCluster.NamespacedName(), "Scaling is completed. Running forget unnecessary nodes, clustermeet, rebalance")
-		err = r.scaleUpClusterNodes(ctx, redisCluster)
-		if err != nil {
-			return err
-		}
-	}
-
-	// If we scaled up, we need to reload the statefulset,
-	// as it'sbeen a while since we loaded it, and the status could have changed.
-	r.logInfo(redisCluster.NamespacedName(), "ScaleCluster - updating statefulset replicas", "newsize", realExpectedReplicas)
-	sset, err = r.FindExistingStatefulSet(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name, Namespace: redisCluster.Namespace}})
-	if err != nil {
-		return err
-	}
-	sset.Spec.Replicas = &realExpectedReplicas
-	sset, err = r.updateStatefulSet(ctx, sset, redisCluster)
-	if err != nil {
-		r.logError(redisCluster.NamespacedName(), err, "Failed to update StatefulSet")
-		return err
-	}
-
-	// Robin deployment update
-	if redisCluster.Spec.Robin != nil {
-		if redisCluster.Spec.Robin.Template != nil {
-			mdep, err := r.FindExistingDeployment(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}})
-			if err != nil {
-				r.logError(redisCluster.NamespacedName(), err, "ScaleCluster - Cannot find existing robin deployment", "deployment", redisCluster.Name+"-robin")
-			} else {
-				desiredReplicas := int32(0)
-				if *sset.Spec.Replicas > 0 {
-					desiredReplicas = int32(1)
-				}
-				if *mdep.Spec.Replicas != desiredReplicas {
-					mdep.Spec.Replicas = &desiredReplicas
-					mdep, err = r.updateDeployment(ctx, mdep, redisCluster)
-					if err != nil {
-						r.logError(redisCluster.NamespacedName(), err, "ScaleCluster - Failed to update Deployment replicas")
-					} else {
-						r.logInfo(redisCluster.NamespacedName(), "ScaleCluster - Robin Deployment replicas updated", "Replicas", mdep.Spec.Replicas)
-					}
-				}
-			}
-		}
-	}
-	// PodDisruptionBudget update
-	// We use currSsetReplicas to check the configured number of replicas (not taking int account the extra pod if created)
-	if redisCluster.Spec.Pdb.Enabled && math.Min(float64(redisCluster.Spec.Replicas), float64(currSsetReplicas)) > 1 {
-		err = r.updatePodDisruptionBudget(ctx, redisCluster)
-		if err != nil {
-			r.logError(redisCluster.NamespacedName(), err, "ScaleCluster - Failed to update PodDisruptionBudget")
-		} else {
-			r.logInfo(redisCluster.NamespacedName(), "ScaleCluster - PodDisruptionBudget updated ", "Name", redisCluster.Name+"-pdb")
-		}
-	}
-
-	return nil
-}
-
 func (r *RedisClusterReconciler) scaleDownClusterNodes(ctx context.Context, redisCluster *redisv1.RedisCluster, realExpectedReplicas int32) error {
 	clusterNodes, err := r.getClusterNodes(ctx, redisCluster)
 	if err != nil {
@@ -1463,14 +1572,14 @@ func (r *RedisClusterReconciler) scaleUpForUpgrade(ctx context.Context, redisClu
 	originalCount := redisCluster.Spec.Replicas
 	if *sset.Spec.Replicas == originalCount && redisCluster.Status.Substatus.Status == "" {
 		redisCluster.Spec.Replicas++
-		err = r.ScaleCluster(ctx, redisCluster)
+		_, err = r.scaleCluster(ctx, redisCluster)
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Error when scaling up")
 			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
 			redisCluster.Status.Status = redisv1.StatusError
 			return false, err
 		}
-		err = r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusScalingUp, 0)
+		err = r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusUpgradingScaleUp, 0)
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Error updating substatus")
 			return false, err

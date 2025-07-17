@@ -129,11 +129,13 @@ func (r *RedisClusterReconciler) updateScalingStatus(ctx context.Context, redisC
 	if realExpectedReplicas == currSsetReplicas {
 		if redisCluster.Status.Status == redisv1.StatusScalingDown {
 			redisCluster.Status.Status = redisv1.StatusReady
+			redisCluster.Status.Substatus.Status = ""
 			setConditionFalse(logger, redisCluster, redisv1.ConditionScalingDown)
 		}
 		if redisCluster.Status.Status == redisv1.StatusScalingUp {
 			if len(redisCluster.Status.Nodes) == int(currSsetReplicas) {
 				redisCluster.Status.Status = redisv1.StatusReady
+				redisCluster.Status.Substatus.Status = ""
 				setConditionFalse(logger, redisCluster, redisv1.ConditionScalingUp)
 			}
 		}
