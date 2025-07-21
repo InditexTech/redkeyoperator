@@ -274,3 +274,26 @@ func (r RedisCluster) NamespacedName() types.NamespacedName {
 		Name:      r.GetName(),
 	}
 }
+
+func CompareStatuses(a, b *RedisClusterStatus) bool {
+	if a.Status != b.Status {
+		return false
+	}
+	if a.Substatus.Status != b.Substatus.Status {
+		return false
+	}
+	for _, nodeA := range a.Nodes {
+		nodeB := RedisNode{}
+		for _, node := range b.Nodes {
+			if node.Name == nodeA.Name {
+				nodeB = *node
+				break
+			}
+		}
+		if nodeA.Name != nodeB.Name || nodeA.IP != nodeB.IP || nodeA.IsMaster != nodeB.IsMaster || nodeA.ReplicaOf != nodeB.ReplicaOf {
+			return false
+		}
+	}
+
+	return true
+}

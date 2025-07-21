@@ -157,30 +157,6 @@ func NewRobin(ctx context.Context, client ctrlClient.Client, redisCluster *redis
 	return robin, nil
 }
 
-// Updates configuration in Robin ConfigMap with the new state from the RedisCluster object.
-func PersistRobinStatut(ctx context.Context, client ctrlClient.Client, redisCluster *redisv1.RedisCluster) error {
-	cmap := &corev1.ConfigMap{}
-	err := client.Get(ctx, types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}, cmap)
-	if err != nil {
-		return err
-	}
-	var config Configuration
-	if err := yaml.Unmarshal([]byte(cmap.Data["application-configmap.yml"]), &config); err != nil {
-		return fmt.Errorf("persist Robin status: %w", err)
-	}
-	config.Redis.Cluster.Status = redisCluster.Status.Status
-	confUpdated, err := yaml.Marshal(config)
-	if err != nil {
-		return fmt.Errorf("persist Robin status: %w", err)
-	}
-	cmap.Data["application-configmap.yml"] = string(confUpdated)
-	if err = client.Update(ctx, cmap); err != nil {
-		return fmt.Errorf("persist Robin status: %w", err)
-	}
-
-	return nil
-}
-
 func (r *Robin) GetStatus() (string, error) {
 	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/rediscluster/status"
 
@@ -340,6 +316,7 @@ func CompareConfigurations(a, b *Configuration) bool {
 	a2 := new(Configuration)
 	*a2 = *a
 	a2.Redis.Cluster.Status = b.Redis.Cluster.Status
+	a2.Redis.Cluster.Replicas = b.Redis.Cluster.Replicas
 	return reflect.DeepEqual(a2, b)
 }
 
@@ -351,4 +328,62 @@ func (cn *ClusterNodes) GetMasterNodes() []*Node {
 		}
 	}
 	return masterNodes
+}
+
+func (cn *ClusterNodes) GetReplicaNodes() []*Node {
+	replicaNodes := make([]*Node, 0)
+	for _, node := range cn.Nodes {
+		if !strings.Contains(node.Flags, "master") {
+			replicaNodes = append(replicaNodes, &node)
+		}
+	}
+	return replicaNodes
+}
+
+// Updates configuration in Robin ConfigMap with the new state from the RedisCluster object.
+func PersistRobinStatut(ctx context.Context, client ctrlClient.Client, redisCluster *redisv1.RedisCluster) error {
+	cmap := &corev1.ConfigMap{}
+	err := client.Get(ctx, types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}, cmap)
+	if err != nil {
+		return err
+	}
+	var config Configuration
+	if err := yaml.Unmarshal([]byte(cmap.Data["application-configmap.yml"]), &config); err != nil {
+		return fmt.Errorf("persist Robin status: %w", err)
+	}
+	config.Redis.Cluster.Status = redisCluster.Status.Status
+	confUpdated, err := yaml.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("persist Robin status: %w", err)
+	}
+	cmap.Data["application-configmap.yml"] = string(confUpdated)
+	if err = client.Update(ctx, cmap); err != nil {
+		return fmt.Errorf("persist Robin status: %w", err)
+	}
+
+	return nil
+}
+
+// Updates configuration in Robin ConfigMap with the new replicas from the RedisCluster object.
+func PersistRobinReplicas(ctx context.Context, client ctrlClient.Client, redisCluster *redisv1.RedisCluster) error {
+	cmap := &corev1.ConfigMap{}
+	err := client.Get(ctx, types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}, cmap)
+	if err != nil {
+		return err
+	}
+	var config Configuration
+	if err := yaml.Unmarshal([]byte(cmap.Data["application-configmap.yml"]), &config); err != nil {
+		return fmt.Errorf("persist Robin replicas: %w", err)
+	}
+	config.Redis.Cluster.Replicas = int(redisCluster.Spec.Replicas)
+	confUpdated, err := yaml.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("persist Robin replicas: %w", err)
+	}
+	cmap.Data["application-configmap.yml"] = string(confUpdated)
+	if err = client.Update(ctx, cmap); err != nil {
+		return fmt.Errorf("persist Robin replicas: %w", err)
+	}
+
+	return nil
 }

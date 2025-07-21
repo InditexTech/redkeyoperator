@@ -209,18 +209,18 @@ func (r *RedisClusterReconciler) checkAndCreateStatefulSet(ctx context.Context, 
 				return immediateRequeue, err
 			}
 		}
-		if realExpectedReplicas < currSsetReplicas {
-			// Inconsistency: if a scaleup could not be completed because of a lack of resources that prevented
-			// all the needed pods from being created
-			// StatefulSet replicas are then aligned with RedisCluster replicas
-			r.logInfo(redisCluster.NamespacedName(), "Not all required pods instantiated: aligning StatefulSet <-> RedisCluster replicas",
-				"StatefulSet replicas", currSsetReplicas, "RedisCluster replicas", realExpectedReplicas)
-			statefulSet.Spec.Replicas = &realExpectedReplicas
-			_, err = r.updateStatefulSet(ctx, statefulSet, redisCluster)
-			if err != nil {
-				r.logError(redisCluster.NamespacedName(), err, "Failed to update StatefulSet replicas")
-			}
-		}
+		// if realExpectedReplicas < currSsetReplicas {
+		// 	// Inconsistency: if a scaleup could not be completed because of a lack of resources that prevented
+		// 	// all the needed pods from being created
+		// 	// StatefulSet replicas are then aligned with RedisCluster replicas
+		// 	r.logInfo(redisCluster.NamespacedName(), "Not all required pods instantiated: aligning StatefulSet <-> RedisCluster replicas",
+		// 		"StatefulSet replicas", currSsetReplicas, "RedisCluster replicas", realExpectedReplicas)
+		// 	statefulSet.Spec.Replicas = &realExpectedReplicas
+		// 	_, err = r.updateStatefulSet(ctx, statefulSet, redisCluster)
+		// 	if err != nil {
+		// 		r.logError(redisCluster.NamespacedName(), err, "Failed to update StatefulSet replicas")
+		// 	}
+		// }
 		return immediateRequeue, err
 	}
 	return immediateRequeue, nil

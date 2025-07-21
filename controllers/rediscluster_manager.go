@@ -6,7 +6,6 @@ package controllers
 
 import (
 	"context"
-	"reflect"
 	"slices"
 	"strings"
 	"time"
@@ -33,6 +32,7 @@ import (
 
 const (
 	DefaultRequeueTimeout time.Duration = 5
+	ScalingDefaultTimeout time.Duration = 30
 	ReadyRequeueTimeout   time.Duration = 30
 	ErrorRequeueTimeout   time.Duration = 30
 )
@@ -129,7 +129,7 @@ func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req
 	}
 
 	var updateErr error
-	if !reflect.DeepEqual(redisCluster.Status, currentStatus) {
+	if !redisv1.CompareStatuses(&redisCluster.Status, &currentStatus) {
 		updateErr = r.updateClusterStatus(ctx, redisCluster)
 	}
 
@@ -201,12 +201,36 @@ func (r *RedisClusterReconciler) reconcileStatusConfiguring(ctx context.Context,
 
 	// Ask Robin for Redis cluster readiness
 	logger := r.getHelperLogger((redisCluster.NamespacedName()))
-	robin, err := robin.NewRobin(ctx, r.Client, redisCluster, logger)
+	robinRedis, err := robin.NewRobin(ctx, r.Client, redisCluster, logger)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Error getting Robin to check the cluster readiness")
 		return true, DefaultRequeueTimeout
 	}
-	check, errors, warnings, err := robin.ClusterCheck()
+	replicas, replicasPerMaster, err := robinRedis.GetReplicas()
+	if err != nil {
+		r.logError(redisCluster.NamespacedName(), err, "Error getting Robin replicas")
+		return true, DefaultRequeueTimeout
+	}
+
+	// Update Robin replicas if needed.
+	if replicas != int(redisCluster.Spec.Replicas) || replicasPerMaster != int(redisCluster.Spec.ReplicasPerMaster) {
+		r.logInfo(redisCluster.NamespacedName(), "Robin replicas updated", "replicas before", replicas, "replicas after", redisCluster.Spec.Replicas,
+			"replicas per master before", replicasPerMaster, "replicas per master after", redisCluster.Spec.ReplicasPerMaster)
+		err = robinRedis.SetReplicas(int(redisCluster.Spec.Replicas), int(redisCluster.Spec.ReplicasPerMaster))
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error updating Robin replicas")
+			return true, DefaultRequeueTimeout
+		}
+		err = robin.PersistRobinReplicas(ctx, r.Client, redisCluster)
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error persisting Robin replicas")
+			return true, DefaultRequeueTimeout
+		}
+		return true, DefaultRequeueTimeout // Requeue to let Robin update the cluster
+	}
+
+	// Check cluster readiness.
+	check, errors, warnings, err := robinRedis.ClusterCheck()
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Error checking the cluster readiness over Robin")
 		return true, DefaultRequeueTimeout
@@ -276,14 +300,14 @@ func (r *RedisClusterReconciler) reconcileStatusScalingDown(ctx context.Context,
 	}
 	if immediateRequeue {
 		// Scaling the cluster may require requeues to wait for operations being done
-		return true, DefaultRequeueTimeout
+		return true, ScalingDefaultTimeout
 	}
 	err = r.updateScalingStatus(ctx, redisCluster)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Error when updating scaling status")
 		r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
 	}
-	return requeue, DefaultRequeueTimeout
+	return requeue, ScalingDefaultTimeout
 }
 
 func (r *RedisClusterReconciler) reconcileStatusScalingUp(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, time.Duration) {
@@ -297,14 +321,14 @@ func (r *RedisClusterReconciler) reconcileStatusScalingUp(ctx context.Context, r
 	}
 	if immediateRequeue {
 		// Scaling the cluster may require requeues to wait for operations being done
-		return true, DefaultRequeueTimeout
+		return true, ScalingDefaultTimeout
 	}
 	err = r.updateScalingStatus(ctx, redisCluster)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Error when updating scaling status")
 		r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
 	}
-	return requeue, DefaultRequeueTimeout
+	return requeue, ScalingDefaultTimeout
 }
 
 func (r *RedisClusterReconciler) reconcileStatusError(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, time.Duration) {
