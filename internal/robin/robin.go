@@ -268,6 +268,15 @@ func (r *Robin) GetClusterNodes() (ClusterNodes, error) {
 }
 
 func (r *Robin) ClusterFix() error {
+	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/cluster/fix"
+
+	var payload []byte
+	body, err := doPut(url, payload)
+	if err != nil {
+		return fmt.Errorf("cluster fix: %w", err)
+	}
+	r.Logger.Info("Asked to Robin to fix the cluster", "response body", string(body))
+
 	return nil
 }
 
