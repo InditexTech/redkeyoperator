@@ -136,7 +136,7 @@ func (r *RedisClusterReconciler) doFastUpgrade(ctx context.Context, redisCluster
 			return true, err
 		}
 
-		err = r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusFastUpgradeFinalizing, 0)
+		err = r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusEndingFastUpgrading, 0)
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Error updating substatus")
 			return true, err
@@ -144,7 +144,7 @@ func (r *RedisClusterReconciler) doFastUpgrade(ctx context.Context, redisCluster
 
 		return true, nil
 
-	case redisv1.SubstatusFastUpgradeFinalizing:
+	case redisv1.SubstatusEndingFastUpgrading:
 		// Rebuilding the cluster after recreating all node pods. Check if the cluster is ready to end the Fast upgrade.
 		logger := r.getHelperLogger(redisCluster.NamespacedName())
 		robin, err := robin.NewRobin(ctx, r.Client, redisCluster, logger)
@@ -250,7 +250,7 @@ func (r *RedisClusterReconciler) doSlowUpgrade(ctx context.Context, redisCluster
 		scaledBeforeUpgrade = true
 	}
 
-	if redisCluster.Status.Substatus.Status == "" || redisCluster.Status.Substatus.Status == redisv1.SubstatusUpgradingScaleUp {
+	if redisCluster.Status.Substatus.Status == "" || redisCluster.Status.Substatus.Status == redisv1.SubstatusUpgradingScalingUp {
 		// Do not update substatus if we are resuming an upgrade
 		err = r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusSlowUpgrading, 0)
 		if err != nil {
@@ -294,7 +294,7 @@ func (r *RedisClusterReconciler) doSlowUpgrade(ctx context.Context, redisCluster
 			// otherwise use the replica count one from before.
 			// Unless we are resuming an upgrade after an error when scaling down.
 			if int(*(existingStatefulSet.Spec.UpdateStrategy.RollingUpdate.Partition)) > 0 ||
-				redisCluster.Status.Substatus.Status == redisv1.SubstatusUpgradingScaleDown {
+				redisCluster.Status.Substatus.Status == redisv1.SubstatusUpgradingScalingDown {
 				r.logInfo(redisCluster.NamespacedName(), "Update Strategy already set. Reusing partition", "partition", existingStatefulSet.Spec.UpdateStrategy.RollingUpdate.Partition)
 				startingPartition = int(*(existingStatefulSet.Spec.UpdateStrategy.RollingUpdate.Partition))
 			}
@@ -323,7 +323,7 @@ func (r *RedisClusterReconciler) doSlowUpgrade(ctx context.Context, redisCluster
 	// Scale down the cluster if an extra node where added before upgrading
 	if scaledBeforeUpgrade {
 		r.logInfo(redisCluster.NamespacedName(), "Scaling down after the upgrade")
-		err = r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusUpgradingScaleDown, 0)
+		err = r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusUpgradingScalingDown, 0)
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Error updating substatus")
 			return err
@@ -725,6 +725,140 @@ func (r *RedisClusterReconciler) UpgradePartitionWithReplicas(ctx context.Contex
 }
 
 func (r *RedisClusterReconciler) scaleCluster(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, error) {
+
+	// If a Fast Scaling is possible or already en progress, start it or check if it's already finished.
+	// In both situations we return here.
+	fastScaling, err := r.doFastScaling(ctx, redisCluster)
+	if err != nil || fastScaling {
+		return true, err
+	}
+
+	// Continue doing a Slow Scaling if we can't go the Fast way.
+	return r.doSlowScaling(ctx, redisCluster)
+}
+
+func (r *RedisClusterReconciler) doFastScaling(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, error) {
+	req := ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      redisCluster.Name,
+			Namespace: redisCluster.Namespace,
+		},
+	}
+	existingStatefulSet, err := r.FindExistingStatefulSet(ctx, req)
+	if err != nil {
+		return false, err
+	}
+	logger := r.getHelperLogger(redisCluster.NamespacedName())
+
+	switch redisCluster.Status.Substatus.Status {
+	case redisv1.SubstatusFastScaling:
+		// Already Fast scaling.
+		r.logInfo(redisCluster.NamespacedName(), "Retaking Fast Scaling")
+
+		podsReady, err := r.allPodsReady(ctx, redisCluster)
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Could not check for pods being ready")
+			return true, err
+		}
+		if !podsReady {
+			r.logInfo(redisCluster.NamespacedName(), "Waiting for pods to become ready to end Fast Scaling", "expectedReplicas", int(*(existingStatefulSet.Spec.Replicas)))
+			return true, nil
+		}
+
+		// Rebuild the cluster
+		robin, err := robin.NewRobin(ctx, r.Client, redisCluster, logger)
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error getting Robin to check its readiness")
+			return true, err
+		}
+		err = robin.ClusterFix()
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error performing a cluster fix through Robin")
+			return true, err
+		}
+
+		err = r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusEndingFastScaling, 0)
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error updating substatus")
+			return true, err
+		}
+
+		return true, nil
+	case redisv1.SubstatusEndingFastScaling:
+		// Rebuilding the cluster after recreating all node pods. Check if the cluster is ready to end the Fast scaling.
+		logger := r.getHelperLogger(redisCluster.NamespacedName())
+		robin, err := robin.NewRobin(ctx, r.Client, redisCluster, logger)
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error getting Robin to check its readiness")
+			return true, err
+		}
+		check, errors, warnings, err := robin.ClusterCheck()
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error checking the cluster readiness over Robin")
+			return true, err
+		}
+		if !check {
+			r.logInfo(redisCluster.NamespacedName(), "Waiting for Redis cluster readiness before ending the fast scaling", "errors", errors, "warnings", warnings)
+			return true, nil
+		}
+
+		// The cluster is now scaled, and we can set the Cluster Status as Ready again and remove the Substatus.
+		redisCluster.Status.Status = redisv1.StatusReady
+		redisCluster.Status.Substatus.Status = ""
+
+		return true, nil
+	default:
+		// Fast scaling start: If purgeKeysOnRebalance property is set to 'true' and we have no replicas. No need to iterate over the partitions.
+		if redisCluster.Spec.PurgeKeysOnRebalance && redisCluster.Spec.ReplicasPerMaster == 0 {
+			r.logInfo(redisCluster.NamespacedName(), "Fast upgrading will be performed")
+
+			err := r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusFastScaling, 0)
+			if err != nil {
+				r.logError(redisCluster.NamespacedName(), err, "Error updating substatus")
+				return true, err
+			}
+
+			// At this point Robin status has been updated from Ready status. Ge go back to Ready status.
+			robinRedis, err := robin.NewRobin(ctx, r.Client, redisCluster, logger)
+			if err != nil {
+				r.logError(redisCluster.NamespacedName(), err, "Error getting Robin to check its readiness")
+				return true, err
+			}
+			err = robinRedis.SetStatus(redisv1.StatusReady)
+			if err != nil {
+				r.logError(redisCluster.NamespacedName(), err, "Error updating Robin status", "status", redisv1.StatusReady)
+				return true, err
+			}
+			err = robin.PersistRobinStatut(ctx, r.Client, redisCluster, redisv1.StatusReady)
+			if err != nil {
+				r.logError(redisCluster.NamespacedName(), err, "Error persisting Robin status", "status", redisv1.StatusReady)
+				return true, err
+			}
+
+			// ** FAST SCALING start **
+			r.Client.Delete(ctx, existingStatefulSet)
+
+			// Update Robin replicas.
+			err = robinRedis.SetReplicas(int(redisCluster.Spec.Replicas), int(redisCluster.Spec.ReplicasPerMaster))
+			if err != nil {
+				r.logError(redisCluster.NamespacedName(), err, "Error setting Robin replicas", "replicas", redisCluster.Spec.Replicas,
+					"replicas per master", redisCluster.Spec.ReplicasPerMaster)
+				return true, err
+			}
+			err = robin.PersistRobinReplicas(ctx, r.Client, redisCluster, int(redisCluster.Spec.Replicas), int(redisCluster.Spec.ReplicasPerMaster))
+			if err != nil {
+				r.logError(redisCluster.NamespacedName(), err, "Error persisting Robin replicas", "replicas", redisCluster.Spec.Replicas,
+					"replicas per master", redisCluster.Spec.ReplicasPerMaster)
+			}
+
+			return true, nil
+		}
+	}
+
+	return true, nil
+}
+
+func (r *RedisClusterReconciler) doSlowScaling(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, error) {
 	var err error
 
 	// By introducing master-replica cluster, the replicas returned by statefulset (which includes replica nodes) and
@@ -815,7 +949,7 @@ func (r *RedisClusterReconciler) scaleDownCluster(ctx context.Context, redisClus
 				"replicas per master", redisCluster.Spec.ReplicasPerMaster)
 			return true, err
 		}
-		err = robin.PersistRobinReplicas(ctx, r.Client, redisCluster)
+		err = robin.PersistRobinReplicas(ctx, r.Client, redisCluster, int(redisCluster.Spec.Replicas), int(redisCluster.Spec.ReplicasPerMaster))
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Error persisting Robin replicas")
 			return true, err
@@ -878,7 +1012,7 @@ func (r *RedisClusterReconciler) completeClusterScaleDown(ctx context.Context, r
 			return true, nil
 		}
 
-		err = r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusScalingFinalizing, 0)
+		err = r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusEndingScaling, 0)
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Error updating substatus")
 			return true, err
@@ -901,7 +1035,7 @@ func (r *RedisClusterReconciler) completeClusterScaleDown(ctx context.Context, r
 
 		return true, nil // Cluster scaling not completed -> requeue
 
-	case redisv1.SubstatusScalingFinalizing:
+	case redisv1.SubstatusEndingScaling:
 		// Final step: ensure the cluster is Ok.
 
 		logger := r.getHelperLogger((redisCluster.NamespacedName()))
@@ -1016,7 +1150,7 @@ func (r *RedisClusterReconciler) completeClusterScaleUp(ctx context.Context, red
 			r.logError(redisCluster.NamespacedName(), err, "Error updating replicas in Robin", "replicas", redisCluster.Spec.Replicas, "replicasPerMaster", redisCluster.Spec.ReplicasPerMaster)
 			return true, err
 		}
-		err = robin.PersistRobinReplicas(ctx, r.Client, redisCluster)
+		err = robin.PersistRobinReplicas(ctx, r.Client, redisCluster, int(redisCluster.Spec.Replicas), int(redisCluster.Spec.ReplicasPerMaster))
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Error persisting Robin replicas")
 			return true, err
@@ -1051,7 +1185,7 @@ func (r *RedisClusterReconciler) completeClusterScaleUp(ctx context.Context, red
 			r.logError(redisCluster.NamespacedName(), err, "Error asking to Robin to ensure the cluster is ok")
 			return true, err
 		}
-		err = r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusScalingFinalizing, 0)
+		err = r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusEndingScaling, 0)
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Error updating substatus")
 			return true, err
@@ -1059,7 +1193,7 @@ func (r *RedisClusterReconciler) completeClusterScaleUp(ctx context.Context, red
 
 		return true, nil // Cluster scaling not completed -> requeue
 
-	case redisv1.SubstatusScalingFinalizing:
+	case redisv1.SubstatusEndingScaling:
 		// Final step: ensure the cluster is Ok.
 
 		check, errors, warnings, err := robinRedis.ClusterCheck()
@@ -1277,7 +1411,7 @@ func (r *RedisClusterReconciler) scaleUpForUpgrade(ctx context.Context, redisClu
 			redisCluster.Status.Status = redisv1.StatusError
 			return false, err
 		}
-		err = r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusUpgradingScaleUp, 0)
+		err = r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusUpgradingScalingUp, 0)
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Error updating substatus")
 			return false, err

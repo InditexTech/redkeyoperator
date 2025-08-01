@@ -75,7 +75,7 @@ func (r *RedisClusterReconciler) updateClusterStatus(ctx context.Context, redisC
 		}
 
 		// Update Robin ConfigMap status
-		err = robin.PersistRobinStatut(ctx, r.Client, redisCluster)
+		err = robin.PersistRobinStatut(ctx, r.Client, redisCluster, redisCluster.Status.Status)
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Error updating the new status in Robin ConfigMap", "status", redisCluster.Status.Status)
 			return err

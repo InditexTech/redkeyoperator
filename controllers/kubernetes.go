@@ -188,7 +188,7 @@ func (r *RedisClusterReconciler) checkAndCreateStatefulSet(ctx context.Context, 
 
 		// When scaling up before upgrading we can have inconsistencies currReadyNodes <> currSsetReplicas
 		// we skip these checks till the sacling up is done.
-		if redisCluster.Status.Status == redisv1.StatusUpgrading && redisCluster.Status.Substatus.Status == redisv1.SubstatusUpgradingScaleUp {
+		if redisCluster.Status.Status == redisv1.StatusUpgrading && redisCluster.Status.Substatus.Status == redisv1.SubstatusUpgradingScalingUp {
 			return immediateRequeue, nil
 		}
 

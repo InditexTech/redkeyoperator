@@ -129,7 +129,7 @@ func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req
 	}
 
 	var updateErr error
-	if !redisv1.CompareStatuses(&redisCluster.Status, &currentStatus) {
+	if !redisv1.IsFastOperationStatus(redisCluster.Status.Substatus) && !redisv1.CompareStatuses(&redisCluster.Status, &currentStatus) {
 		updateErr = r.updateClusterStatus(ctx, redisCluster)
 	}
 
@@ -221,7 +221,7 @@ func (r *RedisClusterReconciler) reconcileStatusConfiguring(ctx context.Context,
 			r.logError(redisCluster.NamespacedName(), err, "Error updating Robin replicas")
 			return true, DefaultRequeueTimeout
 		}
-		err = robin.PersistRobinReplicas(ctx, r.Client, redisCluster)
+		err = robin.PersistRobinReplicas(ctx, r.Client, redisCluster, int(redisCluster.Spec.Replicas), int(redisCluster.Spec.ReplicasPerMaster))
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Error persisting Robin replicas")
 			return true, DefaultRequeueTimeout

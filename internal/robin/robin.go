@@ -340,8 +340,8 @@ func (cn *ClusterNodes) GetReplicaNodes() []*Node {
 	return replicaNodes
 }
 
-// Updates configuration in Robin ConfigMap with the new state from the RedisCluster object.
-func PersistRobinStatut(ctx context.Context, client ctrlClient.Client, redisCluster *redisv1.RedisCluster) error {
+// Updates configuration in Robin ConfigMap with the new status.
+func PersistRobinStatut(ctx context.Context, client ctrlClient.Client, redisCluster *redisv1.RedisCluster, newStatus string) error {
 	cmap := &corev1.ConfigMap{}
 	err := client.Get(ctx, types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}, cmap)
 	if err != nil {
@@ -351,7 +351,7 @@ func PersistRobinStatut(ctx context.Context, client ctrlClient.Client, redisClus
 	if err := yaml.Unmarshal([]byte(cmap.Data["application-configmap.yml"]), &config); err != nil {
 		return fmt.Errorf("persist Robin status: %w", err)
 	}
-	config.Redis.Cluster.Status = redisCluster.Status.Status
+	config.Redis.Cluster.Status = newStatus
 	confUpdated, err := yaml.Marshal(config)
 	if err != nil {
 		return fmt.Errorf("persist Robin status: %w", err)
@@ -364,8 +364,8 @@ func PersistRobinStatut(ctx context.Context, client ctrlClient.Client, redisClus
 	return nil
 }
 
-// Updates configuration in Robin ConfigMap with the new replicas from the RedisCluster object.
-func PersistRobinReplicas(ctx context.Context, client ctrlClient.Client, redisCluster *redisv1.RedisCluster) error {
+// Updates configuration in Robin ConfigMap with the new replicas.
+func PersistRobinReplicas(ctx context.Context, client ctrlClient.Client, redisCluster *redisv1.RedisCluster, replicas int, replicasPerMaster int) error {
 	cmap := &corev1.ConfigMap{}
 	err := client.Get(ctx, types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}, cmap)
 	if err != nil {
@@ -375,7 +375,8 @@ func PersistRobinReplicas(ctx context.Context, client ctrlClient.Client, redisCl
 	if err := yaml.Unmarshal([]byte(cmap.Data["application-configmap.yml"]), &config); err != nil {
 		return fmt.Errorf("persist Robin replicas: %w", err)
 	}
-	config.Redis.Cluster.Replicas = int(redisCluster.Spec.Replicas)
+	config.Redis.Cluster.Replicas = replicas
+	config.Redis.Cluster.ReplicasPerMaster = replicasPerMaster
 	confUpdated, err := yaml.Marshal(config)
 	if err != nil {
 		return fmt.Errorf("persist Robin replicas: %w", err)

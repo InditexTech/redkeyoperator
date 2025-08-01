@@ -55,15 +55,17 @@ const (
 	StatusInitializing = "Initializing"
 	StatusError        = "Error"
 
-	SubstatusFastUpgrading         = "FastUpgrading"
-	SubstatusFastUpgradeFinalizing = "FastUpgradeFinalizing"
-	SubstatusSlowUpgrading         = "SlowUpgrading"
-	SubstatusUpgradingScaleUp      = "ScalingUp"
-	SubstatusUpgradingScaleDown    = "ScalingDown"
+	SubstatusFastUpgrading        = "FastUpgrading"
+	SubstatusEndingFastUpgrading  = "EndingFastUpgrading"
+	SubstatusSlowUpgrading        = "SlowUpgrading"
+	SubstatusUpgradingScalingUp   = "ScalingUp"
+	SubstatusUpgradingScalingDown = "ScalingDown"
 
-	SubstatusScalingPods       = "ScalingPods"
-	SubstatusScalingRobin      = "ScalingRobin"
-	SubstatusScalingFinalizing = "ScaleFinalizing"
+	SubstatusFastScaling       = "FastScaling"
+	SubstatusEndingFastScaling = "EndingFastScaling"
+	SubstatusScalingPods       = "PodScaling"
+	SubstatusScalingRobin      = "RobinScaling"
+	SubstatusEndingScaling     = "EndingScaling"
 )
 
 var ConditionUpgrading = metav1.Condition{
@@ -296,4 +298,9 @@ func CompareStatuses(a, b *RedisClusterStatus) bool {
 	}
 
 	return true
+}
+
+func IsFastOperationStatus(status RedisClusterSubstatus) bool {
+	return status.Status == SubstatusFastScaling || status.Status == SubstatusEndingFastScaling ||
+		status.Status == SubstatusFastUpgrading || status.Status == SubstatusEndingFastUpgrading
 }
