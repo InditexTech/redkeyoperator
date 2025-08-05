@@ -252,7 +252,7 @@ func (r *RedisClusterReconciler) doSlowUpgradeScalingUp(ctx context.Context, red
 	}
 	if !nodePodsReady {
 		r.logInfo(redisCluster.NamespacedName(), "Waiting for Redis node pods to become ready")
-		return nil		// Not all pods ready -> keep waiting
+		return nil // Not all pods ready -> keep waiting
 	}
 	r.logInfo(redisCluster.NamespacedName(), "Redis node pods are ready", "pods", existingStatefulSet.Spec.Replicas)
 
@@ -289,7 +289,7 @@ func (r *RedisClusterReconciler) doSlowUpgradeScalingUp(ctx context.Context, red
 	}
 	if len(clusterNodes.Nodes) != int(*existingStatefulSet.Spec.Replicas) {
 		r.logInfo(redisCluster.NamespacedName(), "Not all cluster nodes are yet ready from Robin")
-		return nil		// Not all nodes ready --> Keep waiting
+		return nil // Not all nodes ready --> Keep waiting
 	}
 
 	// Update substatus.
@@ -312,7 +312,7 @@ func (r *RedisClusterReconciler) doSlowUpgradeUpgrading(ctx context.Context, red
 	}
 	if !nodePodsReady {
 		r.logInfo(redisCluster.NamespacedName(), "Waiting for Redis node pods to become ready")
-		return nil		// Not all pods ready -> keep waiting
+		return nil // Not all pods ready -> keep waiting
 	}
 	r.logInfo(redisCluster.NamespacedName(), "Redis node pods are ready", "pods", existingStatefulSet.Spec.Replicas)
 
@@ -350,14 +350,14 @@ func (r *RedisClusterReconciler) doSlowUpgradeUpgrading(ctx context.Context, red
 		r.logError(redisCluster.NamespacedName(), err, "Error getting Robin to check its readiness")
 		return err
 	}
-	completed, err := robinRedis.MoveSlots(currentPartition, currentPartition + 1, 0)
+	completed, err := robinRedis.MoveSlots(currentPartition, currentPartition+1, 0)
 	if err != nil {
-		r.logError(redisCluster.NamespacedName(), err, "Error moving slots", "From node", currentPartition, "To node", currentPartition + 1)
+		r.logError(redisCluster.NamespacedName(), err, "Error moving slots", "From node", currentPartition, "To node", currentPartition+1)
 		return err
 	}
 	if !completed {
-		r.logInfo(redisCluster.NamespacedName(), "Waiting to complete moving slots", "From node", currentPartition, "To node", currentPartition + 1)
-		return nil		// Move slots not completed --> keep waiting
+		r.logInfo(redisCluster.NamespacedName(), "Waiting to complete moving slots", "From node", currentPartition, "To node", currentPartition+1)
+		return nil // Move slots not completed --> keep waiting
 	}
 
 	// Forget node
@@ -409,12 +409,12 @@ func (r *RedisClusterReconciler) doSlowUpgradeEnd(ctx context.Context, redisClus
 	}
 	if !completed {
 		r.logInfo(redisCluster.NamespacedName(), "Waiting to complete moving slots", "From node", extraNodeIndex, "To node", 0)
-		return nil		// Move slots not completed --> keep waiting
+		return nil // Move slots not completed --> keep waiting
 	}
 
 	// ScaleDown the cluster adding one extra node before start upgrading.
 	r.logInfo(redisCluster.NamespacedName(), "Scaling down the cluster to remove the extra node")
-	_, err = r.updateRdclReplicas(ctx, redisCluster, redisCluster.Spec.Replicas - 1)
+	_, err = r.updateRdclReplicas(ctx, redisCluster, redisCluster.Spec.Replicas-1)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Failed to update RedisCluster replicas")
 	}
@@ -443,7 +443,7 @@ func (r *RedisClusterReconciler) doSlowUpgradeScalingDown(ctx context.Context, r
 	}
 	if !nodePodsReady {
 		r.logInfo(redisCluster.NamespacedName(), "Waiting for Redis node pods to become ready")
-		return nil		// Not all pods ready -> keep waiting
+		return nil // Not all pods ready -> keep waiting
 	}
 	r.logInfo(redisCluster.NamespacedName(), "Redis node pods are ready", "pods", existingStatefulSet.Spec.Replicas)
 
@@ -480,7 +480,7 @@ func (r *RedisClusterReconciler) doSlowUpgradeScalingDown(ctx context.Context, r
 	}
 	if !check {
 		r.logInfo(redisCluster.NamespacedName(), "Waiting for Redis cluster readiness before ending the fast upgrade", "errors", errors, "warnings", warnings)
-		return nil		// Cluster not ready --> keep waiting
+		return nil // Cluster not ready --> keep waiting
 	}
 
 	// Update substatus.
@@ -496,7 +496,7 @@ func (r *RedisClusterReconciler) doSlowUpgradeStart(ctx context.Context, redisCl
 
 	// ScaleUp the cluster adding one extra node before start upgrading.
 	r.logInfo(redisCluster.NamespacedName(), "Scaling up the cluster to add one extra node before upgrading")
-	_, err := r.updateRdclReplicas(ctx, redisCluster, redisCluster.Spec.Replicas + 1)
+	_, err := r.updateRdclReplicas(ctx, redisCluster, redisCluster.Spec.Replicas+1)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Failed to update RedisCluster replicas")
 	}
@@ -1156,4 +1156,3 @@ func (r *RedisClusterReconciler) isConfigChanged(redisCluster *redisv1.RedisClus
 	}
 	return false, ""
 }
-

@@ -121,7 +121,7 @@ type ClusterReplicas struct {
 type MoveSlots struct {
 	NodeIndexFrom string `json:"from"`
 	NodeIndexTo   string `json:"to"`
-	NumSlots      int `json:"slots"`
+	NumSlots      int    `json:"slots"`
 }
 
 type MoveSlotsStatus struct {
