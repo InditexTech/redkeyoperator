@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"net"
 	"sort"
 	"strconv"
 	"strings"
@@ -19,7 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	redisclient "github.com/redis/go-redis/v9"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -65,98 +63,6 @@ func GetRedisSecret(ctx context.Context, client client.Client, redisCluster *red
 	}
 	redisSecret := string(secret.Data["requirepass"])
 	return redisSecret, nil
-}
-
-func GetRedisClient(ctx context.Context, ip string, secret string) *redisclient.Client {
-	redisclient.NewClusterClient(&redisclient.ClusterOptions{})
-	rdb := redisclient.NewClient(&redisclient.Options{
-		Addr:     fmt.Sprintf("%s:%d", ip, RedisCommPort),
-		Password: secret,
-		DB:       0,
-	})
-	return rdb
-}
-
-func NeedsClusterMeet(ctx context.Context, client client.Client, nodes map[string]*redisv1.RedisNode, redisCluster *redisv1.RedisCluster) (bool, error) {
-	// Compile a map of all the IPs which should be listed for each node.
-	// We are using a map to make it faster, as searching a has table is better than a list
-	ipList := map[string]struct{}{}
-	for _, node := range nodes {
-		ipList[node.IP] = struct{}{}
-	}
-
-	// Now for every node, make sure that the nodes it knows about, is the same as the nodes we know about.
-	for _, node := range nodes {
-		secret, _ := GetRedisSecret(ctx, client, redisCluster)
-		redisClient := GetRedisClient(ctx, node.IP, secret)
-		err := redisClient.Ping(ctx).Err()
-		if err != nil {
-			redisClient.Close()
-			return false, err
-		}
-		clusterNodes, err := redisClient.Do(ctx, "CLUSTER", "NODES").Text()
-		redisClient.Close()
-		if err != nil {
-			return false, err
-		}
-		clusterNodeStrings := strings.Split(clusterNodes, "\n")
-		// name addr flags role ping_sent ping_recv link_status slots
-		for _, val := range clusterNodeStrings {
-			parts := strings.Split(val, " ")
-			if len(parts) <= 3 {
-				continue
-			}
-
-			addr := strings.Split(parts[1], "@")[0]
-			host, _, _ := net.SplitHostPort(addr)
-			// If the IP does not exist in our list,
-			// we are probably using an outdated one and should ClusterMeet.
-			if _, ok := ipList[host]; !ok {
-				return true, nil
-			}
-		}
-	}
-	return false, nil
-}
-
-func ParseClusterNodes(nodes string) map[string]redisv1.RedisNode {
-	clusterNodes := make(map[string]redisv1.RedisNode, 0)
-
-	if nodes == "" {
-		return clusterNodes
-	}
-
-	nodesSplit := strings.Split(nodes, "\n")
-
-	for _, val := range nodesSplit {
-		// name addr flags role ping_sent ping_recv link_status slots
-		parts := strings.Split(val, " ")
-		if len(parts) < 4 {
-			continue
-		}
-
-		clusterNodes[parts[0]] = redisv1.RedisNode{
-			IP:        strings.Split(parts[1], ":")[0],
-			IsMaster:  strings.Contains(parts[2], "master"),
-			ReplicaOf: parts[3],
-		}
-	}
-
-	return clusterNodes
-}
-
-func GetRedisCLIFromInfo(nodeInfo string) string {
-	if nodeInfo == "" {
-		return ""
-	}
-
-	infoSplit := strings.Split(nodeInfo, "\n")
-	for _, val := range infoSplit {
-		if strings.Contains(val, "redis_version") {
-			return strings.TrimRight(strings.Split(val, ":")[1], "\r")
-		}
-	}
-	return ""
 }
 
 func CreateStatefulSet(ctx context.Context, req ctrl.Request, spec redisv1.RedisClusterSpec, labels map[string]string) (*v1.StatefulSet, error) {

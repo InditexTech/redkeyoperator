@@ -73,20 +73,6 @@ func Round(num float64) int {
 	return int(num + math.Copysign(0.5, num))
 }
 
-func ClusterNodeArray2String(nodes [](*ClusterNode)) (result string) {
-	for _, node := range nodes {
-		if node != nil {
-			result += node.String() + ","
-		}
-	}
-
-	if len(result) > 0 {
-		result = strings.TrimRight(result, ",") // Assign the result back to the 'result' variable
-	}
-
-	return result
-}
-
 func NumArray2String(nums []int) (result string) {
 	if len(nums) > 0 {
 		result = fmt.Sprintf("%d", nums[0])

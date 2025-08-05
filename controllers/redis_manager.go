@@ -8,7 +8,6 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"maps"
 	"math"
@@ -22,10 +21,8 @@ import (
 
 	errors2 "k8s.io/apimachinery/pkg/api/errors"
 
-	redisclient "github.com/redis/go-redis/v9"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -1093,74 +1090,6 @@ func (r *RedisClusterReconciler) isOwnedByUs(o client.Object) bool {
 	return false
 }
 
-func (r *RedisClusterReconciler) GetRedisClient(ctx context.Context, ip string, secret string) *redisclient.Client {
-	redisclient.NewClusterClient(&redisclient.ClusterOptions{})
-	rdb := redisclient.NewClient(&redisclient.Options{
-		Addr:     fmt.Sprintf("%s:%d", ip, redis.RedisCommPort),
-		Password: secret,
-		DB:       0,
-	})
-	return rdb
-}
-
-func (r *RedisClusterReconciler) GetReadyNodes(ctx context.Context, redisCluster *redisv1.RedisCluster) (map[string]*redisv1.RedisNode, error) {
-	return r.GetReadyNodesFunc(ctx, redisCluster)
-}
-
-func (r *RedisClusterReconciler) DoGetReadyNodes(ctx context.Context, redisCluster *redisv1.RedisCluster) (map[string]*redisv1.RedisNode, error) {
-	allPods := &corev1.PodList{}
-	labelSelector := labels.SelectorFromSet(
-		map[string]string{
-			redis.RedisClusterLabel:                     redisCluster.GetName(),
-			r.getStatefulSetSelectorLabel(redisCluster): "redis",
-		},
-	)
-
-	err := r.Client.List(ctx, allPods, &client.ListOptions{
-		Namespace:     redisCluster.Namespace,
-		LabelSelector: labelSelector,
-	})
-	if err != nil {
-		return nil, errors.New("could not list pods")
-	}
-	readyNodes := make(map[string]*redisv1.RedisNode, 0)
-	clusterNodes := make(map[string]redisv1.RedisNode, 0)
-	redisSecret, _ := r.GetRedisSecret(redisCluster)
-	for _, pod := range allPods.Items {
-		for _, s := range pod.Status.Conditions {
-			if s.Type == corev1.PodReady && s.Status == corev1.ConditionTrue {
-				// get node id
-				redisClient := r.GetRedisClient(ctx, pod.Status.PodIP, redisSecret)
-				defer redisClient.Close()
-				nodeId, err := redisClient.Do(ctx, "cluster", "myid").Result()
-				if err != nil {
-					r.logInfo(redisCluster.NamespacedName(), "Could not fetch node id", "pod: ", pod.Status.PodIP)
-				}
-				if nodeId == nil {
-					return nil, errors.New("can't fetch node id")
-				}
-				// Get cluster nodes info if not already fetched
-				if len(clusterNodes) == 0 {
-					nodes, err := redisClient.Do(ctx, "cluster", "nodes").Result()
-					if err != nil {
-						return nil, errors.New("can't fetch cluster nodes")
-					}
-					clusterNodes = redis.ParseClusterNodes(nodes.(string))
-				}
-
-				readyNodes[nodeId.(string)] = &redisv1.RedisNode{IP: pod.Status.PodIP, Name: pod.GetName(), IsMaster: true, ReplicaOf: ""}
-
-				if value, ok := clusterNodes[nodeId.(string)]; ok {
-					readyNodes[nodeId.(string)].IsMaster = value.IsMaster
-					readyNodes[nodeId.(string)].ReplicaOf = value.ReplicaOf
-				}
-			}
-		}
-	}
-	r.logInfo(redisCluster.NamespacedName(), "GetReadyNodes", "nodes", readyNodes, "numReadyNodes", strconv.Itoa(len(readyNodes)))
-	return readyNodes, nil
-}
-
 func (r *RedisClusterReconciler) GetRedisSecret(redisCluster *redisv1.RedisCluster) (string, error) {
 	if redisCluster.Spec.Auth.SecretName == "" {
 		return "", nil
@@ -1173,14 +1102,6 @@ func (r *RedisClusterReconciler) GetRedisSecret(redisCluster *redisv1.RedisClust
 	}
 	redisSecret := string(secret.Data["requirepass"])
 	return redisSecret, nil
-}
-
-func makeRange(min int, max int) []int {
-	a := make([]int, max-min+1)
-	for i := range a {
-		a[i] = min + i
-	}
-	return a
 }
 
 func calculateRCConfigChecksum(redisCluster *redisv1.RedisCluster) string {

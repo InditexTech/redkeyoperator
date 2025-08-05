@@ -53,7 +53,6 @@ func NewRedisClusterReconciler(mgr ctrl.Manager, maxConcurrentReconciles int, co
 		},
 	}
 
-	reconciler.GetReadyNodesFunc = reconciler.DoGetReadyNodes
 	reconciler.FindExistingStatefulSetFunc = reconciler.DoFindExistingStatefulSet
 	reconciler.FindExistingConfigMapFunc = reconciler.DoFindExistingConfigMap
 	reconciler.FindExistingDeploymentFunc = reconciler.DoFindExistingDeployment
