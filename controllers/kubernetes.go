@@ -526,3 +526,22 @@ func (r *RedisClusterReconciler) updateDeployment(ctx context.Context, deploymen
 	}
 	return refreshedDeployment, nil
 }
+
+func (r *RedisClusterReconciler) updateRdclReplicas(ctx context.Context, redisCluster *redisv1.RedisCluster, replicas int32) (*redisv1.RedisCluster, error) {
+	refreshedRdcl := &redisv1.RedisCluster{}
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// get a fresh rediscluster to minimize conflicts
+		err := r.Client.Get(ctx, types.NamespacedName{Namespace: redisCluster.Namespace, Name: redisCluster.Name}, refreshedRdcl)
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error getting a refreshed RedisCluster before updating it. It may have been deleted?")
+			return err
+		}
+		refreshedRdcl.Spec.Replicas = replicas
+		var updateErr = r.Client.Update(ctx, refreshedRdcl)
+		return updateErr
+	})
+	if err != nil {
+		return nil, err
+	}
+	return refreshedRdcl, nil
+}

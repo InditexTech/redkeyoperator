@@ -60,6 +60,7 @@ const (
 	SubstatusSlowUpgrading        = "SlowUpgrading"
 	SubstatusUpgradingScalingUp   = "ScalingUp"
 	SubstatusUpgradingScalingDown = "ScalingDown"
+	SubstatusEndingSlowUpgrading  = "EndingSlowUpgrading"
 
 	SubstatusFastScaling       = "FastScaling"
 	SubstatusEndingFastScaling = "EndingFastScaling"
@@ -210,7 +211,7 @@ type RedisClusterStatus struct {
 
 type RedisClusterSubstatus struct {
 	Status             string `json:"status,omitempty"`
-	UpgradingPartition int    `json:"upgradingPartition,omitempty"`
+	UpgradingPartition string `json:"upgradingPartition,omitempty"`
 }
 
 type SlotRange struct {

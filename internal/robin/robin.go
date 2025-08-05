@@ -118,6 +118,16 @@ type ClusterReplicas struct {
 	ReplicasPerMaster int `json:"replicas_per_master"`
 }
 
+type MoveSlots struct {
+	NodeIndexFrom string `json:"from"`
+	NodeIndexTo   string `json:"to"`
+	NumSlots      int `json:"slots"`
+}
+
+type MoveSlotsStatus struct {
+	Status string `yaml:"status"`
+}
+
 type Robin struct {
 	Pod    *corev1.Pod
 	Logger logr.Logger
@@ -282,6 +292,39 @@ func (r *Robin) ClusterFix() error {
 
 func (r *Robin) ClusterResetNode(nodeIndex int) error {
 	return nil
+}
+
+func (r *Robin) MoveSlots(nodeIndexFrom int, nodeIndexTo int, numSlots int) (bool, error) {
+	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/cluster/move"
+
+	var moveParam MoveSlots
+	moveParam.NodeIndexFrom = strconv.Itoa(nodeIndexFrom)
+	moveParam.NodeIndexTo = strconv.Itoa(nodeIndexTo)
+	moveParam.NumSlots = numSlots
+	payload, err := json.Marshal(moveParam)
+	if err != nil {
+		return false, fmt.Errorf("moving slots: %w", err)
+	}
+
+	body, err := doPut(url, payload)
+	if err != nil {
+		return false, fmt.Errorf("moving slots: %w", err)
+	}
+	r.Logger.Info("Moving slots", "from", nodeIndexFrom, "to", nodeIndexTo, "slots", numSlots, "response body", string(body))
+
+	var status MoveSlotsStatus
+	err = json.Unmarshal(body, &status)
+	if err != nil {
+		return false, fmt.Errorf("parsing Robin response: %w", err)
+	}
+
+	if status.Status == "Completed" {
+		r.Logger.Info("Moving slots completed", "from", nodeIndexFrom, "to", nodeIndexTo, "slots", numSlots)
+		return true, nil
+	} else {
+		r.Logger.Info("Moving slots still in progress", "from", nodeIndexFrom, "to", nodeIndexTo, "slots", numSlots)
+		return false, nil
+	}
 }
 
 func doSimpleGet(url string) ([]byte, error) {

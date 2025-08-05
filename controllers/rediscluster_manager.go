@@ -153,7 +153,7 @@ func (r *RedisClusterReconciler) reconcileStatusNew(redisCluster *redisv1.RedisC
 
 func (r *RedisClusterReconciler) reconcileStatusInitializing(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, time.Duration) {
 
-	// Check Redis nod pods rediness
+	// Check Redis node pods rediness
 	nodePodsReady, err := r.allPodsReady(ctx, redisCluster)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Could not check for Redis node pods being ready")

@@ -1,5 +1,5 @@
 # Robin base URL. Update the IP before launching any of the requests.
-@robinBaseUrl = http://10.244.0.67:8080
+@robinBaseUrl = http://10.244.0.138:8080
 
 # Metrics
 
@@ -34,7 +34,7 @@ GET {{robinBaseUrl}}/v1/rediscluster/replicas
 PUT {{robinBaseUrl}}/v1/rediscluster/replicas
 
 {
-    "replicas": 3,
+    "replicas": 6,
     "replicas_per_master": 0
 }
 
@@ -57,12 +57,12 @@ PUT {{robinBaseUrl}}/v1/cluster/fix
 PUT {{robinBaseUrl}}/v1/cluster/move
 
 {
-    "from": "1",
-    "to": "0",
+    "from": "4",
+    "to": "5",
     "slots": 0
 }
 
 ### ResetNode
 
-@nodeIndex = 2
+@nodeIndex = 6
 PUT {{robinBaseUrl}}/v1/cluster/reset/{{nodeIndex}}

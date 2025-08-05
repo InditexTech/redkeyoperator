@@ -86,7 +86,7 @@ func (r *RedisClusterReconciler) updateClusterStatus(ctx context.Context, redisC
 	})
 }
 
-func (r *RedisClusterReconciler) updateClusterSubStatus(ctx context.Context, redisCluster *redisv1.RedisCluster, substatus string, partition int) error {
+func (r *RedisClusterReconciler) updateClusterSubStatus(ctx context.Context, redisCluster *redisv1.RedisCluster, substatus string, partition string) error {
 	refreshedRedisCluster := redisv1.RedisCluster{}
 	err := r.Client.Get(ctx, types.NamespacedName{Namespace: redisCluster.Namespace, Name: redisCluster.Name}, &refreshedRedisCluster)
 	if err != nil {
