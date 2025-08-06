@@ -12,7 +12,6 @@ import (
 	redisv1 "github.com/inditextech/redisoperator/api/v1"
 	"github.com/inditextech/redisoperator/internal/kubernetes"
 	redis "github.com/inditextech/redisoperator/internal/redis"
-	"github.com/inditextech/redisoperator/internal/utils"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -454,7 +453,7 @@ func (r *RedisClusterReconciler) allPodsReady(ctx context.Context, redisCluster 
 			},
 		),
 	}
-	podsReady, err := utils.AllPodsReady(ctx, r.Client, &listOptions, redisCluster.NodesNeeded())
+	podsReady, err := kubernetes.AllPodsReady(ctx, r.Client, &listOptions, redisCluster.NodesNeeded())
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Could not check for pods being ready")
 		return false, err

@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -17,9 +18,6 @@ import (
 	v1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	ctrl "sigs.k8s.io/controller-runtime"
-
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	redisv1 "github.com/inditextech/redisoperator/api/v1"
 	"github.com/inditextech/redisoperator/internal/common"
@@ -34,8 +32,6 @@ const RedisGossPort = 16379
 const RedisClusterLabel = "redis-cluster-name"
 const RedisClusterComponentLabel = "redis.rediscluster.operator/component"
 
-const TotalClusterSlots = 16384
-
 var defaultPort = corev1.ServicePort{
 	Name:     "client",
 	Protocol: "TCP",
@@ -44,25 +40,6 @@ var defaultPort = corev1.ServicePort{
 		Type:   0,
 		IntVal: RedisCommPort,
 	},
-}
-
-type NodesSlots struct {
-	Start int
-	End   int
-}
-
-func GetRedisSecret(ctx context.Context, client client.Client, redisCluster *redisv1.RedisCluster) (string, error) {
-	if redisCluster.Spec.Auth.SecretName == "" {
-		return "", nil
-	}
-
-	secret := &corev1.Secret{}
-	err := client.Get(ctx, types.NamespacedName{Name: redisCluster.Spec.Auth.SecretName, Namespace: redisCluster.Namespace}, secret)
-	if err != nil {
-		return "", err
-	}
-	redisSecret := string(secret.Data["requirepass"])
-	return redisSecret, nil
 }
 
 func CreateStatefulSet(ctx context.Context, req ctrl.Request, spec redisv1.RedisClusterSpec, labels map[string]string) (*v1.StatefulSet, error) {
@@ -512,7 +489,7 @@ func ConfigStringToMap(config string) map[string][]string {
 		value := strings.Join(kv[1:], " ")
 
 		// Add the value to the slice associated with the key
-		if !contains(configMap[key], value) {
+		if !slices.Contains(configMap[key], value) {
 			configMap[key] = append(configMap[key], value)
 		} else {
 			log.Printf("Duplicate configuration detected for key %s: %s", key, value)
@@ -520,16 +497,6 @@ func ConfigStringToMap(config string) map[string][]string {
 	}
 
 	return configMap
-}
-
-// Helper function to check if a slice contains a specific string.
-func contains(slice []string, str string) bool {
-	for _, v := range slice {
-		if v == str {
-			return true
-		}
-	}
-	return false
 }
 
 func GenerateRedisConfig(redisCluster *redisv1.RedisCluster) string {
@@ -708,48 +675,6 @@ func MergeWithDefaultConfig(newConfig map[string][]string, ephemeral bool, repli
 	return allowConfiguration
 }
 
-func slotsPerNode(numOfNodes int, slots int) (int, int) {
-	if numOfNodes == 0 {
-		return 0, 0
-	}
-	slotsNodes := slots / numOfNodes
-	resto := slots % numOfNodes
-	return slotsNodes, resto
-}
-
-func SplitNodeSlots(nodesTotal int) []*NodesSlots {
-	nodesSlots := []*NodesSlots{}
-	numOfNodes := nodesTotal
-	slotsNode, resto := slotsPerNode(numOfNodes, TotalClusterSlots)
-	slotsAsigment := []string{}
-	for i := range numOfNodes {
-		switch i {
-		case 0:
-			slotsAsigment = append(slotsAsigment, fmt.Sprintf("0,%s", strconv.Itoa(slotsNode-1)))
-		case 1:
-			slotsAsigment = append(slotsAsigment, fmt.Sprintf("%s,%s", strconv.Itoa(slotsNode*i), strconv.Itoa(slotsNode*(i+1)-1)))
-		case numOfNodes - 1:
-			slotsAsigment = append(slotsAsigment, fmt.Sprintf("%s,%s", strconv.Itoa(slotsNode*i), strconv.Itoa(slotsNode*(i+1)-1+resto)))
-		default:
-			slotsAsigment = append(slotsAsigment, fmt.Sprintf("%s,%s", strconv.Itoa((slotsNode*i)), strconv.Itoa(slotsNode*(i+1)-1)))
-		}
-	}
-	for i := range numOfNodes {
-		stringRangeSplit := strings.Split(slotsAsigment[i], ",")
-		start, err := strconv.Atoi(stringRangeSplit[0])
-		if err != nil {
-			log.Printf("Error assignSlotsToNodes: strconv.Atoi(stringRangeSplit[0] - %s", err)
-		}
-
-		end, err := strconv.Atoi(stringRangeSplit[1])
-		if err != nil {
-			log.Printf("Error assignSlotsToNodes: strconv.Atoi(stringRangeSplit[1] - %s", err)
-		}
-		nodesSlots = append(nodesSlots, &NodesSlots{start, end})
-	}
-	return nodesSlots
-}
-
 func convertRedisMemToMbytes(maxMemory string) (int, error) {
 	maxMemory = strings.ToLower(maxMemory)
 	var maxMemoryInt int
@@ -774,16 +699,4 @@ func convertRedisMemToMbytes(maxMemory string) (int, error) {
 		maxMemoryInt = maxMemoryInt / 1024 / 1024
 	}
 	return maxMemoryInt, err
-}
-
-func GetClusterInfo(state string) map[string]string {
-	lines := strings.Split(strings.ReplaceAll(state, "\r\n", "\n"), "\n")
-	clusterstate := make(map[string]string)
-	for _, line := range lines {
-		kvmap := strings.Split(line, ":")
-		if len(kvmap) == 2 {
-			clusterstate[kvmap[0]] = kvmap[1]
-		}
-	}
-	return clusterstate
 }

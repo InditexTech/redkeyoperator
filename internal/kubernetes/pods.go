@@ -2,15 +2,13 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-package utils
+package kubernetes
 
 import (
 	"context"
 	"fmt"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -73,27 +71,4 @@ func AllPodsReady(ctx context.Context, client client.Client, listOptions *client
 		}
 	}
 	return current == expectedReadyReplicas, nil
-}
-
-type PodReadyWait struct {
-	Client client.Client
-}
-
-func (prw PodReadyWait) WaitForPodsToBecomeReady(ctx context.Context, interval, timeout time.Duration, listOptions *client.ListOptions, expectedReadyReplicas int) error {
-
-	return wait.PollUntilContextTimeout(ctx, interval, timeout, false, func(ctx context.Context) (bool, error) {
-		pods := &corev1.PodList{}
-		if err := prw.Client.List(ctx, pods, listOptions); err != nil {
-			return false, err
-		}
-
-		var current int
-		for _, pod := range pods.Items {
-			if flag, err := PodRunningReady(&pod); err == nil && flag {
-				current++
-			}
-		}
-
-		return current == expectedReadyReplicas, nil
-	})
 }

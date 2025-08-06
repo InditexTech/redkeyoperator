@@ -14,7 +14,6 @@ import (
 	finalizer "github.com/inditextech/redisoperator/internal/finalizers"
 	"github.com/inditextech/redisoperator/internal/kubernetes"
 	"github.com/inditextech/redisoperator/internal/robin"
-	"github.com/inditextech/redisoperator/internal/utils"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
@@ -171,7 +170,7 @@ func (r *RedisClusterReconciler) reconcileStatusInitializing(ctx context.Context
 		r.logError(redisCluster.NamespacedName(), err, "Error getting Robin to check its readiness")
 		return true, DefaultRequeueTimeout
 	}
-	flag, err := utils.PodRunningReady(robin.Pod)
+	flag, err := kubernetes.PodRunningReady(robin.Pod)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Error checking Robin pod readiness")
 		return true, DefaultRequeueTimeout
