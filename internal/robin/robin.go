@@ -291,6 +291,15 @@ func (r *Robin) ClusterFix() error {
 }
 
 func (r *Robin) ClusterResetNode(nodeIndex int) error {
+	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/cluster/reset/" + strconv.Itoa(nodeIndex)
+
+	var payload []byte
+	body, err := doPut(url, payload)
+	if err != nil {
+		return fmt.Errorf("reset node: %w", err)
+	}
+	r.Logger.Info("Asked to Robin to reset node", "node index", nodeIndex, "response body", string(body))
+
 	return nil
 }
 

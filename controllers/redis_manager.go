@@ -304,7 +304,7 @@ func (r *RedisClusterReconciler) doSlowUpgradeScalingUp(ctx context.Context, red
 
 func (r *RedisClusterReconciler) doSlowUpgradeUpgrading(ctx context.Context, redisCluster *redisv1.RedisCluster, existingStatefulSet *v1.StatefulSet) error {
 
-	// Check Redis node pods rediness
+	// Check Redis node pods rediness.
 	nodePodsReady, err := r.allPodsReady(ctx, redisCluster)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Could not check for Redis node pods being ready")
@@ -316,55 +316,69 @@ func (r *RedisClusterReconciler) doSlowUpgradeUpgrading(ctx context.Context, red
 	}
 	r.logInfo(redisCluster.NamespacedName(), "Redis node pods are ready", "pods", existingStatefulSet.Spec.Replicas)
 
-	// Get the current partition and update in RedisCluster
-	currentPartition := int(*(existingStatefulSet.Spec.Replicas)) - 2
-	if !reflect.DeepEqual(existingStatefulSet.Spec.UpdateStrategy, v1.StatefulSetUpdateStrategy{}) {
-		// An UpdateStrategy is already set.
-		// We can reuse the partition as the starting partition
-		// We should only do this for partitions higher than zero,
-		// as we cannot unset the partition after an upgrade, and the default will be zero.
-		//
-		// So 0 partition will trigger a bad thing, where the whole cluster will be immediately applied,
-		// and all pods destroyed simultaneously.
-		// We need to only set the starting partition if it is higher than 0,
-		// otherwise use the replica count one from before.
-		// Unless we are resuming an upgrade after an error when scaling down.
-		if int(*(existingStatefulSet.Spec.UpdateStrategy.RollingUpdate.Partition)) > 0 ||
-			redisCluster.Status.Substatus.Status == redisv1.SubstatusUpgradingScalingDown {
-			r.logInfo(redisCluster.NamespacedName(), "Update Strategy already set. Reusing partition", "partition", existingStatefulSet.Spec.UpdateStrategy.RollingUpdate.Partition)
-			currentPartition = int(*(existingStatefulSet.Spec.UpdateStrategy.RollingUpdate.Partition))
-		}
-	}
-	if redisCluster.Status.Substatus.UpgradingPartition != strconv.Itoa(currentPartition) {
-		err = r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusSlowUpgrading, strconv.Itoa(currentPartition))
-		if err != nil {
-			r.logError(redisCluster.NamespacedName(), err, "Error updating substatus")
-			return err
-		}
-	}
-
-	// Move slots from partition before rolling update.
+	// Get Robin.
 	logger := r.getHelperLogger(redisCluster.NamespacedName())
 	robinRedis, err := robin.NewRobin(ctx, r.Client, redisCluster, logger)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Error getting Robin to check its readiness")
 		return err
 	}
-	completed, err := robinRedis.MoveSlots(currentPartition, currentPartition+1, 0)
+
+	// Check cluster health.
+	check, errors, warnings, err := robinRedis.ClusterCheck()
 	if err != nil {
-		r.logError(redisCluster.NamespacedName(), err, "Error moving slots", "From node", currentPartition, "To node", currentPartition+1)
+		r.logError(redisCluster.NamespacedName(), err, "Error checking the cluster readiness over Robin")
 		return err
 	}
-	if !completed {
-		r.logInfo(redisCluster.NamespacedName(), "Waiting to complete moving slots", "From node", currentPartition, "To node", currentPartition+1)
-		return nil // Move slots not completed --> keep waiting
+	if !check {
+		r.logInfo(redisCluster.NamespacedName(), "Waiting for Redis cluster readiness", "errors", errors, "warnings", warnings)
+		return nil // Cluster not ready --> keep waiting
 	}
 
-	// Forget node
-	err = robinRedis.ClusterResetNode(currentPartition)
-	if err != nil {
-		r.logError(redisCluster.NamespacedName(), err, "Error from Robin resetting the node", "node index", currentPartition)
-		return err
+	// Get the current partition and update Upgrading Partition in RedisCluster Status if starting iterating over partitions.
+	var currentPartition int
+	if redisCluster.Status.Substatus.UpgradingPartition == "" {
+		currentPartition = int(*(existingStatefulSet.Spec.Replicas)) - 1
+		err = r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusSlowUpgrading, strconv.Itoa(currentPartition))
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error updating substatus")
+			return err
+		}
+	} else {
+		currentPartition, err = strconv.Atoi(redisCluster.Status.Substatus.UpgradingPartition)
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error getting Upgrading Partition from RedisCluster object")
+			return err
+		}
+	}
+
+	// If first iteration over partitions: update configuration.
+	// Else: Move slots away from partition and rolling update (don't do over the extra node to optimize).
+	if currentPartition == int(*(existingStatefulSet.Spec.Replicas))-1 {
+		// Update configuration: changes in configuration, labels and overrides are persisted before upgrading
+		existingStatefulSet, err = r.upgradeClusterConfigurationUpdate(ctx, redisCluster)
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error updating Cluster configuration")
+			return err
+		}
+	} else {
+		// Move slots from partition before rolling update.
+		completed, err := robinRedis.MoveSlots(currentPartition, currentPartition+1, 0)
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error moving slots", "From node", currentPartition, "To node", currentPartition+1)
+			return err
+		}
+		if !completed {
+			r.logInfo(redisCluster.NamespacedName(), "Waiting to complete moving slots", "From node", currentPartition, "To node", currentPartition+1)
+			return nil // Move slots not completed --> keep waiting
+		}
+
+		// Forget node
+		err = robinRedis.ClusterResetNode(currentPartition)
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error from Robin resetting the node", "node index", currentPartition)
+			return err
+		}
 	}
 
 	// RollingUpdate
@@ -380,9 +394,17 @@ func (r *RedisClusterReconciler) doSlowUpgradeUpgrading(ctx context.Context, red
 		return err
 	}
 
-	// First partition reached, we can move to the next step.
+	// If first partition reached, we can move to the next step.
+	// Else step over to the next partition.
 	if currentPartition == 0 {
 		err = r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusEndingSlowUpgrading, strconv.Itoa(currentPartition))
+		if err != nil {
+			r.logError(redisCluster.NamespacedName(), err, "Error updating substatus")
+			return err
+		}
+	} else {
+		nextPartition := currentPartition - 1
+		err = r.updateClusterSubStatus(ctx, redisCluster, redisv1.SubstatusSlowUpgrading, strconv.Itoa(nextPartition))
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Error updating substatus")
 			return err
@@ -394,14 +416,39 @@ func (r *RedisClusterReconciler) doSlowUpgradeUpgrading(ctx context.Context, red
 
 func (r *RedisClusterReconciler) doSlowUpgradeEnd(ctx context.Context, redisCluster *redisv1.RedisCluster, existingStatefulSet *v1.StatefulSet) error {
 
-	// Move slots from extra node to node 0.
-	extraNodeIndex := int(*(existingStatefulSet.Spec.Replicas)) - 1
+	// Check Redis node pods rediness (pod from last rolling update could be not ready yet).
+	nodePodsReady, err := r.allPodsReady(ctx, redisCluster)
+	if err != nil {
+		r.logError(redisCluster.NamespacedName(), err, "Could not check for Redis node pods being ready")
+		return err
+	}
+	if !nodePodsReady {
+		r.logInfo(redisCluster.NamespacedName(), "Waiting for Redis node pods to become ready")
+		return nil // Not all pods ready -> keep waiting
+	}
+	r.logInfo(redisCluster.NamespacedName(), "Redis node pods are ready", "pods", existingStatefulSet.Spec.Replicas)
+
+	// Get Robin.
 	logger := r.getHelperLogger(redisCluster.NamespacedName())
 	robinRedis, err := robin.NewRobin(ctx, r.Client, redisCluster, logger)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Error getting Robin to check its readiness")
 		return err
 	}
+
+	// Check cluster health.
+	check, errors, warnings, err := robinRedis.ClusterCheck()
+	if err != nil {
+		r.logError(redisCluster.NamespacedName(), err, "Error checking the cluster readiness over Robin")
+		return err
+	}
+	if !check {
+		r.logInfo(redisCluster.NamespacedName(), "Waiting for Redis cluster readiness", "errors", errors, "warnings", warnings)
+		return nil // Cluster not ready --> keep waiting
+	}
+
+	// Move slots from extra node to node 0.
+	extraNodeIndex := int(*(existingStatefulSet.Spec.Replicas)) - 1
 	completed, err := robinRedis.MoveSlots(extraNodeIndex, 0, 0)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Error moving slots", "From node", extraNodeIndex, "To node", 0)
@@ -435,7 +482,7 @@ func (r *RedisClusterReconciler) doSlowUpgradeEnd(ctx context.Context, redisClus
 
 func (r *RedisClusterReconciler) doSlowUpgradeScalingDown(ctx context.Context, redisCluster *redisv1.RedisCluster, existingStatefulSet *v1.StatefulSet) error {
 
-	// Check Redis node pods rediness
+	// Check Redis node pods rediness.
 	nodePodsReady, err := r.allPodsReady(ctx, redisCluster)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Could not check for Redis node pods being ready")
