@@ -10,7 +10,7 @@ set -o nounset
 
 # Determine the script directory and source helper functions
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/lib-test.sh"  # Expects functions: ensure_namespace, kill_k6, create_clean_rdcl, wait_redis_ready, log_info, log_error
+source "$SCRIPT_DIR/lib-test.sh"  # Expects functions: ensure_namespace, kill_k6, create_clean_rkcl, wait_redis_ready, log_info, log_error
 
 # Read and assign arguments: $2 for namespace and $3 for redis cluster name; ignore $1 (replicas)
 NAMESPACE="$2"
@@ -59,9 +59,9 @@ main() {
         log_info "No k6 tests running"
     fi
 
-    # Create a clean RedisCluster
-    if ! create_clean_rdcl "$NAMESPACE" "$LOCAL"; then
-        log_error "Error: Failed to create RedisCluster in namespace $NAMESPACE"
+    # Create a clean RedKeyCluster
+    if ! create_clean_rkcl "$NAMESPACE" "$LOCAL"; then
+        log_error "Error: Failed to create RedKeyCluster in namespace $NAMESPACE"
         exit 1
     fi
 

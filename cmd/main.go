@@ -26,13 +26,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	redisv1 "github.com/inditextech/redisoperator/api/v1"
-	"github.com/inditextech/redisoperator/controllers"
+	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
+	"github.com/inditextech/redkeyoperator/controllers"
 	//+kubebuilder:scaffold:imports
 )
 
 const (
-	USER_AGENT_NAME    = "redis-cluster-operator"
+	USER_AGENT_NAME    = "redkey-cluster-operator"
 	USER_AGENT_VERSION = "1.3.0"
 )
 
@@ -44,7 +44,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(redisv1.AddToScheme(scheme))
+	utilruntime.Must(redkeyv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -113,7 +113,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = controllers.NewRedisClusterReconciler(mgr, maxConcurrentReconciles, concurrentMigrates).SetupWithManager(mgr); err != nil {
+	if err = controllers.NewRedKeyClusterReconciler(mgr, maxConcurrentReconciles, concurrentMigrates).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RedisCluster")
 		os.Exit(1)
 	}

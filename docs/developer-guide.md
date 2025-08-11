@@ -349,7 +349,7 @@ Before redeploying the webhook code using `make debug-webhook` you can delete th
 Delete the operator and all associated resources with:
 
 ```shell
-make delete-rdcl
+make delete-rkcl
 make undeploy
 make uninstall
 kubectl delete ns redis-operator
@@ -360,10 +360,10 @@ kubectl delete ns redis-operator
 You can deploy a sample Redis Cluster from `config/samples` folder running:
 
 ```shell
-make apply-rdcl
+make apply-rkcl
 ```
 
-This will apply the manifest file to create an single node ephemeral RedisCluster object with `purgeKeysOnRebalance` set to **true**.
+This will apply the manifest file to create an single node ephemeral RedKeyCluster object with `purgeKeysOnRebalance` set to **true**.
 
 ## Tests
 

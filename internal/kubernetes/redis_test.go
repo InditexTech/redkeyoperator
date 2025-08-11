@@ -8,9 +8,9 @@ import (
 	"context"
 	"testing"
 
-	redisv1 "github.com/inditextech/redisoperator/api/v1"
-	"github.com/inditextech/redisoperator/internal/common"
-	"github.com/inditextech/redisoperator/internal/redis"
+	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
+	"github.com/inditextech/redkeyoperator/internal/common"
+	"github.com/inditextech/redkeyoperator/internal/redis"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -25,7 +25,7 @@ func TestFindExistingStatefulSetFindsCorrectStatefulSet(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().
 		WithObjects(&appsv1.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "redis-cluster",
+				Name:      "redkey-cluster",
 				Namespace: "default",
 				Labels: map[string]string{
 					"app": "redis",
@@ -35,7 +35,7 @@ func TestFindExistingStatefulSetFindsCorrectStatefulSet(t *testing.T) {
 		}).Build()
 	request := ctrl.Request{
 		NamespacedName: types.NamespacedName{
-			Name:      "redis-cluster",
+			Name:      "redkey-cluster",
 			Namespace: "default",
 		},
 	}
@@ -44,7 +44,7 @@ func TestFindExistingStatefulSetFindsCorrectStatefulSet(t *testing.T) {
 		t.Errorf("Received unexpected error, when fetching statefulset. Error: [%v]", err)
 		t.FailNow()
 	}
-	if statefulset.Name != "redis-cluster" {
+	if statefulset.Name != "redkey-cluster" {
 		t.Error("message", "Received incorrect statefulset", "got", statefulset, "error", err)
 	}
 }
@@ -59,7 +59,7 @@ func TestFindExistingStatefulSetReturnsNotFoundForCases(t *testing.T) {
 		"objects-in-different-namespace-exist": {
 			client: fake.NewClientBuilder().WithObjects(&appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "redis-cluster",
+					Name:      "redkey-cluster",
 					Namespace: "foobar",
 					Labels: map[string]string{
 						"app": "redis",
@@ -71,7 +71,7 @@ func TestFindExistingStatefulSetReturnsNotFoundForCases(t *testing.T) {
 		"objects-with-different-name": {
 			client: fake.NewClientBuilder().WithObjects(&appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "redis-cluster-2",
+					Name:      "redkey-cluster-2",
 					Namespace: "default",
 					Labels: map[string]string{
 						"app": "redis",
@@ -83,7 +83,7 @@ func TestFindExistingStatefulSetReturnsNotFoundForCases(t *testing.T) {
 	}
 	request := ctrl.Request{
 		NamespacedName: types.NamespacedName{
-			Name:      "redis-cluster",
+			Name:      "redkey-cluster",
 			Namespace: "default",
 		},
 	}
@@ -108,12 +108,12 @@ func TestGetStatefulSetSelectorLabelReturnsCorrectLabels(t *testing.T) {
 	}{
 		"no-objects-exist": {
 			client:           fake.NewClientBuilder().Build(),
-			expectedLabelKey: redis.RedisClusterComponentLabel,
+			expectedLabelKey: redis.RedKeyClusterComponentLabel,
 		},
 		"objects-with-app-label": {
 			client: fake.NewClientBuilder().WithObjects(&appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "redis-cluster",
+					Name:      "redkey-cluster",
 					Namespace: "default",
 				},
 				Spec: appsv1.StatefulSetSpec{
@@ -131,45 +131,45 @@ func TestGetStatefulSetSelectorLabelReturnsCorrectLabels(t *testing.T) {
 		"objects-with-component-label": {
 			client: fake.NewClientBuilder().WithObjects(&appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "redis-cluster",
+					Name:      "redkey-cluster",
 					Namespace: "default",
 				},
 				Spec: appsv1.StatefulSetSpec{
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
-								redis.RedisClusterComponentLabel: common.ComponentLabelRedis,
+								redis.RedKeyClusterComponentLabel: common.ComponentLabelRedis,
 							},
 						},
 					},
 				},
 			}).Build(),
-			expectedLabelKey: redis.RedisClusterComponentLabel,
+			expectedLabelKey: redis.RedKeyClusterComponentLabel,
 		},
 		"objects-with-both-labels": {
 			client: fake.NewClientBuilder().WithObjects(&appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "redis-cluster",
+					Name:      "redkey-cluster",
 					Namespace: "default",
 				},
 				Spec: appsv1.StatefulSetSpec{
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
-								redis.RedisClusterComponentLabel: common.ComponentLabelRedis,
-								"app":                            "redis",
+								redis.RedKeyClusterComponentLabel: common.ComponentLabelRedis,
+								"app":                             "redis",
 							},
 						},
 					},
 				},
 			}).Build(),
-			expectedLabelKey: redis.RedisClusterComponentLabel,
+			expectedLabelKey: redis.RedKeyClusterComponentLabel,
 		},
 	}
 	for name, test := range testMap {
-		labelKey := GetStatefulSetSelectorLabel(context.TODO(), test.client, &redisv1.RedisCluster{
+		labelKey := GetStatefulSetSelectorLabel(context.TODO(), test.client, &redkeyv1.RedKeyCluster{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "redis-cluster",
+				Name:      "redkey-cluster",
 				Namespace: "default",
 			},
 		})

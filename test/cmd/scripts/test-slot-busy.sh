@@ -29,15 +29,15 @@ fi
 
 log_info "Starting Redis cluster scale test for cluster '$REDIS_CLUSTER_NAME' in namespace '$NAMESPACE' with $REPLICAS replicas."
 
-# # Start manager process and create a clean RedisCluster
+# # Start manager process and create a clean RedKeyCluster
 # if ! ensure_manager "$NAMESPACE" "$TEST_NAME" ; then
 #     log_error "Error: Failed to ensure manager process is running."
 #     exit 1
 # fi
 
-# Create a clean RedisCluster
-if ! create_clean_rdcl "$NAMESPACE" "$LOCAL"; then
-    echo "Error: Failed to create RedisCluster in namespace $NAMESPACE"
+# Create a clean RedKeyCluster
+if ! create_clean_rkcl "$NAMESPACE" "$LOCAL"; then
+    echo "Error: Failed to create RedKeyCluster in namespace $NAMESPACE"
     exit 1
 fi
 sleep 2

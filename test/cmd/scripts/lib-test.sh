@@ -5,11 +5,11 @@
 #!/bin/bash
 
 # Global variable for Redis cluster name
-REDIS_CLUSTER_NAME="redis-cluster-test"
+REDIS_CLUSTER_NAME="redkey-cluster-test"
 
 # Function: Print usage information and exit
 function usage() {
-    echo "Usage: $0 <replicas> <namespace> <redis-cluster-name>" >&2
+    echo "Usage: $0 <replicas> <namespace> <redkey-cluster-name>" >&2
     exit 1
 }
 
@@ -167,7 +167,7 @@ function wait_redis_ready {
 
         # Fetch the Redis cluster JSON once.
         local cluster_json
-        if ! cluster_json=$(kubectl get rediscluster/"$cluster" -n "$namespace" -o json 2>/dev/null); then
+        if ! cluster_json=$(kubectl get redkeycluster/"$cluster" -n "$namespace" -o json 2>/dev/null); then
             log_error "Failed to retrieve Redis cluster JSON in namespace '$namespace'. Retrying..."
             sleep "$delay"
             continue
@@ -244,7 +244,7 @@ function scale_redis {
 
     log_info "Scaling Redis cluster '$cluster' to $replicas replicas in namespace '$namespace'."
 
-    if ! kubectl patch rediscluster/"$cluster" -n "$namespace" -p '{"spec":{"replicas":'"$replicas"'}}' --type merge; then
+    if ! kubectl patch redkeycluster/"$cluster" -n "$namespace" -p '{"spec":{"replicas":'"$replicas"'}}' --type merge; then
         log_error "Failed to scale Redis cluster."
         return 1
     fi
@@ -266,8 +266,8 @@ function log_warning {
     echo "$(date +"%Y/%m/%d %H:%M:%S") WARNING: $*" >&2
 }
 
-# Function to create a clean RedisCluster
-function create_clean_rdcl {
+# Function to create a clean RedKeyCluster
+function create_clean_rkcl {
     local namespace="$1"
     local is_local="${2:-false}"
 
@@ -292,10 +292,10 @@ function create_clean_rdcl {
     kubectl apply -n "$namespace" -f "$manifest"
 }
 
-# Function to check if RedisCluster CRD exists
-function ensure_rediscluster {
-    if ! kubectl explain rediscluster &>/dev/null; then
-        log_error "Kubernetes or RedisCluster CRD is missing!"
+# Function to check if RedKeyCluster CRD exists
+function ensure_redkeycluster {
+    if ! kubectl explain redkeycluster &>/dev/null; then
+        log_error "Kubernetes or RedKeyCluster CRD is missing!"
         return 1
     fi
 }
@@ -394,8 +394,8 @@ function check_redis {
     local namespace="$2"
 
     local replicas status
-    replicas=$(kubectl get rediscluster/"$cluster" -n "$namespace" -o json | jq -r .spec.replicas)
-    status=$(kubectl get rediscluster/"$cluster" -n "$namespace" -o json | jq -r .status.status)
+    replicas=$(kubectl get redkeycluster/"$cluster" -n "$namespace" -o json | jq -r .spec.replicas)
+    status=$(kubectl get redkeycluster/"$cluster" -n "$namespace" -o json | jq -r .status.status)
 
     if [[ "$status" != "Ready" ]]; then
         log_error "Redis cluster $cluster is not Ready in namespace $namespace (Status: $status)"

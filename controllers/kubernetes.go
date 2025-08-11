@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"reflect"
 
-	redisv1 "github.com/inditextech/redisoperator/api/v1"
-	"github.com/inditextech/redisoperator/internal/kubernetes"
-	redis "github.com/inditextech/redisoperator/internal/redis"
+	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
+	"github.com/inditextech/redkeyoperator/internal/kubernetes"
+	redis "github.com/inditextech/redkeyoperator/internal/redis"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -24,63 +24,63 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (r *RedisClusterReconciler) checkAndCreateK8sObjects(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) (bool, error) {
+func (r *RedKeyClusterReconciler) checkAndCreateK8sObjects(ctx context.Context, req ctrl.Request, redkeyCluster *redkeyv1.RedKeyCluster) (bool, error) {
 	var immediateRequeue bool = false
 	var err error = nil
 	var configMap *corev1.ConfigMap
 
-	// RedisCluster check
-	err = r.checkAndUpdateRDCL(ctx, req.Name, redisCluster)
+	// RedKeyCluster check
+	err = r.checkAndUpdateRKCL(ctx, req.Name, redkeyCluster)
 	if err != nil {
-		r.logError(redisCluster.NamespacedName(), err, "Error checking RedisCluster object")
+		r.logError(redkeyCluster.NamespacedName(), err, "Error checking RedKeyCluster object")
 		return immediateRequeue, err
 	}
 
 	// ConfigMap check
-	if configMap, immediateRequeue, err = r.checkAndCreateConfigMap(ctx, req, redisCluster); err != nil {
+	if configMap, immediateRequeue, err = r.checkAndCreateConfigMap(ctx, req, redkeyCluster); err != nil {
 		return immediateRequeue, err
 	}
 
 	// PodDisruptionBudget check
-	r.checkAndManagePodDisruptionBudget(ctx, req, redisCluster)
+	r.checkAndManagePodDisruptionBudget(ctx, req, redkeyCluster)
 
 	// StatefulSet check
-	if immediateRequeue, err = r.checkAndCreateStatefulSet(ctx, req, redisCluster, configMap); err != nil {
+	if immediateRequeue, err = r.checkAndCreateStatefulSet(ctx, req, redkeyCluster, configMap); err != nil {
 		return immediateRequeue, err
 	}
 
 	// Robin deployment check
-	r.checkAndCreateRobin(ctx, req, redisCluster)
+	r.checkAndCreateRobin(ctx, req, redkeyCluster)
 
 	// Service check
-	immediateRequeue, err = r.checkAndCreateService(ctx, req, redisCluster)
+	immediateRequeue, err = r.checkAndCreateService(ctx, req, redkeyCluster)
 
 	return immediateRequeue, err
 }
 
-func (r *RedisClusterReconciler) checkAndUpdateRDCL(ctx context.Context, redisName string, redisCluster *redisv1.RedisCluster) error {
-	// Label redis.RedisClusterLabel needed by Redis backup
-	if _, ok := redisCluster.Labels[redis.RedisClusterLabel]; !ok {
-		r.logInfo(redisCluster.NamespacedName(), "RDCL object not containing label", "label", redis.RedisClusterLabel)
-		redisCluster.ObjectMeta.Labels[redis.RedisClusterLabel] = redisName
-		if err := r.Update(ctx, redisCluster); err != nil {
+func (r *RedKeyClusterReconciler) checkAndUpdateRKCL(ctx context.Context, redisName string, redkeyCluster *redkeyv1.RedKeyCluster) error {
+	// Label redis.RedKeyClusterLabel needed by Redis backup
+	if _, ok := redkeyCluster.Labels[redis.RedKeyClusterLabel]; !ok {
+		r.logInfo(redkeyCluster.NamespacedName(), "RKCL object not containing label", "label", redis.RedKeyClusterLabel)
+		redkeyCluster.ObjectMeta.Labels[redis.RedKeyClusterLabel] = redisName
+		if err := r.Update(ctx, redkeyCluster); err != nil {
 			return err
 		}
-		r.logInfo(redisCluster.NamespacedName(), "Label added to RedisCluster labels", "label", redis.RedisClusterLabel, "value", redisName)
+		r.logInfo(redkeyCluster.NamespacedName(), "Label added to RedKeyCluster labels", "label", redis.RedKeyClusterLabel, "value", redisName)
 	}
-	// Label redis.RedisClusterComponentLabel needed by Redis backup
-	if _, ok := redisCluster.Labels[redis.RedisClusterComponentLabel]; !ok {
-		r.logInfo(redisCluster.NamespacedName(), "RDCL object not containing label", "label", redis.RedisClusterComponentLabel)
-		redisCluster.ObjectMeta.Labels[redis.RedisClusterComponentLabel] = "redis"
-		if err := r.Update(ctx, redisCluster); err != nil {
+	// Label redis.RedKeyClusterComponentLabel needed by Redis backup
+	if _, ok := redkeyCluster.Labels[redis.RedKeyClusterComponentLabel]; !ok {
+		r.logInfo(redkeyCluster.NamespacedName(), "RKCL object not containing label", "label", redis.RedKeyClusterComponentLabel)
+		redkeyCluster.ObjectMeta.Labels[redis.RedKeyClusterComponentLabel] = "redis"
+		if err := r.Update(ctx, redkeyCluster); err != nil {
 			return err
 		}
-		r.logInfo(redisCluster.NamespacedName(), "Label added to RedisCluster labels", "label", redis.RedisClusterComponentLabel, "value", "redis")
+		r.logInfo(redkeyCluster.NamespacedName(), "Label added to RedKeyCluster labels", "label", redis.RedKeyClusterComponentLabel, "value", "redis")
 	}
 	return nil
 }
 
-func (r *RedisClusterReconciler) checkAndCreateConfigMap(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) (*corev1.ConfigMap, bool, error) {
+func (r *RedKeyClusterReconciler) checkAndCreateConfigMap(ctx context.Context, req ctrl.Request, redkeyCluster *redkeyv1.RedKeyCluster) (*corev1.ConfigMap, bool, error) {
 	var immediateRequeue = false
 	var auth = &corev1.Secret{}
 	var err error
@@ -88,33 +88,33 @@ func (r *RedisClusterReconciler) checkAndCreateConfigMap(ctx context.Context, re
 	configMap, err := r.FindExistingConfigMapFunc(ctx, req)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			if len(redisCluster.Spec.Auth.SecretName) > 0 {
+			if len(redkeyCluster.Spec.Auth.SecretName) > 0 {
 				auth, err = r.getSecret(ctx, types.NamespacedName{
-					Name:      redisCluster.Spec.Auth.SecretName,
+					Name:      redkeyCluster.Spec.Auth.SecretName,
 					Namespace: req.Namespace,
-				}, redisCluster.NamespacedName())
+				}, redkeyCluster.NamespacedName())
 				if err != nil {
-					r.logError(redisCluster.NamespacedName(), err, "Can't find provided secret", "redisCluster", redisCluster)
+					r.logError(redkeyCluster.NamespacedName(), err, "Can't find provided secret", "redkeyCluster", redkeyCluster)
 					return nil, immediateRequeue, err
 				}
 			}
-			configMap = r.createConfigMap(req, redisCluster.Spec, auth, redisCluster.GetObjectMeta().GetLabels())
-			ctrl.SetControllerReference(redisCluster, configMap, r.Scheme)
-			r.logInfo(redisCluster.NamespacedName(), "Creating configmap", "configmap", configMap.Name)
+			configMap = r.createConfigMap(req, redkeyCluster.Spec, auth, redkeyCluster.GetObjectMeta().GetLabels())
+			ctrl.SetControllerReference(redkeyCluster, configMap, r.Scheme)
+			r.logInfo(redkeyCluster.NamespacedName(), "Creating configmap", "configmap", configMap.Name)
 			createMapErr := r.Client.Create(ctx, configMap)
 			if createMapErr != nil {
-				r.logError(redisCluster.NamespacedName(), createMapErr, "Error when creating configmap")
+				r.logError(redkeyCluster.NamespacedName(), createMapErr, "Error when creating configmap")
 				return nil, immediateRequeue, createMapErr
 			}
 		} else {
-			r.logError(redisCluster.NamespacedName(), err, "Getting configmap data failed")
+			r.logError(redkeyCluster.NamespacedName(), err, "Getting configmap data failed")
 			return nil, immediateRequeue, err
 		}
 	}
 	return configMap, immediateRequeue, nil
 }
 
-func (r *RedisClusterReconciler) getSecret(ctx context.Context, ns types.NamespacedName, RCNamespacedName types.NamespacedName) (*corev1.Secret, error) {
+func (r *RedKeyClusterReconciler) getSecret(ctx context.Context, ns types.NamespacedName, RCNamespacedName types.NamespacedName) (*corev1.Secret, error) {
 	secret := &corev1.Secret{}
 	err := r.Client.Get(ctx, ns, secret)
 	if err != nil {
@@ -123,18 +123,18 @@ func (r *RedisClusterReconciler) getSecret(ctx context.Context, ns types.Namespa
 	return secret, err
 }
 
-func (r *RedisClusterReconciler) createConfigMap(req ctrl.Request, spec redisv1.RedisClusterSpec, secret *corev1.Secret, labels map[string]string) *corev1.ConfigMap {
-	newRedisClusterConf := redis.ConfigStringToMap(spec.Config)
-	labels[redis.RedisClusterLabel] = req.Name
-	labels[redis.RedisClusterComponentLabel] = "redis"
+func (r *RedKeyClusterReconciler) createConfigMap(req ctrl.Request, spec redkeyv1.RedKeyClusterSpec, secret *corev1.Secret, labels map[string]string) *corev1.ConfigMap {
+	newRedKeyClusterConf := redis.ConfigStringToMap(spec.Config)
+	labels[redis.RedKeyClusterLabel] = req.Name
+	labels[redis.RedKeyClusterComponentLabel] = "redis"
 	if val, exists := secret.Data["requirepass"]; exists {
-		newRedisClusterConf["requirepass"] = append(newRedisClusterConf["requirepass"], string(val))
+		newRedKeyClusterConf["requirepass"] = append(newRedKeyClusterConf["requirepass"], string(val))
 
 	} else if secret.Name != "" {
 		r.logInfo(req.NamespacedName, "requirepass field not found in secret", "secretdata", secret.Data)
 	}
 
-	redisConfMap := redis.MergeWithDefaultConfig(newRedisClusterConf, spec.Ephemeral, spec.ReplicasPerMaster)
+	redisConfMap := redis.MergeWithDefaultConfig(newRedKeyClusterConf, spec.Ephemeral, spec.ReplicasPerMaster)
 
 	redisConf := redis.MapToConfigString(redisConfMap)
 	cm := corev1.ConfigMap{
@@ -151,59 +151,59 @@ func (r *RedisClusterReconciler) createConfigMap(req ctrl.Request, spec redisv1.
 	return &cm
 }
 
-func (r *RedisClusterReconciler) checkAndCreateStatefulSet(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster, configMap *corev1.ConfigMap) (bool, error) {
+func (r *RedKeyClusterReconciler) checkAndCreateStatefulSet(ctx context.Context, req ctrl.Request, redkeyCluster *redkeyv1.RedKeyCluster, configMap *corev1.ConfigMap) (bool, error) {
 	var immediateRequeue = false
 	statefulSet, err := r.FindExistingStatefulSet(ctx, req)
 	var createSsetError error
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Create StatefulSet
-			r.logInfo(redisCluster.NamespacedName(), "Creating statefulset")
-			statefulSet, createSsetError = r.createStatefulSet(ctx, req, redisCluster.Spec, *redisCluster.Spec.Labels, configMap)
+			r.logInfo(redkeyCluster.NamespacedName(), "Creating statefulset")
+			statefulSet, createSsetError = r.createStatefulSet(ctx, req, redkeyCluster.Spec, *redkeyCluster.Spec.Labels, configMap)
 			if createSsetError != nil {
-				r.logError(redisCluster.NamespacedName(), createSsetError, "Error when creating StatefulSet")
+				r.logError(redkeyCluster.NamespacedName(), createSsetError, "Error when creating StatefulSet")
 				return immediateRequeue, createSsetError
 			}
-			r.logInfo(redisCluster.NamespacedName(), "Successfully created statefulset")
+			r.logInfo(redkeyCluster.NamespacedName(), "Successfully created statefulset")
 
 			// Set the config checksum annotation
-			statefulSet = r.addConfigChecksumAnnotation(statefulSet, redisCluster)
+			statefulSet = r.addConfigChecksumAnnotation(statefulSet, redkeyCluster)
 
-			ctrl.SetControllerReference(redisCluster, statefulSet, r.Scheme)
+			ctrl.SetControllerReference(redkeyCluster, statefulSet, r.Scheme)
 			createSsetError = r.Client.Create(ctx, statefulSet)
 			if createSsetError != nil {
 				if errors.IsAlreadyExists(createSsetError) {
-					r.logInfo(redisCluster.NamespacedName(), "StatefulSet already exists")
+					r.logInfo(redkeyCluster.NamespacedName(), "StatefulSet already exists")
 				} else {
-					r.logError(redisCluster.NamespacedName(), createSsetError, "Error when creating StatefulSet")
+					r.logError(redkeyCluster.NamespacedName(), createSsetError, "Error when creating StatefulSet")
 				}
 			}
 		} else {
-			r.logError(redisCluster.NamespacedName(), err, "Getting statefulset data failed", "statefulset", statefulSet.Name)
+			r.logError(redkeyCluster.NamespacedName(), err, "Getting statefulset data failed", "statefulset", statefulSet.Name)
 			return immediateRequeue, err
 		}
 	} else {
-		// Check StatefulSet <-> RedisCluster coherence
+		// Check StatefulSet <-> RedKeyCluster coherence
 
 		// When scaling up before upgrading we can have inconsistencies currReadyNodes <> currSsetReplicas
 		// we skip these checks till the sacling up is done.
-		if redisCluster.Status.Status == redisv1.StatusUpgrading && redisCluster.Status.Substatus.Status == redisv1.SubstatusUpgradingScalingUp {
+		if redkeyCluster.Status.Status == redkeyv1.StatusUpgrading && redkeyCluster.Status.Substatus.Status == redkeyv1.SubstatusUpgradingScalingUp {
 			return immediateRequeue, nil
 		}
 
 		currSsetReplicas := *(statefulSet.Spec.Replicas)
-		realExpectedReplicas := int32(redisCluster.NodesNeeded())
+		realExpectedReplicas := int32(redkeyCluster.NodesNeeded())
 		immediateRequeue = false
 		var err error
-		if redisCluster.Status.Status == "" || redisCluster.Status.Status == redisv1.StatusInitializing {
+		if redkeyCluster.Status.Status == "" || redkeyCluster.Status.Status == redkeyv1.StatusInitializing {
 			if currSsetReplicas != realExpectedReplicas {
 				immediateRequeue = true
-				r.logInfo(redisCluster.NamespacedName(), "Replicas updated before reaching Configuring status: aligning StatefulSet <-> RedisCluster replicas",
-					"StatefulSet replicas", currSsetReplicas, "RedisCluster replicas", realExpectedReplicas)
+				r.logInfo(redkeyCluster.NamespacedName(), "Replicas updated before reaching Configuring status: aligning StatefulSet <-> RedKeyCluster replicas",
+					"StatefulSet replicas", currSsetReplicas, "RedKeyCluster replicas", realExpectedReplicas)
 				statefulSet.Spec.Replicas = &realExpectedReplicas
-				_, err = r.updateStatefulSet(ctx, statefulSet, redisCluster)
+				_, err = r.updateStatefulSet(ctx, statefulSet, redkeyCluster)
 				if err != nil {
-					r.logError(redisCluster.NamespacedName(), err, "Failed to update StatefulSet replicas")
+					r.logError(redkeyCluster.NamespacedName(), err, "Failed to update StatefulSet replicas")
 				}
 				return immediateRequeue, err
 			}
@@ -211,13 +211,13 @@ func (r *RedisClusterReconciler) checkAndCreateStatefulSet(ctx context.Context, 
 		// if realExpectedReplicas < currSsetReplicas {
 		// 	// Inconsistency: if a scaleup could not be completed because of a lack of resources that prevented
 		// 	// all the needed pods from being created
-		// 	// StatefulSet replicas are then aligned with RedisCluster replicas
-		// 	r.logInfo(redisCluster.NamespacedName(), "Not all required pods instantiated: aligning StatefulSet <-> RedisCluster replicas",
-		// 		"StatefulSet replicas", currSsetReplicas, "RedisCluster replicas", realExpectedReplicas)
+		// 	// StatefulSet replicas are then aligned with RedKeyCluster replicas
+		// 	r.logInfo(redkeyCluster.NamespacedName(), "Not all required pods instantiated: aligning StatefulSet <-> RedKeyCluster replicas",
+		// 		"StatefulSet replicas", currSsetReplicas, "RedKeyCluster replicas", realExpectedReplicas)
 		// 	statefulSet.Spec.Replicas = &realExpectedReplicas
-		// 	_, err = r.updateStatefulSet(ctx, statefulSet, redisCluster)
+		// 	_, err = r.updateStatefulSet(ctx, statefulSet, redkeyCluster)
 		// 	if err != nil {
-		// 		r.logError(redisCluster.NamespacedName(), err, "Failed to update StatefulSet replicas")
+		// 		r.logError(redkeyCluster.NamespacedName(), err, "Failed to update StatefulSet replicas")
 		// 	}
 		// }
 		return immediateRequeue, err
@@ -225,7 +225,7 @@ func (r *RedisClusterReconciler) checkAndCreateStatefulSet(ctx context.Context, 
 	return immediateRequeue, nil
 }
 
-func (r *RedisClusterReconciler) createStatefulSet(ctx context.Context, req ctrl.Request, spec redisv1.RedisClusterSpec, labels map[string]string, configmap *corev1.ConfigMap) (*v1.StatefulSet, error) {
+func (r *RedKeyClusterReconciler) createStatefulSet(ctx context.Context, req ctrl.Request, spec redkeyv1.RedKeyClusterSpec, labels map[string]string, configmap *corev1.ConfigMap) (*v1.StatefulSet, error) {
 	statefulSet, err := redis.CreateStatefulSet(ctx, req, spec, labels)
 	if err != nil {
 		return statefulSet, err
@@ -274,7 +274,7 @@ func (r *RedisClusterReconciler) createStatefulSet(ctx context.Context, req ctrl
 	return statefulSet, nil
 }
 
-func (r *RedisClusterReconciler) inferResources(req ctrl.Request, spec redisv1.RedisClusterSpec, configmap *corev1.ConfigMap, statefulSet *v1.StatefulSet) (*v1.StatefulSet, error) {
+func (r *RedKeyClusterReconciler) inferResources(req ctrl.Request, spec redkeyv1.RedKeyClusterSpec, configmap *corev1.ConfigMap, statefulSet *v1.StatefulSet) (*v1.StatefulSet, error) {
 	config := spec.Config
 	desiredConfig := redis.MergeWithDefaultConfig(
 		redis.ConfigStringToMap(config),
@@ -314,33 +314,33 @@ func (r *RedisClusterReconciler) inferResources(req ctrl.Request, spec redisv1.R
 	return statefulSet, nil
 }
 
-func (r *RedisClusterReconciler) overrideStatefulSet(req ctrl.Request, redisCluster *redisv1.RedisCluster, statefulSet *v1.StatefulSet) (*v1.StatefulSet, bool) {
+func (r *RedKeyClusterReconciler) overrideStatefulSet(req ctrl.Request, redkeyCluster *redkeyv1.RedKeyCluster, statefulSet *v1.StatefulSet) (*v1.StatefulSet, bool) {
 	// Create a default override if it doesn't exist. This is to handle the case where the user removes the override of an existing cluster.
-	if redisCluster.Spec.Override == nil {
-		redisCluster.Spec.Override = &redisv1.RedisClusterOverrideSpec{
+	if redkeyCluster.Spec.Override == nil {
+		redkeyCluster.Spec.Override = &redkeyv1.RedKeyClusterOverrideSpec{
 			StatefulSet: &v1.StatefulSet{},
 			Service:     &corev1.Service{},
 		}
-	} else if redisCluster.Spec.Override.StatefulSet == nil {
-		redisCluster.Spec.Override.StatefulSet = &v1.StatefulSet{}
+	} else if redkeyCluster.Spec.Override.StatefulSet == nil {
+		redkeyCluster.Spec.Override.StatefulSet = &v1.StatefulSet{}
 	}
 
 	// Apply the override
-	patchedStatefulSet, err := redis.ApplyStsOverride(statefulSet, redisCluster.Spec.Override.StatefulSet)
+	patchedStatefulSet, err := redis.ApplyStsOverride(statefulSet, redkeyCluster.Spec.Override.StatefulSet)
 	if err != nil {
 		ctrl.Log.Error(err, "Error applying StatefulSet override")
 		return statefulSet, false
 	}
 
 	// Apply the resources override if provided in containers without resources after patch
-	if redisCluster.Spec.Resources != nil {
+	if redkeyCluster.Spec.Resources != nil {
 		for k := range patchedStatefulSet.Spec.Template.Spec.Containers {
 			if patchedStatefulSet.Spec.Template.Spec.Containers[k].Resources.Limits == nil {
-				patchedStatefulSet.Spec.Template.Spec.Containers[k].Resources.Limits = redisCluster.Spec.Resources.Limits
+				patchedStatefulSet.Spec.Template.Spec.Containers[k].Resources.Limits = redkeyCluster.Spec.Resources.Limits
 			}
 
 			if patchedStatefulSet.Spec.Template.Spec.Containers[k].Resources.Requests == nil {
-				patchedStatefulSet.Spec.Template.Spec.Containers[k].Resources.Requests = redisCluster.Spec.Resources.Requests
+				patchedStatefulSet.Spec.Template.Spec.Containers[k].Resources.Requests = redkeyCluster.Spec.Resources.Requests
 			}
 		}
 	}
@@ -357,19 +357,19 @@ func (r *RedisClusterReconciler) overrideStatefulSet(req ctrl.Request, redisClus
 	return patchedStatefulSet, changed
 }
 
-func (r *RedisClusterReconciler) checkAndCreateService(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) (bool, error) {
+func (r *RedKeyClusterReconciler) checkAndCreateService(ctx context.Context, req ctrl.Request, redkeyCluster *redkeyv1.RedKeyCluster) (bool, error) {
 	service, err := r.FindExistingService(ctx, req)
 	if err != nil {
 		// Return if the error is not a NotFound error
 		if !errors.IsNotFound(err) {
-			r.logError(redisCluster.NamespacedName(), err, "Getting svc data failed")
+			r.logError(redkeyCluster.NamespacedName(), err, "Getting svc data failed")
 			return false, err
 		}
 
 		// Create service otherwise
-		r.logInfo(redisCluster.NamespacedName(), "Creating service")
-		service := r.createService(req, redisCluster.Spec, redisCluster.GetObjectMeta().GetLabels())
-		ctrl.SetControllerReference(redisCluster, service, r.Scheme)
+		r.logInfo(redkeyCluster.NamespacedName(), "Creating service")
+		service := r.createService(req, redkeyCluster.Spec, redkeyCluster.GetObjectMeta().GetLabels())
+		ctrl.SetControllerReference(redkeyCluster, service, r.Scheme)
 
 		createSVCError := r.Client.Create(ctx, service)
 		if createSVCError != nil {
@@ -377,30 +377,30 @@ func (r *RedisClusterReconciler) checkAndCreateService(ctx context.Context, req 
 				return false, createSVCError
 			}
 
-			r.logInfo(redisCluster.NamespacedName(), "Svc already exists")
+			r.logInfo(redkeyCluster.NamespacedName(), "Svc already exists")
 			return false, nil
 		}
 
-		r.logInfo(redisCluster.NamespacedName(), "Successfully created service", "service", service.Name)
+		r.logInfo(redkeyCluster.NamespacedName(), "Successfully created service", "service", service.Name)
 	} else {
 		// Handle changes in spec.override.service
-		patchedService, changed := r.overrideService(req, redisCluster, service)
+		patchedService, changed := r.overrideService(req, redkeyCluster, service)
 
 		// Update service if changed
 		if changed {
 			service = patchedService
 			err := r.Client.Update(ctx, service)
 			if err != nil {
-				r.logError(redisCluster.NamespacedName(), err, "Error updating service")
+				r.logError(redkeyCluster.NamespacedName(), err, "Error updating service")
 				return false, err
 			}
-			r.logInfo(redisCluster.NamespacedName(), "Successfully updated service", "service", service.Name)
+			r.logInfo(redkeyCluster.NamespacedName(), "Successfully updated service", "service", service.Name)
 		}
 	}
 	return false, nil
 }
 
-func (r *RedisClusterReconciler) createService(req ctrl.Request, spec redisv1.RedisClusterSpec, labels map[string]string) *corev1.Service {
+func (r *RedKeyClusterReconciler) createService(req ctrl.Request, spec redkeyv1.RedKeyClusterSpec, labels map[string]string) *corev1.Service {
 	service := redis.CreateService(req.Namespace, req.Name, labels)
 
 	// Override the service with the provided override
@@ -415,19 +415,19 @@ func (r *RedisClusterReconciler) createService(req ctrl.Request, spec redisv1.Re
 	return service
 }
 
-func (r *RedisClusterReconciler) overrideService(req ctrl.Request, redisCluster *redisv1.RedisCluster, service *corev1.Service) (*corev1.Service, bool) {
+func (r *RedKeyClusterReconciler) overrideService(req ctrl.Request, redkeyCluster *redkeyv1.RedKeyCluster, service *corev1.Service) (*corev1.Service, bool) {
 	// Create a default override if it doesn't exist. This is to handle the case where the user removes the override of an existing cluster.
-	if redisCluster.Spec.Override == nil {
-		redisCluster.Spec.Override = &redisv1.RedisClusterOverrideSpec{
+	if redkeyCluster.Spec.Override == nil {
+		redkeyCluster.Spec.Override = &redkeyv1.RedKeyClusterOverrideSpec{
 			StatefulSet: &v1.StatefulSet{},
 			Service:     &corev1.Service{},
 		}
-	} else if redisCluster.Spec.Override.Service == nil {
-		redisCluster.Spec.Override.Service = &corev1.Service{}
+	} else if redkeyCluster.Spec.Override.Service == nil {
+		redkeyCluster.Spec.Override.Service = &corev1.Service{}
 	}
 
 	// Apply the override
-	patchedService, err := redis.ApplyServiceOverride(service, redisCluster.Spec.Override.Service)
+	patchedService, err := redis.ApplyServiceOverride(service, redkeyCluster.Spec.Override.Service)
 	if err != nil {
 		ctrl.Log.Error(err, "Error applying Service override")
 		return service, false
@@ -443,28 +443,28 @@ func (r *RedisClusterReconciler) overrideService(req ctrl.Request, redisCluster 
 	return patchedService, changed
 }
 
-func (r *RedisClusterReconciler) allPodsReady(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, error) {
+func (r *RedKeyClusterReconciler) allPodsReady(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) (bool, error) {
 	listOptions := client.ListOptions{
-		Namespace: redisCluster.Namespace,
+		Namespace: redkeyCluster.Namespace,
 		LabelSelector: labels.SelectorFromSet(
 			map[string]string{
-				redis.RedisClusterLabel:                     redisCluster.Name,
-				r.getStatefulSetSelectorLabel(redisCluster): "redis",
+				redis.RedKeyClusterLabel:                     redkeyCluster.Name,
+				r.getStatefulSetSelectorLabel(redkeyCluster): "redis",
 			},
 		),
 	}
-	podsReady, err := kubernetes.AllPodsReady(ctx, r.Client, &listOptions, redisCluster.NodesNeeded())
+	podsReady, err := kubernetes.AllPodsReady(ctx, r.Client, &listOptions, redkeyCluster.NodesNeeded())
 	if err != nil {
-		r.logError(redisCluster.NamespacedName(), err, "Could not check for pods being ready")
+		r.logError(redkeyCluster.NamespacedName(), err, "Could not check for pods being ready")
 		return false, err
 	}
 	return podsReady, nil
 }
 
-func (r *RedisClusterReconciler) getPersistentVolumeClaim(ctx context.Context, client client.Client, redisCluster *redisv1.RedisCluster, name string) (*corev1.PersistentVolumeClaim, error) {
-	r.logInfo(redisCluster.NamespacedName(), "Getting persistent volume claim to be deleted ")
+func (r *RedKeyClusterReconciler) getPersistentVolumeClaim(ctx context.Context, client client.Client, redkeyCluster *redkeyv1.RedKeyCluster, name string) (*corev1.PersistentVolumeClaim, error) {
+	r.logInfo(redkeyCluster.NamespacedName(), "Getting persistent volume claim to be deleted ")
 	pvc := &corev1.PersistentVolumeClaim{}
-	err := client.Get(ctx, types.NamespacedName{Name: name, Namespace: redisCluster.Namespace}, pvc)
+	err := client.Get(ctx, types.NamespacedName{Name: name, Namespace: redkeyCluster.Namespace}, pvc)
 
 	if err != nil {
 		return nil, err
@@ -472,25 +472,25 @@ func (r *RedisClusterReconciler) getPersistentVolumeClaim(ctx context.Context, c
 	return pvc, nil
 }
 
-func (ef *RedisClusterReconciler) deletePVC(ctx context.Context, client client.Client, pvc *corev1.PersistentVolumeClaim) error {
+func (ef *RedKeyClusterReconciler) deletePVC(ctx context.Context, client client.Client, pvc *corev1.PersistentVolumeClaim) error {
 	err := client.Delete(ctx, pvc)
 	return err
 }
 
-// GetStatefulSetSelectorLabel returns the label key that should be used to find RedisCluster nodes for
-// backwards compatibility with the old version RedisCluster.
+// GetStatefulSetSelectorLabel returns the label key that should be used to find RedKeyCluster nodes for
+// backwards compatibility with the old version RedKeyCluster.
 // The implementation has been moved, and this exists merely as an alias for backward compatibility
-func (r *RedisClusterReconciler) getStatefulSetSelectorLabel(rdcl *redisv1.RedisCluster) string {
-	return kubernetes.GetStatefulSetSelectorLabel(context.TODO(), r.Client, rdcl)
+func (r *RedKeyClusterReconciler) getStatefulSetSelectorLabel(rkcl *redkeyv1.RedKeyCluster) string {
+	return kubernetes.GetStatefulSetSelectorLabel(context.TODO(), r.Client, rkcl)
 }
 
-func (r *RedisClusterReconciler) updateStatefulSet(ctx context.Context, statefulSet *v1.StatefulSet, redisCluster *redisv1.RedisCluster) (*v1.StatefulSet, error) {
+func (r *RedKeyClusterReconciler) updateStatefulSet(ctx context.Context, statefulSet *v1.StatefulSet, redkeyCluster *redkeyv1.RedKeyCluster) (*v1.StatefulSet, error) {
 	refreshedStatefulSet := &v1.StatefulSet{}
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		// get a fresh rediscluster to minimize conflicts
+		// get a fresh redkeycluster to minimize conflicts
 		err := r.Client.Get(ctx, types.NamespacedName{Namespace: statefulSet.Namespace, Name: statefulSet.Name}, refreshedStatefulSet)
 		if err != nil {
-			r.logError(redisCluster.NamespacedName(), err, "Error getting a refreshed RedisCluster before updating it. It may have been deleted?")
+			r.logError(redkeyCluster.NamespacedName(), err, "Error getting a refreshed RedKeyCluster before updating it. It may have been deleted?")
 			return err
 		}
 		// update the slots
@@ -505,13 +505,13 @@ func (r *RedisClusterReconciler) updateStatefulSet(ctx context.Context, stateful
 	return refreshedStatefulSet, nil
 }
 
-func (r *RedisClusterReconciler) updateDeployment(ctx context.Context, deployment *v1.Deployment, redisCluster *redisv1.RedisCluster) (*v1.Deployment, error) {
+func (r *RedKeyClusterReconciler) updateDeployment(ctx context.Context, deployment *v1.Deployment, redkeyCluster *redkeyv1.RedKeyCluster) (*v1.Deployment, error) {
 	refreshedDeployment := &v1.Deployment{}
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		// get a fresh rediscluster to minimize conflicts
+		// get a fresh redkeycluster to minimize conflicts
 		err := r.Client.Get(ctx, types.NamespacedName{Namespace: deployment.Namespace, Name: deployment.Name}, refreshedDeployment)
 		if err != nil {
-			r.logError(redisCluster.NamespacedName(), err, "Error getting a refreshed RedisCluster before updating it. It may have been deleted?")
+			r.logError(redkeyCluster.NamespacedName(), err, "Error getting a refreshed RedKeyCluster before updating it. It may have been deleted?")
 			return err
 		}
 		// update the slots
@@ -526,21 +526,21 @@ func (r *RedisClusterReconciler) updateDeployment(ctx context.Context, deploymen
 	return refreshedDeployment, nil
 }
 
-func (r *RedisClusterReconciler) updateRdclReplicas(ctx context.Context, redisCluster *redisv1.RedisCluster, replicas int32) (*redisv1.RedisCluster, error) {
-	refreshedRdcl := &redisv1.RedisCluster{}
+func (r *RedKeyClusterReconciler) updateRkclReplicas(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster, replicas int32) (*redkeyv1.RedKeyCluster, error) {
+	refreshedRkcl := &redkeyv1.RedKeyCluster{}
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		// get a fresh rediscluster to minimize conflicts
-		err := r.Client.Get(ctx, types.NamespacedName{Namespace: redisCluster.Namespace, Name: redisCluster.Name}, refreshedRdcl)
+		// get a fresh redkeycluster to minimize conflicts
+		err := r.Client.Get(ctx, types.NamespacedName{Namespace: redkeyCluster.Namespace, Name: redkeyCluster.Name}, refreshedRkcl)
 		if err != nil {
-			r.logError(redisCluster.NamespacedName(), err, "Error getting a refreshed RedisCluster before updating it. It may have been deleted?")
+			r.logError(redkeyCluster.NamespacedName(), err, "Error getting a refreshed RedKeyCluster before updating it. It may have been deleted?")
 			return err
 		}
-		refreshedRdcl.Spec.Replicas = replicas
-		var updateErr = r.Client.Update(ctx, refreshedRdcl)
+		refreshedRkcl.Spec.Replicas = replicas
+		var updateErr = r.Client.Update(ctx, refreshedRkcl)
 		return updateErr
 	})
 	if err != nil {
 		return nil, err
 	}
-	return refreshedRdcl, nil
+	return refreshedRkcl, nil
 }

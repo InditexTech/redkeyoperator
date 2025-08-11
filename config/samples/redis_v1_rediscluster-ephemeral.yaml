@@ -1,10 +1,10 @@
 apiVersion: redis.inditex.dev/v1
-kind: RedisCluster
+kind: RedkeyCluster
 metadata:
   labels:
-    app.kubernetes.io/name: redis-cluster-operator
+    app.kubernetes.io/name: redkey-cluster-operator
     app.kubernetes.io/managed-by: kustomize
-  name: redis-cluster-ephemeral
+  name: redkey-cluster-ephemeral
 spec:
   replicas: 3
   ephemeral: true
@@ -38,7 +38,7 @@ spec:
           operation_cleanup_interval_seconds: 30
         cluster:
           namespace: redis-operator
-          name: redis-cluster-ephemeral
+          name: redkey-cluster-ephemeral
           replicas: 3
           replicas_per_master: 0
           status: 'Unknown'
@@ -80,7 +80,7 @@ spec:
                 protocol: TCP
             volumeMounts:
               - mountPath: /opt/conf/configmap
-                name: redis-cluster-ephemeral-robin-config
+                name: redkey-cluster-ephemeral-robin-config
             resources:
               requests:
                 cpu: 500m
@@ -91,8 +91,8 @@ spec:
         volumes:
           - configMap:
               defaultMode: 420
-              name: redis-cluster-ephemeral-robin
-            name: redis-cluster-ephemeral-robin-config
+              name: redkey-cluster-ephemeral-robin
+            name: redkey-cluster-ephemeral-robin-config
   # override:
   #   service:
   #     metadata:

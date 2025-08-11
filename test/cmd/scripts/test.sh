@@ -9,7 +9,7 @@ set -o nounset
 set -o pipefail
 
 REPLICAS="${1:-10}"
-REDIS_CLUSTER_NAME="${2:-redis-cluster-test}"
+REDIS_CLUSTER_NAME="${2:-redkey-cluster-test}"
 MINUTES="${3:-10}"
 LOCAL="${4:-false}"
 

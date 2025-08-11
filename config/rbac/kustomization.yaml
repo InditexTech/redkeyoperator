@@ -4,12 +4,12 @@ resources:
 - bases/role.yaml
 - bases/role_binding.yaml
 - bases/service_account.yaml
-- bases/rediscluster_editor_role.yaml
+- bases/redkeycluster_editor_role.yaml
 
 namespace: default
 # For each CRD, "Editor" and "Viewer" roles are scaffolded by
 # default, aiding admins in cluster management. Those roles are
 # not used by the Project itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
-# - rediscluster_editor_role.yaml
-# - rediscluster_viewer_role.yaml
+# - redkeycluster_editor_role.yaml
+# - redkeycluster_viewer_role.yaml

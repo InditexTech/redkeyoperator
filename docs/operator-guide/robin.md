@@ -7,20 +7,20 @@ Robin is designed to help the Operator (Batman) in its duties, in particular:
 - FUTURE WORK
 
 The Operator deploys a Deployment and a ConfigMap for Robin given the configuration provided in `spec.robin` for each Redis Cluster, if configured. The operator is responsible 
-of reconcile any addition, update or delete in the `spec.robin` of a RedisCluster.
+of reconcile any addition, update or delete in the `spec.robin` of a RedKeyCluster.
 
 ## How to deploy Robin
 
-Robin deployment can be configured in `spec.robin.template`. This field is an object representing a [PodSpecTemplate](https://github.com/kubernetes/kubernetes/blob/v1.32.2/staging/src/k8s.io/api/core/v1/types.go#L5050). The template is then used by the Redis Operator to create, update or delete a Deployment with Robin, whose name is `<RedisClusterName>-robin`.
+Robin deployment can be configured in `spec.robin.template`. This field is an object representing a [PodSpecTemplate](https://github.com/kubernetes/kubernetes/blob/v1.32.2/staging/src/k8s.io/api/core/v1/types.go#L5050). The template is then used by the Redis Operator to create, update or delete a Deployment with Robin, whose name is `<RedKeyClusterName>-robin`.
 
-Robin connects to all the nodes of the Redis Cluster using port 6379 and the K8s Redis Pod domain name (e.g.: rediscluster-sample-0.redis-cluster-sample). Therefore, a DNS resolving that name 
+Robin connects to all the nodes of the Redis Cluster using port 6379 and the K8s Redis Pod domain name (e.g.: redkeycluster-sample-0.redkey-cluster-sample). Therefore, a DNS resolving that name 
 to the Pod IP is needed for Robin to work.
 
 ### Example
 
 ```yaml
 apiVersion: redis.inditex.dev/v1
-kind: RedisCluster
+kind: RedKeyCluster
 ...
 spec:
   ...
@@ -38,21 +38,21 @@ spec:
                 protocol: TCP
             volumeMounts:
               - mountPath: /opt/conf/configmap
-                name: rediscluster-sample-robin-config
+                name: redkeycluster-sample-robin-config
         volumes:
           - configMap:
               defaultMode: 420
-              name: rediscluster-sample-robin
-            name: rediscluster-sample-robin-config
+              name: redkeycluster-sample-robin
+            name: redkeycluster-sample-robin-config
 ```
 
 ## How to configure Robin
 
-Robin configuration can be included in `spec.robin.config`. This field is an string whose content is included in the key `application-configmap.yml` of the ConfigMap `<RedisClusterName>-robin`. 
+Robin configuration can be included in `spec.robin.config`. This field is an string whose content is included in the key `application-configmap.yml` of the ConfigMap `<RedKeyClusterName>-robin`. 
 The content is expected to be a valid YAML with several fields which can be seen in [Configuration fields](#configuration-fields) section
 
 The Redis Operator applies the MD5 algorithm to the `spec.robin.config` content and adds the result in the `checksum/config` annotation of the Robin Deployment template. This way, any change 
-in the configuration content will trigger a Robin POD recreation, which will have always the latest content applied to the RedisCluster object.
+in the configuration content will trigger a Robin POD recreation, which will have always the latest content applied to the RedKeyCluster object.
 
 ### Configuration fields
 
@@ -78,7 +78,7 @@ The expected fields of the `spec.robin.config` YAML are:
 
 ```yaml
 apiVersion: redis.inditex.dev/v1
-kind: RedisCluster
+kind: RedKeyCluster
 ...
 spec:
   ...
@@ -101,7 +101,7 @@ spec:
           collection_interval_seconds: 60
         cluster:
           replicas: 1
-          name: "rediscluster-sample"
+          name: "redkeycluster-sample"
           namespace: redis-operator
           health_probe_interval_seconds: 60
           healing_time_seconds: 60

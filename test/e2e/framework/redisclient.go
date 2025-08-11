@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	redisv1 "github.com/inditextech/redisoperator/api/v1"
-	"github.com/inditextech/redisoperator/internal/redis"
+	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
+	"github.com/inditextech/redkeyoperator/internal/redis"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -40,7 +40,7 @@ const (
 	CLUSTERINFOCMD         string = "redis-cli cluster info"
 	CLUSTERNODESCMD        string = "redis-cli cluster nodes"
 	EXPECTEDKEYS           int    = 30
-	WAIT_FOR_RDCL_DELETION int    = 180
+	WAIT_FOR_RKCL_DELETION int    = 180
 	defaultConfig                 = `save ""
 appendonly no
 maxmemory 70mb`
@@ -61,7 +61,7 @@ type ClusterStatus struct {
 
 var version = "6.0.2"
 
-// EnsureClusterExistsOrCreate will create or update (upsert) a RedisCluster CR.
+// EnsureClusterExistsOrCreate will create or update (upsert) a RedKeyCluster CR.
 // It applies storage, replica count, PDB and optional overrides, then waits for reconciliation.
 func EnsureClusterExistsOrCreate(
 	ctx context.Context,
@@ -70,10 +70,10 @@ func EnsureClusterExistsOrCreate(
 	replicas, replicasPerMaster int32,
 	storage, image string,
 	purgeKeys, ephemeral bool,
-	pdb redisv1.Pdb,
-	userOverride redisv1.RedisClusterOverrideSpec,
+	pdb redkeyv1.Pdb,
+	userOverride redkeyv1.RedKeyClusterOverrideSpec,
 ) error {
-	rc := &redisv1.RedisCluster{
+	rc := &redkeyv1.RedKeyCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      key.Name,
 			Namespace: key.Namespace,
@@ -83,8 +83,8 @@ func EnsureClusterExistsOrCreate(
 
 	_, err := controllerutil.CreateOrUpdate(ctx, c, rc, func() error {
 		// Base spec
-		rc.Spec = redisv1.RedisClusterSpec{
-			Auth:                 redisv1.RedisAuth{},
+		rc.Spec = redkeyv1.RedKeyClusterSpec{
+			Auth:                 redkeyv1.RedisAuth{},
 			Version:              version,
 			Replicas:             replicas,
 			Ephemeral:            ephemeral,
@@ -103,7 +103,7 @@ func EnsureClusterExistsOrCreate(
 		}
 
 		// PDB override
-		if !reflect.DeepEqual(pdb, redisv1.Pdb{}) {
+		if !reflect.DeepEqual(pdb, redkeyv1.Pdb{}) {
 			rc.Spec.Pdb = pdb
 		}
 
@@ -113,7 +113,7 @@ func EnsureClusterExistsOrCreate(
 		}
 
 		// Start with the user’s override (if any), or an empty one
-		var ov redisv1.RedisClusterOverrideSpec
+		var ov redkeyv1.RedKeyClusterOverrideSpec
 		if userOverride.StatefulSet != nil || userOverride.Service != nil {
 			ov = userOverride
 		}
@@ -142,7 +142,7 @@ func EnsureClusterExistsOrCreate(
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("upsert RedisCluster %s/%s: %w", key.Namespace, key.Name, err)
+		return fmt.Errorf("upsert RedKeyCluster %s/%s: %w", key.Namespace, key.Name, err)
 	}
 	return nil
 }
@@ -168,7 +168,7 @@ func WaitForStatus(
 	c client.Client,
 	key types.NamespacedName,
 	desired string,
-) (*redisv1.RedisCluster, error) {
+) (*redkeyv1.RedKeyCluster, error) {
 
 	const interval = 3 * time.Second
 	var last string
@@ -179,13 +179,13 @@ func WaitForStatus(
 		}
 		// if we were waiting for a transient state and the controller already
 		// completed the reconciliation, Ready is also acceptable.
-		return desired != redisv1.StatusReady && s == redisv1.StatusReady
+		return desired != redkeyv1.StatusReady && s == redkeyv1.StatusReady
 	}
 
 	if err := wait.PollUntilContextTimeout(
 		ctx, interval, defaultTimeout, true,
 		func(ctx context.Context) (bool, error) {
-			rc := &redisv1.RedisCluster{}
+			rc := &redkeyv1.RedKeyCluster{}
 			if err := c.Get(ctx, key, rc); err != nil {
 				// keep polling if NotFound, abort on any other error
 				if errors.IsNotFound(err) {
@@ -204,20 +204,20 @@ func WaitForStatus(
 	}
 
 	// fetch the fresh object before returning
-	final := &redisv1.RedisCluster{}
+	final := &redkeyv1.RedKeyCluster{}
 	if err := c.Get(ctx, key, final); err != nil {
-		return nil, fmt.Errorf("fetch latest RedisCluster %s/%s: %w",
+		return nil, fmt.Errorf("fetch latest RedKeyCluster %s/%s: %w",
 			key.Namespace, key.Name, err)
 	}
 	return final, nil
 }
 
 // Convenience wrapper for waiting until “Ready”
-func WaitForReady(ctx context.Context, c client.Client, key types.NamespacedName) (*redisv1.RedisCluster, error) {
-	return WaitForStatus(ctx, c, key, redisv1.StatusReady)
+func WaitForReady(ctx context.Context, c client.Client, key types.NamespacedName) (*redkeyv1.RedKeyCluster, error) {
+	return WaitForStatus(ctx, c, key, redkeyv1.StatusReady)
 }
 
-// ChangeCluster mutates the RedisCluster specified by key:
+// ChangeCluster mutates the RedKeyCluster specified by key:
 //
 //  1. wait until the cluster is Ready
 //  2. run opts.Mutate (wrapped in controller-runtime CreateOrUpdate +
@@ -229,7 +229,7 @@ func WaitForReady(ctx context.Context, c client.Client, key types.NamespacedName
 // were observed while waiting (useful for asserting “ScalingUp” / “Upgrading”
 // etc. occurred).
 type ChangeClusterOptions struct {
-	Mutate func(rc *redisv1.RedisCluster)
+	Mutate func(rc *redkeyv1.RedKeyCluster)
 }
 
 func ChangeCluster(
@@ -237,14 +237,14 @@ func ChangeCluster(
 	c client.Client,
 	key types.NamespacedName,
 	opts ChangeClusterOptions,
-) (*redisv1.RedisCluster, []string, error) {
+) (*redkeyv1.RedKeyCluster, []string, error) {
 	// 1) ensure initial Ready
-	if _, err := WaitForStatus(ctx, c, key, redisv1.StatusReady); err != nil {
+	if _, err := WaitForStatus(ctx, c, key, redkeyv1.StatusReady); err != nil {
 		return nil, nil, err
 	}
 
 	// 2) mutate (with retry-on-conflict)
-	rc := &redisv1.RedisCluster{ObjectMeta: metav1.ObjectMeta{Name: key.Name, Namespace: key.Namespace}}
+	rc := &redkeyv1.RedKeyCluster{ObjectMeta: metav1.ObjectMeta{Name: key.Name, Namespace: key.Namespace}}
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		_, err := controllerutil.CreateOrUpdate(ctx, c, rc, func() error {
 			opts.Mutate(rc)
@@ -253,7 +253,7 @@ func ChangeCluster(
 		})
 		return err
 	}); err != nil {
-		return nil, nil, fmt.Errorf("patch RedisCluster: %w", err)
+		return nil, nil, fmt.Errorf("patch RedKeyCluster: %w", err)
 	}
 
 	// 3) re-get to know the generation we just wrote
@@ -279,9 +279,9 @@ func WaitForReadyWithTrace(
 	cl client.Client,
 	key types.NamespacedName,
 	wantGen int64,
-) (*redisv1.RedisCluster, []string, error) {
+) (*redkeyv1.RedKeyCluster, []string, error) {
 	var (
-		rc        = &redisv1.RedisCluster{}
+		rc        = &redkeyv1.RedKeyCluster{}
 		trace     []string
 		readyHits int
 	)
@@ -307,7 +307,7 @@ func WaitForReadyWithTrace(
 
 		trace = append(trace, rc.Status.Status)
 
-		if rc.Status.Status == redisv1.StatusReady &&
+		if rc.Status.Status == redkeyv1.StatusReady &&
 			readyObservedGen(rc) >= wantGen {
 
 			readyHits++
@@ -337,60 +337,60 @@ func WaitForReadyWithTrace(
 // observed. prefer .status.observedGeneration; fall back to the
 // Ready condition; if both are zero, just return rc.Generation so
 // the waiter can still progress.
-func readyObservedGen(rc *redisv1.RedisCluster) int64 {
+func readyObservedGen(rc *redkeyv1.RedKeyCluster) int64 {
 	for _, c := range rc.Status.Conditions {
-		if c.Type == redisv1.StatusReady {
+		if c.Type == redkeyv1.StatusReady {
 			return c.ObservedGeneration // <- the only reliable place
 		}
 	}
 	return rc.Generation // fallback
 }
 
-func CheckRedisCluster(k8Client client.Client, ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, error) {
+func CheckRedKeyCluster(k8Client client.Client, ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) (bool, error) {
 	allPods := &corev1.PodList{}
 
 	labelSelector := labels.SelectorFromSet(
 		map[string]string{
-			"redis-cluster-name":                    redisCluster.Name,
-			"redis.rediscluster.operator/component": "redis",
+			"redkey-cluster-name":                    redkeyCluster.Name,
+			"redis.redkeycluster.operator/component": "redis",
 		},
 	)
 
 	k8Client.List(ctx, allPods, &client.ListOptions{
-		Namespace:     redisCluster.Namespace,
+		Namespace:     redkeyCluster.Namespace,
 		LabelSelector: labelSelector,
 	})
 
-	rdclStatus, err := inspectRedisClusterStatus(allPods)
+	rkclStatus, err := inspectRedKeyClusterStatus(allPods)
 
 	if err != nil {
 		return false, err
 	}
 
-	isOkStatus := checkRedisClusterConditions(rdclStatus)
+	isOkStatus := checkRedKeyClusterConditions(rkclStatus)
 
 	return isOkStatus, nil
 }
 
-func GetPods(k8Client client.Client, ctx context.Context, redisCluster *redisv1.RedisCluster) *corev1.PodList {
+func GetPods(k8Client client.Client, ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) *corev1.PodList {
 	allPods := &corev1.PodList{}
 
 	labelSelector := labels.SelectorFromSet(
 		map[string]string{
-			"redis-cluster-name":                    redisCluster.Name,
-			"redis.rediscluster.operator/component": "redis",
+			"redkey-cluster-name":                    redkeyCluster.Name,
+			"redis.redkeycluster.operator/component": "redis",
 		},
 	)
 
 	k8Client.List(ctx, allPods, &client.ListOptions{
-		Namespace:     redisCluster.Namespace,
+		Namespace:     redkeyCluster.Namespace,
 		LabelSelector: labelSelector,
 	})
 
 	return allPods
 }
 
-func RedisStsContainsOverride(sts appsv1.StatefulSet, override redisv1.RedisClusterOverrideSpec) bool {
+func RedisStsContainsOverride(sts appsv1.StatefulSet, override redkeyv1.RedKeyClusterOverrideSpec) bool {
 	// Labels and annotations in override must exist and have the same content in sts
 	for k, v := range override.StatefulSet.Spec.Template.Labels {
 		if sts.Spec.Template.Labels[k] != v {
@@ -532,7 +532,7 @@ func randomValue() string {
 	return randomNumber
 }
 
-func inspectRedisClusterStatus(pods *corev1.PodList) (ClusterStatus, error) {
+func inspectRedKeyClusterStatus(pods *corev1.PodList) (ClusterStatus, error) {
 	var cmd string
 	if len(pods.Items) == 0 {
 		return ClusterStatus{}, fmt.Errorf("no pods found")
@@ -549,7 +549,7 @@ func inspectRedisClusterStatus(pods *corev1.PodList) (ClusterStatus, error) {
 	return clusterStatus, nil
 }
 
-func checkRedisClusterConditions(clusterStatus ClusterStatus) bool {
+func checkRedKeyClusterConditions(clusterStatus ClusterStatus) bool {
 	statusOK := true
 
 	if strings.ToLower(clusterStatus.State) != "ok" {
@@ -608,10 +608,10 @@ func getNodeIPsFromStdOut(stdOut string) string {
 	return nodeIPs
 }
 
-// ValidateRedisClusterMasterSlave waits until Ready, then checks that
+// ValidateRedKeyClusterMasterSlave waits until Ready, then checks that
 // the number of masters & replicas-per-master match, and the StatefulSet
 // has the correct total replica count.
-func ValidateRedisClusterMasterSlave(
+func ValidateRedKeyClusterMasterSlave(
 	ctx context.Context,
 	c client.Client,
 	key types.NamespacedName,
@@ -659,22 +659,22 @@ func ValidateRedisClusterMasterSlave(
 	return true, nil
 }
 
-func InsertDataIntoCluster(ctx context.Context, k8sClient client.Client, nsName types.NamespacedName, redisCluster *redisv1.RedisCluster) (bool, error) {
+func InsertDataIntoCluster(ctx context.Context, k8sClient client.Client, nsName types.NamespacedName, redkeyCluster *redkeyv1.RedKeyCluster) (bool, error) {
 	selectedPods := &corev1.PodList{}
-	// Wait for ready status of redis-cluster
+	// Wait for ready status of redkey-cluster
 	_, err := WaitForReady(ctx, k8sClient, nsName)
 	if err != nil {
 		return false, err
 	}
 	labelSelector := labels.SelectorFromSet(
 		map[string]string{
-			"redis-cluster-name":                    redisCluster.Name,
-			"redis.rediscluster.operator/component": "redis",
+			"redkey-cluster-name":                    redkeyCluster.Name,
+			"redis.redkeycluster.operator/component": "redis",
 		},
 	)
 
 	err = k8sClient.List(ctx, selectedPods, &client.ListOptions{
-		Namespace:     redisCluster.Namespace,
+		Namespace:     redkeyCluster.Namespace,
 		LabelSelector: labelSelector,
 	})
 	if err != nil {
@@ -740,18 +740,18 @@ func updateService(
 	})
 }
 
-func ForgetANode(k8Client client.Client, ctx context.Context, redisCluster *redisv1.RedisCluster) error {
+func ForgetANode(k8Client client.Client, ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) error {
 	allPods := &corev1.PodList{}
 
 	labelSelector := labels.SelectorFromSet(
 		map[string]string{
-			"redis-cluster-name":                    redisCluster.Name,
-			"redis.rediscluster.operator/component": "redis",
+			"redkey-cluster-name":                    redkeyCluster.Name,
+			"redis.redkeycluster.operator/component": "redis",
 		},
 	)
 
 	k8Client.List(ctx, allPods, &client.ListOptions{
-		Namespace:     redisCluster.Namespace,
+		Namespace:     redkeyCluster.Namespace,
 		LabelSelector: labelSelector,
 	})
 
@@ -764,18 +764,18 @@ func ForgetANode(k8Client client.Client, ctx context.Context, redisCluster *redi
 	return nil
 }
 
-func ForgetANodeFixAndMeet(k8Client client.Client, ctx context.Context, redisCluster *redisv1.RedisCluster) error {
+func ForgetANodeFixAndMeet(k8Client client.Client, ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) error {
 	allPods := &corev1.PodList{}
 
 	labelSelector := labels.SelectorFromSet(
 		map[string]string{
-			"redis-cluster-name":                    redisCluster.Name,
-			"redis.rediscluster.operator/component": "redis",
+			"redkey-cluster-name":                    redkeyCluster.Name,
+			"redis.redkeycluster.operator/component": "redis",
 		},
 	)
 
 	k8Client.List(ctx, allPods, &client.ListOptions{
-		Namespace:     redisCluster.Namespace,
+		Namespace:     redkeyCluster.Namespace,
 		LabelSelector: labelSelector,
 	})
 

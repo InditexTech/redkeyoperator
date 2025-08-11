@@ -6,7 +6,7 @@ getStatus()
 {
     local namespace=$1
     local name=$2
-    local status=$(kubectl get rediscluster -n $namespace $name --template='{{.status.status}}')
+    local status=$(kubectl get redkeycluster -n $namespace $name --template='{{.status.status}}')
     echo "$status"
 }
 
@@ -25,7 +25,7 @@ waitForStatus()
 
     # echo "Status=$status"
     if [[ "$waitstatus" != "$status" ]]; then
-        # echo "Error getting expected status in RedisCluster, Status: $status"
+        # echo "Error getting expected status in RedKeyCluster, Status: $status"
         exit 1
     else
         exit 0

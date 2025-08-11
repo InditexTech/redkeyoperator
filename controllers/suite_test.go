@@ -19,8 +19,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	redisv1 "github.com/inditextech/redisoperator/api/v1"
-	finalizer "github.com/inditextech/redisoperator/internal/finalizers"
+	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
+	finalizer "github.com/inditextech/redkeyoperator/internal/finalizers"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,7 +34,7 @@ import (
 
 var k8sClient client.Client
 var testEnv *envtest.Environment
-var cluster *redisv1.RedisCluster = CreateRedisCluster()
+var cluster *redkeyv1.RedKeyCluster = CreateRedKeyCluster()
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -51,7 +51,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	err = redisv1.AddToScheme(scheme.Scheme)
+	err = redkeyv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
@@ -65,7 +65,7 @@ var _ = BeforeSuite(func() {
 	maxConcurrentReconciles := 10
 	concurrentMigrates := 3
 
-	reconciler := NewRedisClusterReconciler(k8sManager, maxConcurrentReconciles, concurrentMigrates)
+	reconciler := NewRedKeyClusterReconciler(k8sManager, maxConcurrentReconciles, concurrentMigrates)
 
 	err = reconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
@@ -79,7 +79,7 @@ var _ = BeforeSuite(func() {
 		Expect(err).ToNot(HaveOccurred())
 	}()
 
-	cluster := CreateRedisCluster()
+	cluster := CreateRedKeyCluster()
 	Expect(k8sClient.Create(ctx, cluster)).Should(Succeed())
 })
 
@@ -104,7 +104,7 @@ var _ = Describe("Reconciler", func() {
 	Context("CRD object", func() {
 		When("CRD is submitted", func() {
 			It("Can be found", func() {
-				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: cluster.Name, Namespace: "default"}, &redisv1.RedisCluster{})
+				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: cluster.Name, Namespace: "default"}, &redkeyv1.RedKeyCluster{})
 				Expect(err).ToNot(HaveOccurred())
 			})
 		})
@@ -116,7 +116,7 @@ var _ = Describe("Reconciler", func() {
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: cluster.Name, Namespace: "default"}, sset)
 				Expect(err).ToNot(HaveOccurred())
 				controller := metav1.GetControllerOf(sset)
-				Expect(controller.Kind).To(Equal("RedisCluster"))
+				Expect(controller.Kind).To(Equal("RedKeyCluster"))
 			})
 			It("Creates configmap", func() {
 				cmap := &corev1.ConfigMap{}
@@ -140,7 +140,7 @@ var _ = Describe("Reconciler", func() {
 				clusterName := "resources-labels-cluster-test"
 
 				// create test cluster
-				scluster := CreateRedisCluster()
+				scluster := CreateRedKeyCluster()
 				scluster.SetName(clusterName)
 				scluster.Spec.Labels = &map[string]string{"belongsto": "team-a", "other": "label"}
 				scluster.Spec.Resources = &corev1.ResourceRequirements{
@@ -170,7 +170,7 @@ var _ = Describe("Reconciler", func() {
 			})
 
 			It("Pod template labels are passed", func() {
-				rcluster := &redisv1.RedisCluster{}
+				rcluster := &redkeyv1.RedKeyCluster{}
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: cluster.Name, Namespace: "default"}, cluster)
 				log.Log.Info("ncluster", "cluster", rcluster)
 				Expect(err).ToNot(HaveOccurred())
@@ -203,7 +203,7 @@ var _ = Describe("Reconciler", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				// create test cluster
-				scluster := CreateRedisCluster()
+				scluster := CreateRedKeyCluster()
 				scluster.SetName(clusterName)
 				scluster.Spec.Auth.SecretName = secretName
 				Expect(k8sClient.Create(context.Background(), scluster)).Should(Succeed())
@@ -220,36 +220,36 @@ var _ = Describe("Reconciler", func() {
 })
 
 func EnsureClusterExistsOrCreate(nsName types.NamespacedName) {
-	rc := &redisv1.RedisCluster{}
+	rc := &redkeyv1.RedKeyCluster{}
 	err := k8sClient.Get(context.TODO(), nsName, rc)
 	if err != nil {
-		k8sClient.Create(context.TODO(), CreateRedisCluster())
+		k8sClient.Create(context.TODO(), CreateRedKeyCluster())
 		time.Sleep(3 * time.Second)
 	}
 }
 
-func CreateRedisCluster() *redisv1.RedisCluster {
+func CreateRedKeyCluster() *redkeyv1.RedKeyCluster {
 	var finalizerId = (&finalizer.ConfigMapCleanupFinalizer{}).GetId()
-	cluster := &redisv1.RedisCluster{
+	cluster := &redkeyv1.RedKeyCluster{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "RedisCluster",
-			APIVersion: "redis.inditex.dev/redisv1",
+			Kind:       "RedKeyCluster",
+			APIVersion: "redis.inditex.dev/redkeyv1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:       "rediscluster-sample",
+			Name:       "redkeycluster-sample",
 			Namespace:  "default",
 			Finalizers: []string{finalizerId},
 			Labels:     map[string]string{"team": "team-a"},
 		},
-		Spec: redisv1.RedisClusterSpec{
-			Auth:     redisv1.RedisAuth{},
+		Spec: redkeyv1.RedKeyClusterSpec{
+			Auth:     redkeyv1.RedisAuth{},
 			Version:  "6.0.2",
 			Replicas: 1,
 			Config: `
 			maxmemory 500mb
 
 	`,
-			Robin: &redisv1.RobinSpec{
+			Robin: &redkeyv1.RobinSpec{
 				Template: &corev1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:   "monitor",

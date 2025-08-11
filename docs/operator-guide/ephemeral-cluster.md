@@ -8,9 +8,9 @@ For a new cluster configuration set the property `ephemeral: true` and apply the
 
 ```yaml
 apiVersion: redis.inditex.dev/v1
-kind: RedisCluster
+kind: RedKeyCluster
 metadata:
-  name: redis-cluster
+  name: redkey-cluster
   ...
 spec:
   ...

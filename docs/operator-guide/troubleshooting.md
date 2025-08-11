@@ -2,9 +2,9 @@
 
 The Redis Operator is a complex piece of software. In some cases it can self-recover from service losses but in other cases a cluster administrator has to intervene. This document helps administrators how to solve failing redis clusters.
 
-The first section describes [redis cluster failure scenarios](#redis-cluster-failure-scenarios) and show to solve them.
+The first section describes [redis cluster failure scenarios](#redkey-cluster-failure-scenarios) and show to solve them.
 
-The second section lists [commands](#redis-cluster-manager-commands) used to solve the failures described in the first section.
+The second section lists [commands](#redkey-cluster-manager-commands) used to solve the failures described in the first section.
 
 ## Redis cluster failure scenarios
 
@@ -123,7 +123,7 @@ M: 11d23d3c2cbac49201825415b38015c862313ec9 10.244.0.57:6379
 For each pod list the status of each node: its role, master or slave, whether it is failing, and which slots are allocated to it.
 
 ```
-for pod in $(kubectl get pods -l redis-cluster-name=[redis-cluster-name] -o json | jq -r '.items[] | .metadata.name'); do echo "POD ${pod} NODES"; kubectl exec -it ${pod} -- redis-cli CLUSTER NODES  | sort; done
+for pod in $(kubectl get pods -l redkey-cluster-name=[redkey-cluster-name] -o json | jq -r '.items[] | .metadata.name'); do echo "POD ${pod} NODES"; kubectl exec -it ${pod} -- redis-cli CLUSTER NODES  | sort; done
 ```
 
 ### Cluster meet
@@ -138,16 +138,16 @@ To do cluster meet among all cluster nodes:
 
 ```
 # File: ./redis-cli-meet-all-nodes.sh
-# Example: ./redis-cli-meet-all-nodes.sh redis-cluster-mecprada-2
+# Example: ./redis-cli-meet-all-nodes.sh redkey-cluster-mecprada-2
 if [ -z "$1" ]; then
-    echo "Usage $0 <redis-cluster>"
+    echo "Usage $0 <redkey-cluster>"
     exit 1
 fi
 cluster_redis=$1
 echo "Meeting all with all nodes: " $cluster_redis
 
-for pod in $(oc get pod -l redis-cluster-name=$cluster_redis,redis.rediscluster.operator/component=redis -o json | jq -r '.items[].metadata.name'); do
-    for ip in $(oc get pod -l redis-cluster-name=$cluster_redis,redis.rediscluster.operator/component=redis -o json | jq -r '.items[].status.podIP'); do
+for pod in $(oc get pod -l redkey-cluster-name=$cluster_redis,redis.redkeycluster.operator/component=redis -o json | jq -r '.items[].metadata.name'); do
+    for ip in $(oc get pod -l redkey-cluster-name=$cluster_redis,redis.redkeycluster.operator/component=redis -o json | jq -r '.items[].status.podIP'); do
         oc exec $pod -- redis-cli cluster meet $ip 3689
     done
 done
@@ -198,21 +198,21 @@ kubectl exec -it [redis-pod-name] -- redis-cli cluster reset
 Have all nodes in the cluster forget a failing node. First get the node id via the [cluster nodes command](#gathering-nodes-information).
 
 ```
-for pod in $(kubectl get pods -l redis-cluster-name=[redis-cluster-name] -o json | jq -r '.items[] | .metadata.name'); do echo "POD ${pod} NODES"; kubectl exec -it ${pod} -- redis-cli CLUSTER FORGET [node-id] | sort; done
+for pod in $(kubectl get pods -l redkey-cluster-name=[redkey-cluster-name] -o json | jq -r '.items[] | .metadata.name'); do echo "POD ${pod} NODES"; kubectl exec -it ${pod} -- redis-cli CLUSTER FORGET [node-id] | sort; done
 ```
 
 If there is a set of disconnected or failing nodes they can forget all at once with the following script:
 
 ```
 # File: ./redis-cli-forget-all-disconnected.sh
-# Example: ./redis-cli-forget-all-disconnected.sh redis-cluster-mecprada-2
+# Example: ./redis-cli-forget-all-disconnected.sh redkey-cluster-mecprada-2
 if [ -z "$1" ]; then
-    echo "Usage $0 <redis-cluster>"
+    echo "Usage $0 <redkey-cluster>"
     exit 1
 fi
 cluster_redis=$1
 echo "Forgetting disconnect in: " $cluster_redis
-for pod in $(oc get pod -l redis-cluster-name=$cluster_redis,redis.rediscluster.operator/component=redis -o json | jq -r '.items[].metadata.name'); do
+for pod in $(oc get pod -l redkey-cluster-name=$cluster_redis,redis.redkeycluster.operator/component=redis -o json | jq -r '.items[].metadata.name'); do
     for node in $(oc exec $pod -- cat /tmp/nodes.conf | egrep '(fail|disconnected)' | cut -f1 -d" "); do
         oc exec  $pod -- redis-cli cluster forget $node
     done

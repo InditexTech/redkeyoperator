@@ -2,22 +2,22 @@
 
 ## CRD
 
-Redis operator CRD defines a new resource type `RedisCluster`.
+Redis operator CRD defines a new resource type `RedKeyCluster`.
 
 Below you'll find an example of manifest conforming to the resource definition that will deploy a Redis cluster:
 
 ```yaml
 apiVersion: redis.inditex.dev/v1
-kind: RedisCluster
+kind: RedKeyCluster
 metadata:
-  name: rediscluster-sample
+  name: redkeycluster-sample
   namespace: default
   labels:
     app: redis
     team: team-a
 spec:
   labels:
-    redis-name: rediscluster-sample
+    redis-name: redkeycluster-sample
     app: myapp
   replicas: 3
   storage: 3Gi
@@ -42,12 +42,12 @@ spec:
             protocol: TCP
           volumeMounts:
           - mountPath: /opt/conf/configmap
-            name: rediscluster-sample-robin-config
+            name: redkeycluster-sample-robin-config
         volumes:
         - configMap:
             defaultMode: 420
-            name: rediscluster-sample-robin
-          name: rediscluster-sample-robin-config
+            name: redkeycluster-sample-robin
+          name: redkeycluster-sample-robin-config
 ```
 
 ### Redis configuration
@@ -63,7 +63,7 @@ However, it's possible to set `replicas: 1` to deploy a single instance Redis cl
 
 ## Live reloading
 
-The configuration from `config` item will be placed under a ConfigMap created and managed by the Operator. This ConfigMap shares its name with the RedisCluster.
+The configuration from `config` item will be placed under a ConfigMap created and managed by the Operator. This ConfigMap shares its name with the RedKeyCluster.
 
 The configuration contained in this ConfigMap is the `source of truth` that Redis operator will use to create and configure the Redis cluster nodes.
 

@@ -6,7 +6,7 @@ Let's think a scenario where you delete a 5 master cluster and create a 3 master
 
 Or you may have a 7 master cluster, scale it down to 3 and scale it up to 5 masters. When the cluster is scaled down to 3, all the slots will be moved to the first 3 nodes, they'll forget about the tailing 4 nodes and their configuration will change accorgingly. When you scale it back to 5 nodes, the 2 newly added nodes will load configuration where there were 7 nodes and this configuration will not match the first 3 nodes' configurations.
 
-Starting with Redis Operator release 0.2.33, Redis Operator supports deletion of PVCs after a scale down operation or a cluster deletions. In case of scaling down, the operator will delete de PVCs of the nodes that are deleted, and in case of cluster deletion, it'll delete all the PVCs owned by the nodes of the cluster. This feature can be enabled by setting `deletePVC` to `true` under `spec` section of a RedisCluster definition.
+Starting with Redis Operator release 0.2.33, Redis Operator supports deletion of PVCs after a scale down operation or a cluster deletions. In case of scaling down, the operator will delete de PVCs of the nodes that are deleted, and in case of cluster deletion, it'll delete all the PVCs owned by the nodes of the cluster. This feature can be enabled by setting `deletePVC` to `true` under `spec` section of a RedKeyCluster definition.
 
 > This setting is optional. The PVCs belonging to the cluster without this setting is its manifest will not be deleted.
 
@@ -16,7 +16,7 @@ Starting with Redis Operator release 0.2.33, Redis Operator supports deletion of
 
 ```yaml
 apiVersion: redis.inditex.dev/v1
-kind: RedisCluster
+kind: RedKeyCluster
 ...
 spec:
   ...

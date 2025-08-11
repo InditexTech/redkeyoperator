@@ -40,9 +40,9 @@ if ! kill_k6; then
     log_info "No k6 tests running"
 fi
 
-# Create a clean RedisCluster
-if ! create_clean_rdcl "$NAMESPACE" "$LOCAL"; then
-    echo "Error: Failed to create RedisCluster in namespace $NAMESPACE"
+# Create a clean RedKeyCluster
+if ! create_clean_rkcl "$NAMESPACE" "$LOCAL"; then
+    echo "Error: Failed to create RedKeyCluster in namespace $NAMESPACE"
     exit 1
 fi
 

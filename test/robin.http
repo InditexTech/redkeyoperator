@@ -7,7 +7,7 @@
 
 GET {{robinBaseUrl}}/metrics
 
-# RedisCluster
+# RedKeyCluster
 
 ## Status
 

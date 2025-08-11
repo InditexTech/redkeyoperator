@@ -27,15 +27,15 @@ Manifests:
 * namespace=$1
 * image=$2
 * test=$3
-* newRedisCluster=$4
-* typeRedisCluster=$5
+* newRedKeyCluster=$4
+* typeRedKeyCluster=$5
 ```
 
 * `namespace` name of namespace where the funtional will be executed
 * `image` name of image that deploy the Redis Operator 
 * `test` name of the desired test `Initialize,ScalingUp,ScalingDown,ChangeStorage,ChangeStorageReplicas,AddLabel,DeleteLabel,InsertData,InsertDataWhileScaling,InsertDataWhileScalingDown,GetSpecificKey,ValidateBasicRedisMasterSlave,ScalingUpRedisMasterSlave,ScalingDownRedisMasterSlave,KillPodRedisMasterSlave`
-* `newRedisCluster` allows to create a new instance of Redis Cluster `true,false`
-* `typeRedisCluster`  type of deployment of the Redis Cluster `storage,ephemeral,repmaster`
+* `newRedKeyCluster` allows to create a new instance of Redis Cluster `true,false`
+* `typeRedKeyCluster`  type of deployment of the Redis Cluster `storage,ephemeral,repmaster`
 
 ## Deploying a Redis cluster
 
@@ -87,10 +87,10 @@ Tests can be run with (examples):
  * ```./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.6" "ScalingDownRedisMasterSlave" "true" "repmaster"```
  * ```./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.6" "KillPodRedisMasterSlave" "true" "repmaster"```
  * ```./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.0" "All" "true" "storage"```
- * ```./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.0" "DeleteRedisCluster"```
+ * ```./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.0" "DeleteRedKeyCluster"```
 
 ## Cleanup
 Delete the operator and all associated resources with:
 
-* ```./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.0" "DeleteRedisCluster"```
+* ```./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.0" "DeleteRedKeyCluster"```
 * ```./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.0" "DeleteAll"```

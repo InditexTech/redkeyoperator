@@ -25,7 +25,7 @@ Refer to [operator guide](./docs/operator-guide/toc.md) to have an overview of t
 
 If you are a developer, you'll find interesting information in the [developer guide](./docs/developer-guide.md).
 
-Learn about [Redis cluster status](./docs/redis-cluster-status.md).
+Learn about [Redis cluster status](./docs/redkey-cluster-status.md).
 
 ## Versions
 
