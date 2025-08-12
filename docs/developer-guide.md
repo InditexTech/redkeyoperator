@@ -17,8 +17,8 @@ As we will see below, you can use the `make` command to deploy the different com
 Three **Deployment Profiles** have been defined. Basically, these profiles determine which image will be used to deploy the RedKey Operator pod. These are the 3 Deployment Profiles and the default images used to create the RedKey Operator pod:
 
 | Profile | Image used to create the RedKey Operator pod | Purpose                                         |
-|---------|---------------------------------------------|-------------------------------------------------|
-| debug   | delve:1.24.5                                | Debug code from your IDE using Delve            |
+|---------|----------------------------------------------|-------------------------------------------------|
+| debug   | delve:1.24.6                                 | Debug code from your IDE using Delve            |
 | dev     | redkey-operator:1.3.0                        | Test a locally built (from source code) release |
 
 ## Create your Kubernetes cluster

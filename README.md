@@ -29,7 +29,7 @@ Learn about [Redis cluster status](./docs/redis-cluster-status.md).
 
 ## Versions
 
-- Go version: v1.24.5
+- Go version: v1.24.6
 - Operator SDK version: v1.37.0
 
 ## License
