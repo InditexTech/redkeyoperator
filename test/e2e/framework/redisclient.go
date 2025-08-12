@@ -71,9 +71,9 @@ func EnsureClusterExistsOrCreate(
 	storage, image string,
 	purgeKeys, ephemeral bool,
 	pdb redisv1.Pdb,
-	userOverride redisv1.RedisClusterOverrideSpec,
+	userOverride redisv1.RedKeyClusterOverrideSpec,
 ) error {
-	rc := &redisv1.RedisCluster{
+	rc := &redisv1.RedKeyCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      key.Name,
 			Namespace: key.Namespace,
@@ -83,7 +83,7 @@ func EnsureClusterExistsOrCreate(
 
 	_, err := controllerutil.CreateOrUpdate(ctx, c, rc, func() error {
 		// Base spec
-		rc.Spec = redisv1.RedisClusterSpec{
+		rc.Spec = redisv1.RedKeyClusterSpec{
 			Auth:                 redisv1.RedisAuth{},
 			Version:              version,
 			Replicas:             replicas,
@@ -113,7 +113,7 @@ func EnsureClusterExistsOrCreate(
 		}
 
 		// Start with the user’s override (if any), or an empty one
-		var ov redisv1.RedisClusterOverrideSpec
+		var ov redisv1.RedKeyClusterOverrideSpec
 		if userOverride.StatefulSet != nil || userOverride.Service != nil {
 			ov = userOverride
 		}
@@ -168,7 +168,7 @@ func WaitForStatus(
 	c client.Client,
 	key types.NamespacedName,
 	desired string,
-) (*redisv1.RedisCluster, error) {
+) (*redisv1.RedKeyCluster, error) {
 
 	const interval = 3 * time.Second
 	var last string
@@ -185,7 +185,7 @@ func WaitForStatus(
 	if err := wait.PollUntilContextTimeout(
 		ctx, interval, defaultTimeout, true,
 		func(ctx context.Context) (bool, error) {
-			rc := &redisv1.RedisCluster{}
+			rc := &redisv1.RedKeyCluster{}
 			if err := c.Get(ctx, key, rc); err != nil {
 				// keep polling if NotFound, abort on any other error
 				if errors.IsNotFound(err) {
@@ -204,7 +204,7 @@ func WaitForStatus(
 	}
 
 	// fetch the fresh object before returning
-	final := &redisv1.RedisCluster{}
+	final := &redisv1.RedKeyCluster{}
 	if err := c.Get(ctx, key, final); err != nil {
 		return nil, fmt.Errorf("fetch latest RedisCluster %s/%s: %w",
 			key.Namespace, key.Name, err)
@@ -213,7 +213,7 @@ func WaitForStatus(
 }
 
 // Convenience wrapper for waiting until “Ready”
-func WaitForReady(ctx context.Context, c client.Client, key types.NamespacedName) (*redisv1.RedisCluster, error) {
+func WaitForReady(ctx context.Context, c client.Client, key types.NamespacedName) (*redisv1.RedKeyCluster, error) {
 	return WaitForStatus(ctx, c, key, redisv1.StatusReady)
 }
 
@@ -229,7 +229,7 @@ func WaitForReady(ctx context.Context, c client.Client, key types.NamespacedName
 // were observed while waiting (useful for asserting “ScalingUp” / “Upgrading”
 // etc. occurred).
 type ChangeClusterOptions struct {
-	Mutate func(rc *redisv1.RedisCluster)
+	Mutate func(rc *redisv1.RedKeyCluster)
 }
 
 func ChangeCluster(
@@ -237,14 +237,14 @@ func ChangeCluster(
 	c client.Client,
 	key types.NamespacedName,
 	opts ChangeClusterOptions,
-) (*redisv1.RedisCluster, []string, error) {
+) (*redisv1.RedKeyCluster, []string, error) {
 	// 1) ensure initial Ready
 	if _, err := WaitForStatus(ctx, c, key, redisv1.StatusReady); err != nil {
 		return nil, nil, err
 	}
 
 	// 2) mutate (with retry-on-conflict)
-	rc := &redisv1.RedisCluster{ObjectMeta: metav1.ObjectMeta{Name: key.Name, Namespace: key.Namespace}}
+	rc := &redisv1.RedKeyCluster{ObjectMeta: metav1.ObjectMeta{Name: key.Name, Namespace: key.Namespace}}
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		_, err := controllerutil.CreateOrUpdate(ctx, c, rc, func() error {
 			opts.Mutate(rc)
@@ -279,9 +279,9 @@ func WaitForReadyWithTrace(
 	cl client.Client,
 	key types.NamespacedName,
 	wantGen int64,
-) (*redisv1.RedisCluster, []string, error) {
+) (*redisv1.RedKeyCluster, []string, error) {
 	var (
-		rc        = &redisv1.RedisCluster{}
+		rc        = &redisv1.RedKeyCluster{}
 		trace     []string
 		readyHits int
 	)
@@ -337,7 +337,7 @@ func WaitForReadyWithTrace(
 // observed. prefer .status.observedGeneration; fall back to the
 // Ready condition; if both are zero, just return rc.Generation so
 // the waiter can still progress.
-func readyObservedGen(rc *redisv1.RedisCluster) int64 {
+func readyObservedGen(rc *redisv1.RedKeyCluster) int64 {
 	for _, c := range rc.Status.Conditions {
 		if c.Type == redisv1.StatusReady {
 			return c.ObservedGeneration // <- the only reliable place
@@ -346,7 +346,7 @@ func readyObservedGen(rc *redisv1.RedisCluster) int64 {
 	return rc.Generation // fallback
 }
 
-func CheckRedisCluster(k8Client client.Client, ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, error) {
+func CheckRedisCluster(k8Client client.Client, ctx context.Context, redisCluster *redisv1.RedKeyCluster) (bool, error) {
 	allPods := &corev1.PodList{}
 
 	labelSelector := labels.SelectorFromSet(
@@ -372,7 +372,7 @@ func CheckRedisCluster(k8Client client.Client, ctx context.Context, redisCluster
 	return isOkStatus, nil
 }
 
-func GetPods(k8Client client.Client, ctx context.Context, redisCluster *redisv1.RedisCluster) *corev1.PodList {
+func GetPods(k8Client client.Client, ctx context.Context, redisCluster *redisv1.RedKeyCluster) *corev1.PodList {
 	allPods := &corev1.PodList{}
 
 	labelSelector := labels.SelectorFromSet(
@@ -390,7 +390,7 @@ func GetPods(k8Client client.Client, ctx context.Context, redisCluster *redisv1.
 	return allPods
 }
 
-func RedisStsContainsOverride(sts appsv1.StatefulSet, override redisv1.RedisClusterOverrideSpec) bool {
+func RedisStsContainsOverride(sts appsv1.StatefulSet, override redisv1.RedKeyClusterOverrideSpec) bool {
 	// Labels and annotations in override must exist and have the same content in sts
 	for k, v := range override.StatefulSet.Spec.Template.Labels {
 		if sts.Spec.Template.Labels[k] != v {
@@ -659,7 +659,7 @@ func ValidateRedisClusterMasterSlave(
 	return true, nil
 }
 
-func InsertDataIntoCluster(ctx context.Context, k8sClient client.Client, nsName types.NamespacedName, redisCluster *redisv1.RedisCluster) (bool, error) {
+func InsertDataIntoCluster(ctx context.Context, k8sClient client.Client, nsName types.NamespacedName, redisCluster *redisv1.RedKeyCluster) (bool, error) {
 	selectedPods := &corev1.PodList{}
 	// Wait for ready status of redis-cluster
 	_, err := WaitForReady(ctx, k8sClient, nsName)
@@ -740,7 +740,7 @@ func updateService(
 	})
 }
 
-func ForgetANode(k8Client client.Client, ctx context.Context, redisCluster *redisv1.RedisCluster) error {
+func ForgetANode(k8Client client.Client, ctx context.Context, redisCluster *redisv1.RedKeyCluster) error {
 	allPods := &corev1.PodList{}
 
 	labelSelector := labels.SelectorFromSet(
@@ -764,7 +764,7 @@ func ForgetANode(k8Client client.Client, ctx context.Context, redisCluster *redi
 	return nil
 }
 
-func ForgetANodeFixAndMeet(k8Client client.Client, ctx context.Context, redisCluster *redisv1.RedisCluster) error {
+func ForgetANodeFixAndMeet(k8Client client.Client, ctx context.Context, redisCluster *redisv1.RedKeyCluster) error {
 	allPods := &corev1.PodList{}
 
 	labelSelector := labels.SelectorFromSet(

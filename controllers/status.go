@@ -23,7 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func (r *RedisClusterReconciler) updateClusterStatus(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
+func (r *RedisClusterReconciler) updateClusterStatus(ctx context.Context, redisCluster *redisv1.RedKeyCluster) error {
 	var req reconcile.Request
 	req.NamespacedName.Namespace = redisCluster.Namespace
 	req.NamespacedName.Name = redisCluster.Name
@@ -36,7 +36,7 @@ func (r *RedisClusterReconciler) updateClusterStatus(ctx context.Context, redisC
 		// Update RedisCluster status first
 
 		// get a fresh rediscluster to minimize conflicts
-		refreshedRedisCluster := redisv1.RedisCluster{}
+		refreshedRedisCluster := redisv1.RedKeyCluster{}
 		err := r.Client.Get(ctx, types.NamespacedName{Namespace: redisCluster.Namespace, Name: redisCluster.Name}, &refreshedRedisCluster)
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Error getting a refreshed RedisCluster before updating it. It may have been deleted?")
@@ -86,8 +86,8 @@ func (r *RedisClusterReconciler) updateClusterStatus(ctx context.Context, redisC
 	})
 }
 
-func (r *RedisClusterReconciler) updateClusterSubStatus(ctx context.Context, redisCluster *redisv1.RedisCluster, substatus string, partition string) error {
-	refreshedRedisCluster := redisv1.RedisCluster{}
+func (r *RedisClusterReconciler) updateClusterSubStatus(ctx context.Context, redisCluster *redisv1.RedKeyCluster, substatus string, partition string) error {
+	refreshedRedisCluster := redisv1.RedKeyCluster{}
 	err := r.Client.Get(ctx, types.NamespacedName{Namespace: redisCluster.Namespace, Name: redisCluster.Name}, &refreshedRedisCluster)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Error getting a refreshed RedisCluster before updating it. It may have been deleted?")
@@ -106,7 +106,7 @@ func (r *RedisClusterReconciler) updateClusterSubStatus(ctx context.Context, red
 	return nil
 }
 
-func (r *RedisClusterReconciler) updateScalingStatus(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
+func (r *RedisClusterReconciler) updateScalingStatus(ctx context.Context, redisCluster *redisv1.RedKeyCluster) error {
 	sset, ssetErr := r.FindExistingStatefulSet(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name, Namespace: redisCluster.Namespace}})
 	if ssetErr != nil {
 		return ssetErr
@@ -155,7 +155,7 @@ func (r *RedisClusterReconciler) updateScalingStatus(ctx context.Context, redisC
 	return nil
 }
 
-func (r *RedisClusterReconciler) updateUpgradingStatus(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
+func (r *RedisClusterReconciler) updateUpgradingStatus(ctx context.Context, redisCluster *redisv1.RedKeyCluster) error {
 	req := ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name, Namespace: redisCluster.Namespace}}
 	statefulSet, err := r.FindExistingStatefulSet(ctx, req)
 	if err != nil {

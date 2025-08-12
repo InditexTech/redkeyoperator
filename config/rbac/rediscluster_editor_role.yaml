@@ -1,16 +1,16 @@
-# permissions for end users to edit redisclusters.
+# permissions for end users to edit redkeyclusters.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
-    app.kubernetes.io/name: redis-cluster-operator
+    app.kubernetes.io/name: redkey-cluster-operator
     app.kubernetes.io/managed-by: kustomize
-  name: rediscluster-editor-role
+  name: redkeycluster-editor-role
 rules:
 - apiGroups:
   - redidev
   resources:
-  - redisclusters
+  - redkeyclusters
   verbs:
   - create
   - delete
@@ -22,6 +22,6 @@ rules:
 - apiGroups:
   - redis.inditex.dev
   resources:
-  - redisclusters/status
+  - redkeyclusters/status
   verbs:
   - get

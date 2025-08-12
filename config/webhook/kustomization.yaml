@@ -6,4 +6,4 @@ resources:
 - bases/namespace.yaml
 - bases/allow-webhook-traffic.yaml
 
-namespace: redis-operator-webhook
+namespace: redkey-operator-webhook

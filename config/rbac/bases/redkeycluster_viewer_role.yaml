@@ -1,15 +1,15 @@
-# permissions for end users to view redisclusters.
+# permissions for end users to view redkeyclusters.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: rediscluster-viewer-role
+  name: redkeycluster-viewer-role
   labels:
     rbac.authorization.k8s.io/aggregate-to-admin: "true"
 rules:
 - apiGroups:
   - redis.inditex.dev
   resources:
-  - redisclusters
+  - redkeyclusters
   verbs:
   - get
   - list
@@ -17,6 +17,6 @@ rules:
 - apiGroups:
   - redis.inditex.dev
   resources:
-  - redisclusters/status
+  - redkeyclusters/status
   verbs:
   - get

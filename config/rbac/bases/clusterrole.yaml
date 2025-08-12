@@ -3,7 +3,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: redis-operator-role
+  name: redkey-operator-role
   labels:
     rbac.authorization.k8s.io/aggregate-to-admin: "true"
 rules:
@@ -68,7 +68,7 @@ rules:
 - apiGroups:
   - redis.inditex.dev
   resources:
-  - redisclusters
+  - redkeyclusters
   verbs:
   - create
   - delete
@@ -80,13 +80,13 @@ rules:
 - apiGroups:
   - redis.inditex.dev
   resources:
-  - redisclusters/finalizers
+  - redkeyclusters/finalizers
   verbs:
   - update
 - apiGroups:
   - redis.inditex.dev
   resources:
-  - redisclusters/status
+  - redkeyclusters/status
   verbs:
   - get
   - patch

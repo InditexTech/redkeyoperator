@@ -8,5 +8,5 @@ roleRef:
   name: leader-election-role
 subjects:
 - kind: ServiceAccount
-  name: redis-operator-sa
+  name: redkey-operator-sa
   namespace: default

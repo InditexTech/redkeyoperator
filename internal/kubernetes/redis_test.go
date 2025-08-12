@@ -167,7 +167,7 @@ func TestGetStatefulSetSelectorLabelReturnsCorrectLabels(t *testing.T) {
 		},
 	}
 	for name, test := range testMap {
-		labelKey := GetStatefulSetSelectorLabel(context.TODO(), test.client, &redisv1.RedisCluster{
+		labelKey := GetStatefulSetSelectorLabel(context.TODO(), test.client, &redisv1.RedKeyCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "redis-cluster",
 				Namespace: "default",

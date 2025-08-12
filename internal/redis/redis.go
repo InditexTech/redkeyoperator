@@ -42,7 +42,7 @@ var defaultPort = corev1.ServicePort{
 	},
 }
 
-func CreateStatefulSet(ctx context.Context, req ctrl.Request, spec redisv1.RedisClusterSpec, labels map[string]string) (*v1.StatefulSet, error) {
+func CreateStatefulSet(ctx context.Context, req ctrl.Request, spec redisv1.RedKeyClusterSpec, labels map[string]string) (*v1.StatefulSet, error) {
 	var err error = nil
 	//	req ctrl.Request, replicas int32, redisImage string, storage string
 	redisImage := spec.Image
@@ -249,7 +249,7 @@ func cleanStatefulSetResult(result, original, override *v1.StatefulSet) {
 	}
 }
 
-func AddStatefulSetStorage(statefulSet *v1.StatefulSet, req ctrl.Request, spec redisv1.RedisClusterSpec) error {
+func AddStatefulSetStorage(statefulSet *v1.StatefulSet, req ctrl.Request, spec redisv1.RedKeyClusterSpec) error {
 	storage := spec.Storage
 	if storage == "" {
 		return errors.New("non ephemeral cluster with no storage defined in spec.Storage")
@@ -499,7 +499,7 @@ func ConfigStringToMap(config string) map[string][]string {
 	return configMap
 }
 
-func GenerateRedisConfig(redisCluster *redisv1.RedisCluster) string {
+func GenerateRedisConfig(redisCluster *redisv1.RedKeyCluster) string {
 	// Assuming RedisClusterType is the type of redisCluster
 	// and it has Spec with Config, Ephemeral, and ReplicasPerMaster fields
 	// Convert string configuration to map

@@ -5,13 +5,13 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   labels:
-    app.kubernetes.io/name: redis-cluster-operator
+    app.kubernetes.io/name: redkey-cluster-operator
   name: allow-webhook-traffic
-  namespace: redis-operator
+  namespace: redkey-operator
 spec:
   podSelector:
     matchLabels:
-      control-plane: redis-operator-webhook
+      control-plane: redkey-operator-webhook
   policyTypes:
     - Ingress
   ingress:

@@ -5,13 +5,13 @@ resources:
 - ../../rbac
 - ../../manager
 
-namespace: redis-operator
+namespace: redkey-operator
 
 patches:
 - path: ./operator-env-patch.yaml
   target:
     group: apps
     kind: Deployment
-    name: redis-operator
+    name: redkey-operator
     version: v1
 - path: ./operator-deployment-patch.yaml

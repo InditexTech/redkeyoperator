@@ -11,14 +11,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (r *RedisClusterReconciler) setConditionTrue(rc *redisv1.RedisCluster, condition metav1.Condition, message string) {
+func (r *RedisClusterReconciler) setConditionTrue(rc *redisv1.RedKeyCluster, condition metav1.Condition, message string) {
 	if !meta.IsStatusConditionTrue(rc.Status.Conditions, condition.Type) {
 		meta.SetStatusCondition(&rc.Status.Conditions, condition)
 		r.Recorder.Event(rc, "Normal", condition.Reason, message)
 	}
 }
 
-func setConditionFalse(log logr.Logger, redisCluster *redisv1.RedisCluster, condition metav1.Condition) {
+func setConditionFalse(log logr.Logger, redisCluster *redisv1.RedKeyCluster, condition metav1.Condition) {
 	condition.Status = metav1.ConditionFalse
 	changed := meta.SetStatusCondition(&redisCluster.Status.Conditions, condition)
 	if changed {
@@ -26,7 +26,7 @@ func setConditionFalse(log logr.Logger, redisCluster *redisv1.RedisCluster, cond
 	}
 }
 
-func setAllConditionsFalse(log logr.Logger, redisCluster *redisv1.RedisCluster) {
+func setAllConditionsFalse(log logr.Logger, redisCluster *redisv1.RedKeyCluster) {
 	for _, condition := range redisv1.AllConditions {
 		setConditionFalse(log, redisCluster, condition)
 	}

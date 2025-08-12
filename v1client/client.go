@@ -17,8 +17,8 @@ import (
 
 // RdclInterface defines the methods to be implemented by Redis Clients
 type RdclInterface interface {
-	List(ctx context.Context, opts metav1.ListOptions) (*redisv1.RedisClusterList, error)
-	Get(ctx context.Context, name string, options metav1.GetOptions) (*redisv1.RedisCluster, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*redisv1.RedKeyClusterList, error)
+	Get(ctx context.Context, name string, options metav1.GetOptions) (*redisv1.RedKeyCluster, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 }
 
@@ -27,8 +27,8 @@ type rdclClient struct {
 	ns         string
 }
 
-func (c *rdclClient) List(ctx context.Context, opts metav1.ListOptions) (*redisv1.RedisClusterList, error) {
-	result := redisv1.RedisClusterList{}
+func (c *rdclClient) List(ctx context.Context, opts metav1.ListOptions) (*redisv1.RedKeyClusterList, error) {
+	result := redisv1.RedKeyClusterList{}
 	err := c.restClient.
 		Get().
 		AbsPath("/apis/redis.inditex.dev/redisv1").
@@ -41,8 +41,8 @@ func (c *rdclClient) List(ctx context.Context, opts metav1.ListOptions) (*redisv
 	return &result, err
 }
 
-func (c *rdclClient) Get(ctx context.Context, name string, opts metav1.GetOptions) (*redisv1.RedisCluster, error) {
-	result := redisv1.RedisCluster{}
+func (c *rdclClient) Get(ctx context.Context, name string, opts metav1.GetOptions) (*redisv1.RedKeyCluster, error) {
+	result := redisv1.RedKeyCluster{}
 	err := c.restClient.
 		Get().
 		AbsPath("/apis/redis.inditex.dev/v1").

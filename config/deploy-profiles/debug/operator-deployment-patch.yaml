@@ -1,9 +1,9 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: redis-operator
+  name: redkey-operator
   labels:
-    control-plane: redis-operator
+    control-plane: redkey-operator
 spec:
   template:
     metadata:
@@ -16,7 +16,7 @@ spec:
         prometheus.io/scrape: "true"
     spec:
       containers:
-        - name: redis-operator
+        - name: redkey-operator
           resources:
             requests:
               cpu: 0.3 

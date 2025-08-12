@@ -1,14 +1,14 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: redis-operator
+  name: redkey-operator
   labels:
-    control-plane: redis-operator
+    control-plane: redkey-operator
 spec:
   template:
     spec:
       containers:
-        - name: redis-operator
+        - name: redkey-operator
           resources:
             limits:
               cpu: "500m"

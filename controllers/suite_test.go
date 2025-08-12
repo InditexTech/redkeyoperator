@@ -34,7 +34,7 @@ import (
 
 var k8sClient client.Client
 var testEnv *envtest.Environment
-var cluster *redisv1.RedisCluster = CreateRedisCluster()
+var cluster *redisv1.RedKeyCluster = CreateRedisCluster()
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -104,7 +104,7 @@ var _ = Describe("Reconciler", func() {
 	Context("CRD object", func() {
 		When("CRD is submitted", func() {
 			It("Can be found", func() {
-				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: cluster.Name, Namespace: "default"}, &redisv1.RedisCluster{})
+				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: cluster.Name, Namespace: "default"}, &redisv1.RedKeyCluster{})
 				Expect(err).ToNot(HaveOccurred())
 			})
 		})
@@ -170,7 +170,7 @@ var _ = Describe("Reconciler", func() {
 			})
 
 			It("Pod template labels are passed", func() {
-				rcluster := &redisv1.RedisCluster{}
+				rcluster := &redisv1.RedKeyCluster{}
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: cluster.Name, Namespace: "default"}, cluster)
 				log.Log.Info("ncluster", "cluster", rcluster)
 				Expect(err).ToNot(HaveOccurred())
@@ -220,7 +220,7 @@ var _ = Describe("Reconciler", func() {
 })
 
 func EnsureClusterExistsOrCreate(nsName types.NamespacedName) {
-	rc := &redisv1.RedisCluster{}
+	rc := &redisv1.RedKeyCluster{}
 	err := k8sClient.Get(context.TODO(), nsName, rc)
 	if err != nil {
 		k8sClient.Create(context.TODO(), CreateRedisCluster())
@@ -228,9 +228,9 @@ func EnsureClusterExistsOrCreate(nsName types.NamespacedName) {
 	}
 }
 
-func CreateRedisCluster() *redisv1.RedisCluster {
+func CreateRedisCluster() *redisv1.RedKeyCluster {
 	var finalizerId = (&finalizer.ConfigMapCleanupFinalizer{}).GetId()
-	cluster := &redisv1.RedisCluster{
+	cluster := &redisv1.RedKeyCluster{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "RedisCluster",
 			APIVersion: "redis.inditex.dev/redisv1",
@@ -241,7 +241,7 @@ func CreateRedisCluster() *redisv1.RedisCluster {
 			Finalizers: []string{finalizerId},
 			Labels:     map[string]string{"team": "team-a"},
 		},
-		Spec: redisv1.RedisClusterSpec{
+		Spec: redisv1.RedKeyClusterSpec{
 			Auth:     redisv1.RedisAuth{},
 			Version:  "6.0.2",
 			Replicas: 1,

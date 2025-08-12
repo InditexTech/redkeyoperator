@@ -28,7 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-func newClient(rc *redisv1.RedisCluster, s *runtime.Scheme) client.Client {
+func newClient(rc *redisv1.RedKeyCluster, s *runtime.Scheme) client.Client {
 	return fake.NewClientBuilder().WithObjects(rc).WithScheme(s).Build()
 }
 
@@ -41,7 +41,7 @@ func newScheme() *runtime.Scheme {
 	return s
 }
 
-func newReconciler(redis *redisv1.RedisCluster, recorder record.EventRecorder) *RedisClusterReconciler {
+func newReconciler(redis *redisv1.RedKeyCluster, recorder record.EventRecorder) *RedisClusterReconciler {
 	ctrl.SetLogger(zap.New(zap.WriteTo(ginkgo.GinkgoWriter), zap.UseDevMode(true)))
 
 	var defaultReplicas int32 = 3
@@ -67,7 +67,7 @@ func newContext() context.Context {
 	return context.Background()
 }
 
-func newRequest(rc *redisv1.RedisCluster) ctrl.Request {
+func newRequest(rc *redisv1.RedKeyCluster) ctrl.Request {
 	return ctrl.Request{
 		NamespacedName: types.NamespacedName{
 			Namespace: rc.Namespace,
@@ -76,7 +76,7 @@ func newRequest(rc *redisv1.RedisCluster) ctrl.Request {
 	}
 }
 
-func newRedisCluster() *redisv1.RedisCluster {
+func newRedisCluster() *redisv1.RedKeyCluster {
 	om := metav1.ObjectMeta{
 		Name:      "redis-cluster",
 		Namespace: "unittest",
@@ -84,13 +84,13 @@ func newRedisCluster() *redisv1.RedisCluster {
 			"label-key": "label-value",
 		},
 	}
-	return &redisv1.RedisCluster{
+	return &redisv1.RedKeyCluster{
 		ObjectMeta: om,
-		Status: redisv1.RedisClusterStatus{
+		Status: redisv1.RedKeyClusterStatus{
 			Status:     redisv1.StatusReady,
 			Conditions: []metav1.Condition{},
 		},
-		Spec: redisv1.RedisClusterSpec{
+		Spec: redisv1.RedKeyClusterSpec{
 			Replicas: 3,
 			Config:   r.MapToConfigString(r.MergeWithDefaultConfig(nil, false, 0)),
 			Image:    "redis-operator:0.3.0",
@@ -113,8 +113,8 @@ func newLimits() corev1.ResourceList {
 	}
 }
 
-func mockReadyNodes(nodes map[string]*redisv1.RedisNode) func(ctx context.Context, redisCluster *redisv1.RedisCluster) (map[string]*redisv1.RedisNode, error) {
-	return func(ctx context.Context, redisCluster *redisv1.RedisCluster) (map[string]*redisv1.RedisNode, error) {
+func mockReadyNodes(nodes map[string]*redisv1.RedisNode) func(ctx context.Context, redisCluster *redisv1.RedKeyCluster) (map[string]*redisv1.RedisNode, error) {
+	return func(ctx context.Context, redisCluster *redisv1.RedKeyCluster) (map[string]*redisv1.RedisNode, error) {
 		return nodes, nil
 	}
 }
@@ -133,7 +133,7 @@ func mockStatefulSet(sset *v1.StatefulSet) func(ctx context.Context, req ctrl.Re
 	}
 }
 
-func newStatefulSet(redis *redisv1.RedisCluster, numReplicas int32) *v1.StatefulSet {
+func newStatefulSet(redis *redisv1.RedKeyCluster, numReplicas int32) *v1.StatefulSet {
 	req := newRequest(redis)
 	spec := redis.Spec
 	labels := make(map[string]string)

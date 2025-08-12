@@ -40,7 +40,7 @@ const (
 //	 -> delete pdb
 //	 -> Redis cluster status set to 'Ready'
 //		-> All conditions set to false
-func (r *RedisClusterReconciler) clusterScaledToZeroReplicas(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
+func (r *RedisClusterReconciler) clusterScaledToZeroReplicas(ctx context.Context, redisCluster *redisv1.RedKeyCluster) error {
 	r.logInfo(redisCluster.NamespacedName(), "Cluster spec replicas is set to 0", "SpecReplicas", redisCluster.Spec.Replicas)
 	sset, err := r.FindExistingStatefulSet(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name, Namespace: redisCluster.Namespace}})
 	if err != nil {
@@ -74,7 +74,7 @@ func (r *RedisClusterReconciler) clusterScaledToZeroReplicas(ctx context.Context
 	return update_err
 }
 
-func (r *RedisClusterReconciler) upgradeCluster(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
+func (r *RedisClusterReconciler) upgradeCluster(ctx context.Context, redisCluster *redisv1.RedKeyCluster) error {
 
 	// If a Fast Upgrade is possible or already en progress, start it or check if it's already finished.
 	// In both situations we return here.
@@ -89,7 +89,7 @@ func (r *RedisClusterReconciler) upgradeCluster(ctx context.Context, redisCluste
 
 // If PurgeKeysOnRebalance flag is active and Redis cluster is not configures as master-replica we can
 // do a Fast Upgrade, applying the changes to the StatefulSet and recreaing it. Slots move will be avoided.
-func (r *RedisClusterReconciler) doFastUpgrade(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, error) {
+func (r *RedisClusterReconciler) doFastUpgrade(ctx context.Context, redisCluster *redisv1.RedKeyCluster) (bool, error) {
 	switch redisCluster.Status.Substatus.Status {
 	case redisv1.SubstatusFastUpgrading:
 		// Already Fast upgrading. Check if the node pods are ready to start rebuilding the cluster.
@@ -192,7 +192,7 @@ func (r *RedisClusterReconciler) doFastUpgrade(ctx context.Context, redisCluster
 
 // Classic Slow Upgrade: StatefulSet updated with the config changes, cluster is scaledUp if no replicas used,
 // slots and keys are copied. No data lose.
-func (r *RedisClusterReconciler) doSlowUpgrade(ctx context.Context, redisCluster *redisv1.RedisCluster) error {
+func (r *RedisClusterReconciler) doSlowUpgrade(ctx context.Context, redisCluster *redisv1.RedKeyCluster) error {
 	req := ctrl.Request{
 		NamespacedName: types.NamespacedName{
 			Name:      redisCluster.Name,
@@ -242,7 +242,7 @@ func (r *RedisClusterReconciler) doSlowUpgrade(ctx context.Context, redisCluster
 	return err
 }
 
-func (r *RedisClusterReconciler) doSlowUpgradeScalingUp(ctx context.Context, redisCluster *redisv1.RedisCluster, existingStatefulSet *v1.StatefulSet) error {
+func (r *RedisClusterReconciler) doSlowUpgradeScalingUp(ctx context.Context, redisCluster *redisv1.RedKeyCluster, existingStatefulSet *v1.StatefulSet) error {
 
 	// Check Redis node pods rediness
 	nodePodsReady, err := r.allPodsReady(ctx, redisCluster)
@@ -302,7 +302,7 @@ func (r *RedisClusterReconciler) doSlowUpgradeScalingUp(ctx context.Context, red
 	return nil
 }
 
-func (r *RedisClusterReconciler) doSlowUpgradeUpgrading(ctx context.Context, redisCluster *redisv1.RedisCluster, existingStatefulSet *v1.StatefulSet) error {
+func (r *RedisClusterReconciler) doSlowUpgradeUpgrading(ctx context.Context, redisCluster *redisv1.RedKeyCluster, existingStatefulSet *v1.StatefulSet) error {
 
 	// Check Redis node pods rediness.
 	nodePodsReady, err := r.allPodsReady(ctx, redisCluster)
@@ -414,7 +414,7 @@ func (r *RedisClusterReconciler) doSlowUpgradeUpgrading(ctx context.Context, red
 	return nil
 }
 
-func (r *RedisClusterReconciler) doSlowUpgradeEnd(ctx context.Context, redisCluster *redisv1.RedisCluster, existingStatefulSet *v1.StatefulSet) error {
+func (r *RedisClusterReconciler) doSlowUpgradeEnd(ctx context.Context, redisCluster *redisv1.RedKeyCluster, existingStatefulSet *v1.StatefulSet) error {
 
 	// Check Redis node pods rediness (pod from last rolling update could be not ready yet).
 	nodePodsReady, err := r.allPodsReady(ctx, redisCluster)
@@ -480,7 +480,7 @@ func (r *RedisClusterReconciler) doSlowUpgradeEnd(ctx context.Context, redisClus
 	return nil
 }
 
-func (r *RedisClusterReconciler) doSlowUpgradeScalingDown(ctx context.Context, redisCluster *redisv1.RedisCluster, existingStatefulSet *v1.StatefulSet) error {
+func (r *RedisClusterReconciler) doSlowUpgradeScalingDown(ctx context.Context, redisCluster *redisv1.RedKeyCluster, existingStatefulSet *v1.StatefulSet) error {
 
 	// Check Redis node pods rediness.
 	nodePodsReady, err := r.allPodsReady(ctx, redisCluster)
@@ -539,7 +539,7 @@ func (r *RedisClusterReconciler) doSlowUpgradeScalingDown(ctx context.Context, r
 	return nil
 }
 
-func (r *RedisClusterReconciler) doSlowUpgradeStart(ctx context.Context, redisCluster *redisv1.RedisCluster, existingStatefulSet *v1.StatefulSet) error {
+func (r *RedisClusterReconciler) doSlowUpgradeStart(ctx context.Context, redisCluster *redisv1.RedKeyCluster, existingStatefulSet *v1.StatefulSet) error {
 
 	// ScaleUp the cluster adding one extra node before start upgrading.
 	r.logInfo(redisCluster.NamespacedName(), "Scaling up the cluster to add one extra node before upgrading")
@@ -563,7 +563,7 @@ func (r *RedisClusterReconciler) doSlowUpgradeStart(ctx context.Context, redisCl
 }
 
 // Updates and persists the StatefulSet configuration and labels, including overrides.
-func (r *RedisClusterReconciler) upgradeClusterConfigurationUpdate(ctx context.Context, redisCluster *redisv1.RedisCluster) (*v1.StatefulSet, error) {
+func (r *RedisClusterReconciler) upgradeClusterConfigurationUpdate(ctx context.Context, redisCluster *redisv1.RedKeyCluster) (*v1.StatefulSet, error) {
 	req := ctrl.Request{
 		NamespacedName: types.NamespacedName{
 			Name:      redisCluster.Name,
@@ -637,7 +637,7 @@ func (r *RedisClusterReconciler) upgradeClusterConfigurationUpdate(ctx context.C
 	return existingStatefulSet, nil
 }
 
-func (r *RedisClusterReconciler) scaleCluster(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, error) {
+func (r *RedisClusterReconciler) scaleCluster(ctx context.Context, redisCluster *redisv1.RedKeyCluster) (bool, error) {
 
 	// If a Fast Scaling is possible or already en progress, start it or check if it's already finished.
 	// In both situations we return here.
@@ -650,7 +650,7 @@ func (r *RedisClusterReconciler) scaleCluster(ctx context.Context, redisCluster 
 	return r.doSlowScaling(ctx, redisCluster)
 }
 
-func (r *RedisClusterReconciler) doFastScaling(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, error) {
+func (r *RedisClusterReconciler) doFastScaling(ctx context.Context, redisCluster *redisv1.RedKeyCluster) (bool, error) {
 	req := ctrl.Request{
 		NamespacedName: types.NamespacedName{
 			Name:      redisCluster.Name,
@@ -771,7 +771,7 @@ func (r *RedisClusterReconciler) doFastScaling(ctx context.Context, redisCluster
 	return false, nil
 }
 
-func (r *RedisClusterReconciler) doSlowScaling(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, error) {
+func (r *RedisClusterReconciler) doSlowScaling(ctx context.Context, redisCluster *redisv1.RedKeyCluster) (bool, error) {
 	var err error
 
 	// By introducing master-replica cluster, the replicas returned by statefulset (which includes replica nodes) and
@@ -840,7 +840,7 @@ func (r *RedisClusterReconciler) doSlowScaling(ctx context.Context, redisCluster
 	return false, nil
 }
 
-func (r *RedisClusterReconciler) scaleDownCluster(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, error) {
+func (r *RedisClusterReconciler) scaleDownCluster(ctx context.Context, redisCluster *redisv1.RedKeyCluster) (bool, error) {
 
 	logger := r.getHelperLogger((redisCluster.NamespacedName()))
 	robinRedis, err := robin.NewRobin(ctx, r.Client, redisCluster, logger)
@@ -908,7 +908,7 @@ func (r *RedisClusterReconciler) scaleDownCluster(ctx context.Context, redisClus
 	return false, nil
 }
 
-func (r *RedisClusterReconciler) completeClusterScaleDown(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, error) {
+func (r *RedisClusterReconciler) completeClusterScaleDown(ctx context.Context, redisCluster *redisv1.RedKeyCluster) (bool, error) {
 	switch redisCluster.Status.Substatus.Status {
 	case redisv1.SubstatusScalingPods:
 		// StatefulSet has been updated with new replicas/replicasPerMaster at this point.
@@ -977,7 +977,7 @@ func (r *RedisClusterReconciler) completeClusterScaleDown(ctx context.Context, r
 	return false, nil
 }
 
-func (r *RedisClusterReconciler) getCulledNodes(ctx context.Context, redisCluster *redisv1.RedisCluster) ([]robin.Node, error) {
+func (r *RedisClusterReconciler) getCulledNodes(ctx context.Context, redisCluster *redisv1.RedKeyCluster) ([]robin.Node, error) {
 	logger := r.getHelperLogger((redisCluster.NamespacedName()))
 	redisRobin, err := robin.NewRobin(ctx, r.Client, redisCluster, logger)
 	if err != nil {
@@ -1002,7 +1002,7 @@ func (r *RedisClusterReconciler) getCulledNodes(ctx context.Context, redisCluste
 	return culledNodes, nil
 }
 
-func (r *RedisClusterReconciler) deleteNodePVC(ctx context.Context, redisCluster *redisv1.RedisCluster, node *robin.Node) error {
+func (r *RedisClusterReconciler) deleteNodePVC(ctx context.Context, redisCluster *redisv1.RedKeyCluster, node *robin.Node) error {
 	pvc, err := r.getPersistentVolumeClaim(ctx, r.Client, redisCluster, fmt.Sprintf("data-%s", node.Name))
 	if errors2.IsNotFound(err) {
 		r.logError(redisCluster.NamespacedName(), err, fmt.Sprintf("PVC of node %s doesn't exist. Skipping.", node.Name))
@@ -1015,7 +1015,7 @@ func (r *RedisClusterReconciler) deleteNodePVC(ctx context.Context, redisCluster
 	return r.deletePVC(ctx, r.Client, pvc)
 }
 
-func (r *RedisClusterReconciler) scaleUpCluster(ctx context.Context, redisCluster *redisv1.RedisCluster, realExpectedReplicas int32) error {
+func (r *RedisClusterReconciler) scaleUpCluster(ctx context.Context, redisCluster *redisv1.RedKeyCluster, realExpectedReplicas int32) error {
 	r.logInfo(redisCluster.NamespacedName(), "ScaleCluster - updating statefulset replicas", "newsize", realExpectedReplicas)
 
 	sset, err := r.FindExistingStatefulSet(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name, Namespace: redisCluster.Namespace}})
@@ -1033,7 +1033,7 @@ func (r *RedisClusterReconciler) scaleUpCluster(ctx context.Context, redisCluste
 	return nil
 }
 
-func (r *RedisClusterReconciler) completeClusterScaleUp(ctx context.Context, redisCluster *redisv1.RedisCluster) (bool, error) {
+func (r *RedisClusterReconciler) completeClusterScaleUp(ctx context.Context, redisCluster *redisv1.RedKeyCluster) (bool, error) {
 	logger := r.getHelperLogger((redisCluster.NamespacedName()))
 	robinRedis, err := robin.NewRobin(ctx, r.Client, redisCluster, logger)
 	if err != nil {
@@ -1137,7 +1137,7 @@ func (r *RedisClusterReconciler) isOwnedByUs(o client.Object) bool {
 	return false
 }
 
-func (r *RedisClusterReconciler) GetRedisSecret(redisCluster *redisv1.RedisCluster) (string, error) {
+func (r *RedisClusterReconciler) GetRedisSecret(redisCluster *redisv1.RedKeyCluster) (string, error) {
 	if redisCluster.Spec.Auth.SecretName == "" {
 		return "", nil
 	}
@@ -1151,13 +1151,13 @@ func (r *RedisClusterReconciler) GetRedisSecret(redisCluster *redisv1.RedisClust
 	return redisSecret, nil
 }
 
-func calculateRCConfigChecksum(redisCluster *redisv1.RedisCluster) string {
+func calculateRCConfigChecksum(redisCluster *redisv1.RedKeyCluster) string {
 	hash := md5.Sum([]byte(redisCluster.Spec.Config))
 	return hex.EncodeToString(hash[:])
 }
 
 // Updates StatefulSet annotations with the config checksum (annotation "config-checksum")
-func (r *RedisClusterReconciler) addConfigChecksumAnnotation(statefulSet *v1.StatefulSet, redisCluster *redisv1.RedisCluster) *v1.StatefulSet {
+func (r *RedisClusterReconciler) addConfigChecksumAnnotation(statefulSet *v1.StatefulSet, redisCluster *redisv1.RedKeyCluster) *v1.StatefulSet {
 	var updatedAnnotations map[string]string
 
 	checksum := calculateRCConfigChecksum(redisCluster)
@@ -1178,7 +1178,7 @@ func (r *RedisClusterReconciler) addConfigChecksumAnnotation(statefulSet *v1.Sta
 // If the annotation StatefulSet.Spec.Template.Annotations[ConfigChecksumAnnotation]  exists, we check first if the
 // configuration checksum has changed.
 // If not, we compare the configuration properties.
-func (r *RedisClusterReconciler) isConfigChanged(redisCluster *redisv1.RedisCluster, statefulSet *v1.StatefulSet,
+func (r *RedisClusterReconciler) isConfigChanged(redisCluster *redisv1.RedKeyCluster, statefulSet *v1.StatefulSet,
 	configMap *corev1.ConfigMap) (bool, string) {
 	// Comparing config checksums
 	if statefulSet.Spec.Template.Annotations != nil {

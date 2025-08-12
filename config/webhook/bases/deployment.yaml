@@ -2,21 +2,21 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    control-plane: redis-operator-webhook
-  name: redis-operator-webhook
-  namespace: redis-operator
+    control-plane: redkey-operator-webhook
+  name: redkey-operator-webhook
+  namespace: redkey-operator
 spec:
   replicas: 1
   selector:
     matchLabels:
-      control-plane: redis-operator-webhook
+      control-plane: redkey-operator-webhook
   template:
     metadata:
       labels:
-        control-plane: redis-operator-webhook
+        control-plane: redkey-operator-webhook
         domain: DOMAIN
         environment: ENVIRONMENT
-        layer: middleware-redisoperator-webhook
+        layer: middleware-redkeyoperator-webhook
         slot: default
         tenant: TENANT
         type: middleware
@@ -24,9 +24,9 @@ spec:
       containers:
       - command:
         - /webhook
-        image: redis-operator-webhook
+        image: redkey-operator-webhook
         imagePullPolicy: Always
-        name: redis-operator-webhook
+        name: redkey-operator-webhook
         ports:
         - containerPort: 9443
           name: webhook-server
@@ -46,10 +46,10 @@ spec:
           readOnly: true
       securityContext:
         runAsNonRoot: true
-      serviceAccountName: redis-operator-sa
+      serviceAccountName: redkey-operator-sa
       terminationGracePeriodSeconds: 10
       volumes:
       - name: cert
         secret:
           defaultMode: 420
-          secretName: redis-operator-webhook-service-cert
+          secretName: redkey-operator-webhook-service-cert

@@ -4,16 +4,16 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.2
-  name: redisclusters.redis.inditex.dev
+  name: redkeyclusters.redis.inditex.dev
 spec:
   group: redis.inditex.dev
   names:
-    kind: RedisCluster
-    listKind: RedisClusterList
-    plural: redisclusters
+    kind: RedKeyCluster
+    listKind: RedKeyClusterList
+    plural: redkeyclusters
     shortNames:
-    - rdcl
-    singular: rediscluster
+    - rkcl
+    singular: redkeycluster
   scope: Namespaced
   versions:
   - additionalPrinterColumns:

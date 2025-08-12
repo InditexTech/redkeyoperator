@@ -8,8 +8,8 @@ generatorOptions:
 
 configMapGenerator:
 - files:
-  - redis_operator_config.yaml
-  name: redis-operator-config
+  - redkey_operator_config.yaml
+  name: redkey-operator-config
 
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
