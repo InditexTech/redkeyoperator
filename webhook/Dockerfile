@@ -31,7 +31,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -o webhook .
 # Refer to https://www.redhat.com/en/blog/introducing-red-hat-universal-base-image for more details.
 FROM redhat/ubi9-minimal:9.1.0
 
-LABEL org.opencontainers.image.source="https://github.com/inditextech/redisoperator"
+LABEL org.opencontainers.image.source="https://github.com/inditextech/redkeyoperator"
 
 RUN microdnf update -y && microdnf install procps -y
 
