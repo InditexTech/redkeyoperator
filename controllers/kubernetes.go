@@ -66,7 +66,7 @@ func (r *RedKeyClusterReconciler) checkAndUpdateRDCL(ctx context.Context, redisN
 		if err := r.Update(ctx, redkeyCluster); err != nil {
 			return err
 		}
-		r.logInfo(redkeyCluster.NamespacedName(), "Label added to RedisCluster labels", "label", redis.RedKeyClusterLabel, "value", redisName)
+		r.logInfo(redkeyCluster.NamespacedName(), "Label added to RedKeyCluster labels", "label", redis.RedKeyClusterLabel, "value", redisName)
 	}
 	// Label redis.RedKeyClusterComponentLabel needed by Redis backup
 	if _, ok := redkeyCluster.Labels[redis.RedKeyClusterComponentLabel]; !ok {
@@ -75,7 +75,7 @@ func (r *RedKeyClusterReconciler) checkAndUpdateRDCL(ctx context.Context, redisN
 		if err := r.Update(ctx, redkeyCluster); err != nil {
 			return err
 		}
-		r.logInfo(redkeyCluster.NamespacedName(), "Label added to RedisCluster labels", "label", redis.RedKeyClusterComponentLabel, "value", "redis")
+		r.logInfo(redkeyCluster.NamespacedName(), "Label added to RedKeyCluster labels", "label", redis.RedKeyClusterComponentLabel, "value", "redis")
 	}
 	return nil
 }

@@ -499,14 +499,14 @@ func ConfigStringToMap(config string) map[string][]string {
 	return configMap
 }
 
-func GenerateRedisConfig(redisCluster *redkeyv1.RedKeyCluster) string {
-	// Assuming RedisClusterType is the type of redisCluster
+func GenerateRedisConfig(redkeyCluster *redkeyv1.RedKeyCluster) string {
+	// Assuming RedKeyClusterType is the type of redkeyCluster
 	// and it has Spec with Config, Ephemeral, and ReplicasPerMaster fields
 	// Convert string configuration to map
-	newRedisClusterConf := ConfigStringToMap(redisCluster.Spec.Config)
+	newRedKeyClusterConf := ConfigStringToMap(redkeyCluster.Spec.Config)
 
 	// Merge new configuration with the default
-	redisConfMap := MergeWithDefaultConfig(newRedisClusterConf, redisCluster.Spec.Ephemeral, redisCluster.Spec.ReplicasPerMaster)
+	redisConfMap := MergeWithDefaultConfig(newRedKeyClusterConf, redkeyCluster.Spec.Ephemeral, redkeyCluster.Spec.ReplicasPerMaster)
 
 	// Convert the merged configuration map to a string
 	redisConf := MapToConfigString(redisConfMap)

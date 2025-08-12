@@ -210,17 +210,17 @@ func operatorPolicyRules() []rbacv1.PolicyRule {
 		},
 		{
 			APIGroups: []string{"redis.inditex.com"},
-			Resources: []string{"redisclusters"},
+			Resources: []string{"redkeyclusters"},
 			Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
 		},
 		{
 			APIGroups: []string{"redis.inditex.com"},
-			Resources: []string{"redisclusters/finalizers"},
+			Resources: []string{"redkeyclusters/finalizers"},
 			Verbs:     []string{"update"},
 		},
 		{
 			APIGroups: []string{"redis.inditex.com"},
-			Resources: []string{"redisclusters/status"},
+			Resources: []string{"redkeyclusters/status"},
 			Verbs:     []string{"get", "patch", "update"},
 		},
 	}

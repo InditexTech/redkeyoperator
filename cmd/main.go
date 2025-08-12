@@ -114,7 +114,7 @@ func main() {
 	}
 
 	if err = controllers.NewRedKeyClusterReconciler(mgr, maxConcurrentReconciles, concurrentMigrates).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "RedisCluster")
+		setupLog.Error(err, "unable to create controller", "controller", "RedKeyCluster")
 		os.Exit(1)
 	}
 

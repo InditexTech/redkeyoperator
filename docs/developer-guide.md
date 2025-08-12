@@ -363,7 +363,7 @@ You can deploy a sample Redis Cluster from `config/samples` folder running:
 make apply-rdcl
 ```
 
-This will apply the manifest file to create an single node ephemeral RedisCluster object with `purgeKeysOnRebalance` set to **true**.
+This will apply the manifest file to create an single node ephemeral RedKeyCluster object with `purgeKeysOnRebalance` set to **true**.
 
 ## Tests
 

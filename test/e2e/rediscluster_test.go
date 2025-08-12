@@ -76,9 +76,9 @@ func createNamespace(ctx context.Context, c client.Client, prefix string) *corev
 }
 
 // deleteNamespace tears down everything in the namespace, including
-// RedisCluster CRs with finalizers, then deletes the namespace itself.
+// RedKeyCluster CRs with finalizers, then deletes the namespace itself.
 func deleteNamespace(ctx context.Context, c client.Client, ns *corev1.Namespace) {
-	// 1) Remove any RedisCluster CRs so their finalizers don't stall namespace deletion
+	// 1) Remove any RedKeyCluster CRs so their finalizers don't stall namespace deletion
 	var rcList redkeyv1.RedKeyClusterList
 	Expect(c.List(ctx, &rcList, &client.ListOptions{Namespace: ns.Name})).To(Succeed())
 
@@ -99,7 +99,7 @@ func deleteNamespace(ctx context.Context, c client.Client, ns *corev1.Namespace)
 		// delete the CR immediately
 		Expect(c.Delete(ctx, &redkeyv1.RedKeyCluster{
 			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns},
-		})).To(Succeed(), "deleting RedisCluster %s/%s", ns, name)
+		})).To(Succeed(), "deleting RedKeyCluster %s/%s", ns, name)
 	}
 
 	// 2) Delete the namespace
@@ -112,7 +112,7 @@ func deleteNamespace(ctx context.Context, c client.Client, ns *corev1.Namespace)
 	}, defaultWait, defaultPoll).Should(BeTrue(), "namespace %s should be gone", ns.Name)
 }
 
-var _ = Describe("RedKey Operator & RedisCluster E2E", Label("operator", "cluster"), func() {
+var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "cluster"), func() {
 	var (
 		namespace *corev1.Namespace
 	)
@@ -134,7 +134,7 @@ var _ = Describe("RedKey Operator & RedisCluster E2E", Label("operator", "cluste
 		Expect(rc.Spec.Storage).To(Equal(storage))
 		Expect(rc.Spec.PurgeKeysOnRebalance).To(Equal(purgeKeys))
 		Expect(rc.Spec.Ephemeral).To(Equal(ephemeral))
-		Expect(rc.Kind).To(Equal("RedisCluster"))
+		Expect(rc.Kind).To(Equal("RedKeyCluster"))
 		Expect(rc.APIVersion).To(Equal("redis.inditex.com/v1"))
 		Expect(rc.Spec.Auth).To(Equal(redkeyv1.RedisAuth{}))
 		Expect(rc.Spec.Image).To(Equal(getRedisImage()))
@@ -572,7 +572,7 @@ var _ = Describe("RedKey Operator & RedisCluster E2E", Label("operator", "cluste
 
 		checkLayout := func(rep, perMaster int32) {
 			Eventually(func() (bool, error) {
-				return framework.ValidateRedisClusterMasterSlave(
+				return framework.ValidateRedKeyClusterMasterSlave(
 					ctx, k8sClient, key, rep, perMaster)
 			}, defaultWait*2, defaultPoll).Should(BeTrue())
 		}
@@ -1018,7 +1018,7 @@ var _ = Describe("RedKey Operator & RedisCluster E2E", Label("operator", "cluste
 				if err != nil {
 					return false, err
 				}
-				return framework.CheckRedisCluster(k8sClient, ctx, rc)
+				return framework.CheckRedKeyCluster(k8sClient, ctx, rc)
 			}, defaultWait*3, defaultPoll).Should(BeTrue())
 		}
 

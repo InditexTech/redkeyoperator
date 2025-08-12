@@ -33,7 +33,7 @@ func (c *rdclClient) List(ctx context.Context, opts metav1.ListOptions) (*redkey
 		Get().
 		AbsPath("/apis/redis.inditex.dev/redisv1").
 		Namespace(c.ns).
-		Resource("redisclusters").
+		Resource("redkeyclusters").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Do(ctx).
 		Into(&result)
@@ -47,7 +47,7 @@ func (c *rdclClient) Get(ctx context.Context, name string, opts metav1.GetOption
 		Get().
 		AbsPath("/apis/redis.inditex.dev/v1").
 		Namespace(c.ns).
-		Resource("redisclusters").
+		Resource("redkeyclusters").
 		Name(name).
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Do(ctx).
@@ -60,17 +60,17 @@ func (c *rdclClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.
 	return c.restClient.Get().
 		AbsPath("/apis/redis.inditex.dev/v1").
 		Namespace(c.ns).
-		Resource("redisclusters").
+		Resource("redkeyclusters").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch(ctx)
 }
 
 // V1Interface defines the interface to communicate with all GroupVersion. It now just bears a client fdr Redis Clusters
 type V1Interface interface {
-	RedisClusters(namespace string) RdclInterface
+	RedKeyClusters(namespace string) RdclInterface
 }
 
-// V1Client is the struct that bears the rest Interface. It implements RedisClusters method, which satisfies the redisv1Interface
+// V1Client is the struct that bears the rest Interface. It implements RedKeyClusters method, which satisfies the redisv1Interface
 type V1Client struct {
 	restClient rest.Interface
 }
@@ -91,8 +91,8 @@ func NewForConfig(c *rest.Config) (*V1Client, error) {
 	return &V1Client{restClient: client}, nil
 }
 
-// RedisClusters returns the interface which will allow the caller to access the implemented methods of the interface
-func (c *V1Client) RedisClusters(namespace string) RdclInterface {
+// RedKeyClusters returns the interface which will allow the caller to access the implemented methods of the interface
+func (c *V1Client) RedKeyClusters(namespace string) RdclInterface {
 	return &rdclClient{
 		restClient: c.restClient,
 		ns:         namespace,
