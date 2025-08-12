@@ -29,8 +29,8 @@ import (
 
 const RedisCommPort = 6379
 const RedisGossPort = 16379
-const RedisClusterLabel = "redis-cluster-name"
-const RedisClusterComponentLabel = "redis.rediscluster.operator/component"
+const RedKeyClusterLabel = "redkey-cluster-name"
+const RedKeyClusterComponentLabel = "redis.redkeycluster.operator/component"
 
 var defaultPort = corev1.ServicePort{
 	Name:     "client",
@@ -53,8 +53,8 @@ func CreateStatefulSet(ctx context.Context, req ctrl.Request, spec redkeyv1.RedK
 	}
 
 	defaultLabels := map[string]string{
-		RedisClusterLabel:          req.Name,
-		RedisClusterComponentLabel: common.ComponentLabelRedis,
+		RedKeyClusterLabel:          req.Name,
+		RedKeyClusterComponentLabel: common.ComponentLabelRedis,
 	}
 
 	// Add default labels and apply them to the statefulset.
@@ -79,7 +79,7 @@ func CreateStatefulSet(ctx context.Context, req ctrl.Request, spec redkeyv1.RedK
 			ServiceName: req.Name,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{RedisClusterLabel: req.Name, RedisClusterComponentLabel: common.ComponentLabelRedis},
+					Labels: map[string]string{RedKeyClusterLabel: req.Name, RedKeyClusterComponentLabel: common.ComponentLabelRedis},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -331,7 +331,7 @@ func CreateService(Namespace, Name string, labels map[string]string) *corev1.Ser
 			Ports: []corev1.ServicePort{
 				defaultPort,
 			},
-			Selector:  map[string]string{RedisClusterLabel: Name, RedisClusterComponentLabel: common.ComponentLabelRedis},
+			Selector:  map[string]string{RedKeyClusterLabel: Name, RedKeyClusterComponentLabel: common.ComponentLabelRedis},
 			ClusterIP: "None",
 		},
 	}
@@ -392,7 +392,7 @@ func cleanServiceResult(result, original, override *corev1.Service) {
 
 	// Assure to clean selector if override does not set them
 	if len(override.Spec.Selector) == 0 {
-		result.Spec.Selector = map[string]string{RedisClusterLabel: original.Name, RedisClusterComponentLabel: common.ComponentLabelRedis}
+		result.Spec.Selector = map[string]string{RedKeyClusterLabel: original.Name, RedKeyClusterComponentLabel: common.ComponentLabelRedis}
 	}
 }
 

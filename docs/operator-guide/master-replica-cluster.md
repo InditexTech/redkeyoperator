@@ -8,7 +8,7 @@ The minimum configuration for the correct operation of this function is:
 
 ```yaml
 apiVersion: redis.inditex.dev/v1
-kind: RedisCluster
+kind: RedKeyCluster
 ...
 spec:
   ...
@@ -22,7 +22,7 @@ If this feature is enabled, this additional configuration should be added to `re
 
 ```yaml
 apiVersion: redis.inditex.dev/v1
-kind: RedisCluster
+kind: RedKeyCluster
 ...
 spec:
   ...
@@ -43,7 +43,7 @@ spec:
 
 ```yaml
 apiVersion: redis.inditex.dev/v1
-kind: RedisCluster
+kind: RedKeyCluster
 ...
 spec:
   ...
@@ -56,7 +56,7 @@ Redis Operator will create 6 pods, 3 masters and 3 replicas (one for each master
 
 ```yaml
 apiVersion: redis.inditex.dev/v1
-kind: RedisCluster
+kind: RedKeyCluster
 ...
 spec:
   ...
@@ -68,7 +68,7 @@ Redis Operator will create 15 pods, 5 masters and 10 replicas (two for each mast
 
 ```yaml
 apiVersion: redis.inditex.dev/v1
-kind: RedisCluster
+kind: RedKeyCluster
 ...
 spec:
   ...
@@ -80,7 +80,7 @@ Redis Operator will create 5 pods, 5 masters and no replicas.
 
 ```yaml
 apiVersion: redis.inditex.dev/v1
-kind: RedisCluster
+kind: RedKeyCluster
 ...
 spec:
   ...

@@ -20,7 +20,7 @@ to the Pod IP is needed for Robin to work.
 
 ```yaml
 apiVersion: redis.inditex.dev/v1
-kind: RedisCluster
+kind: RedKeyCluster
 ...
 spec:
   ...
@@ -78,7 +78,7 @@ The expected fields of the `spec.robin.config` YAML are:
 
 ```yaml
 apiVersion: redis.inditex.dev/v1
-kind: RedisCluster
+kind: RedKeyCluster
 ...
 spec:
   ...

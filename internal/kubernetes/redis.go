@@ -44,13 +44,13 @@ func GetStatefulSetSelectorLabel(ctx context.Context, client client.Client, redi
 	}})
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return redis.RedisClusterComponentLabel
+			return redis.RedKeyClusterComponentLabel
 		}
 		return ""
 	}
-	if statefulset.Spec.Template.Labels[redis.RedisClusterComponentLabel] != "" {
+	if statefulset.Spec.Template.Labels[redis.RedKeyClusterComponentLabel] != "" {
 		// new label
-		return redis.RedisClusterComponentLabel
+		return redis.RedKeyClusterComponentLabel
 	} else {
 		return "app"
 	}

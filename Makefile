@@ -444,7 +444,7 @@ $(ENVTEST):
 
 ##@ Troubleshooting
 
-REDIS_PODS=$(shell kubectl get po -n ${NAMESPACE} --field-selector=status.phase=Running  -l='redis.rediscluster.operator/component=redis' -o custom-columns=':metadata.name' )
+REDIS_PODS=$(shell kubectl get po -n ${NAMESPACE} --field-selector=status.phase=Running  -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name' )
 redis-check: ## Check information in pods related to redis cluster.
 	for POD in $(REDIS_PODS); do kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli --cluster check localhost:6379; done
 
@@ -482,7 +482,7 @@ args = `arg="$(filter-out $@,$(MAKECMDGOALS))" && echo $${arg:-${1}}`
 redis-forget-manually:
 	for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli CLUSTER FORGET $(call args, $(nodeid)); done
 
-REDIS_POD=$(shell kubectl get po -n ${NAMESPACE} --field-selector=status.phase=Running  -l='redis.rediscluster.operator/component=redis' -o custom-columns=':metadata.name' --no-headers | head -n 1)
+REDIS_POD=$(shell kubectl get po -n ${NAMESPACE} --field-selector=status.phase=Running  -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name' --no-headers | head -n 1)
 
 .SILENT:
 redis-insert:

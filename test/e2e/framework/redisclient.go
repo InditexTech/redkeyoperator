@@ -351,8 +351,8 @@ func CheckRedisCluster(k8Client client.Client, ctx context.Context, redisCluster
 
 	labelSelector := labels.SelectorFromSet(
 		map[string]string{
-			"redis-cluster-name":                    redisCluster.Name,
-			"redis.rediscluster.operator/component": "redis",
+			"redkey-cluster-name":                    redisCluster.Name,
+			"redis.redkeycluster.operator/component": "redis",
 		},
 	)
 
@@ -377,8 +377,8 @@ func GetPods(k8Client client.Client, ctx context.Context, redisCluster *redkeyv1
 
 	labelSelector := labels.SelectorFromSet(
 		map[string]string{
-			"redis-cluster-name":                    redisCluster.Name,
-			"redis.rediscluster.operator/component": "redis",
+			"redkey-cluster-name":                    redisCluster.Name,
+			"redis.redkeycluster.operator/component": "redis",
 		},
 	)
 
@@ -668,8 +668,8 @@ func InsertDataIntoCluster(ctx context.Context, k8sClient client.Client, nsName 
 	}
 	labelSelector := labels.SelectorFromSet(
 		map[string]string{
-			"redis-cluster-name":                    redisCluster.Name,
-			"redis.rediscluster.operator/component": "redis",
+			"redkey-cluster-name":                    redisCluster.Name,
+			"redis.redkeycluster.operator/component": "redis",
 		},
 	)
 
@@ -745,8 +745,8 @@ func ForgetANode(k8Client client.Client, ctx context.Context, redisCluster *redk
 
 	labelSelector := labels.SelectorFromSet(
 		map[string]string{
-			"redis-cluster-name":                    redisCluster.Name,
-			"redis.rediscluster.operator/component": "redis",
+			"redkey-cluster-name":                    redisCluster.Name,
+			"redis.redkeycluster.operator/component": "redis",
 		},
 	)
 
@@ -769,8 +769,8 @@ func ForgetANodeFixAndMeet(k8Client client.Client, ctx context.Context, redisClu
 
 	labelSelector := labels.SelectorFromSet(
 		map[string]string{
-			"redis-cluster-name":                    redisCluster.Name,
-			"redis.rediscluster.operator/component": "redis",
+			"redkey-cluster-name":                    redisCluster.Name,
+			"redis.redkeycluster.operator/component": "redis",
 		},
 	)
 

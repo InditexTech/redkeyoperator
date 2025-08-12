@@ -138,8 +138,8 @@ func NewRobin(ctx context.Context, client ctrlClient.Client, redisCluster *redke
 	componentLabel := kubernetes.GetStatefulSetSelectorLabel(ctx, client, redisCluster)
 	labelSelector := labels.SelectorFromSet(
 		map[string]string{
-			redis.RedisClusterLabel: redisCluster.Name,
-			componentLabel:          common.ComponentLabelRobin,
+			redis.RedKeyClusterLabel: redisCluster.Name,
+			componentLabel:           common.ComponentLabelRobin,
 		},
 	)
 

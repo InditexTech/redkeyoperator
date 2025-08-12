@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 apiVersion: redis.inditex.com/v1
-kind: RedisCluster
+kind: RedKeyCluster
 metadata:
   annotations:
     amiga-admin: ""
@@ -15,8 +15,8 @@ metadata:
     slot: test
     technology: redis_7.4.0
     version: 7.4.0
-    redis-cluster-name: redis-cluster-test
-    redis.rediscluster.operator/component: redis
+    redkey-cluster-name: redis-cluster-test
+    redis.redkeycluster.operator/component: redis
   name: redis-cluster-test
 spec:
   config: |

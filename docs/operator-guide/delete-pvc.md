@@ -16,7 +16,7 @@ Starting with Redis Operator release 0.2.33, Redis Operator supports deletion of
 
 ```yaml
 apiVersion: redis.inditex.dev/v1
-kind: RedisCluster
+kind: RedKeyCluster
 ...
 spec:
   ...

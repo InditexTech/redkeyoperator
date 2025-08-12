@@ -409,14 +409,14 @@ var _ = Describe("Redis Operator & RedisCluster E2E", Label("operator", "cluster
 		}
 
 		base := map[string]string{
-			"redis-cluster-name":                    clusterName,
-			"redis.rediscluster.operator/component": "redis",
+			"redkey-cluster-name":                    clusterName,
+			"redis.redkeycluster.operator/component": "redis",
 		}
 		with := map[string]string{
-			"redis-cluster-name":                    clusterName,
-			"redis.rediscluster.operator/component": "redis",
-			"team":                                  "teamA",
-			"foo":                                   "bar",
+			"redkey-cluster-name":                    clusterName,
+			"redis.redkeycluster.operator/component": "redis",
+			"team":                                   "teamA",
+			"foo":                                    "bar",
 		}
 
 		DescribeTable("adds / removes spec.labels",

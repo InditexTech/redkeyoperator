@@ -9,7 +9,7 @@ REDIS_CLUSTER_NAME="redis-cluster-test"
 
 # Function: Print usage information and exit
 function usage() {
-    echo "Usage: $0 <replicas> <namespace> <redis-cluster-name>" >&2
+    echo "Usage: $0 <replicas> <namespace> <redkey-cluster-name>" >&2
     exit 1
 }
 

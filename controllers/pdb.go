@@ -17,9 +17,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-func (r *RedisClusterReconciler) createPodDisruptionBudget(req ctrl.Request, redisCluster *redkeyv1.RedKeyCluster, labels map[string]string) *pv1.PodDisruptionBudget {
+func (r *RedKeyClusterReconciler) createPodDisruptionBudget(req ctrl.Request, redkeyCluster *redkeyv1.RedKeyCluster, labels map[string]string) *pv1.PodDisruptionBudget {
 	pdb := &pv1.PodDisruptionBudget{}
-	if redisCluster.Spec.Pdb.PdbSizeUnavailable.StrVal != "" || redisCluster.Spec.Pdb.PdbSizeUnavailable.IntVal != 0 {
+	if redkeyCluster.Spec.Pdb.PdbSizeUnavailable.StrVal != "" || redkeyCluster.Spec.Pdb.PdbSizeUnavailable.IntVal != 0 {
 		pdb = &pv1.PodDisruptionBudget{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      req.Name + "-pdb",
@@ -27,9 +27,9 @@ func (r *RedisClusterReconciler) createPodDisruptionBudget(req ctrl.Request, red
 				Labels:    labels,
 			},
 			Spec: pv1.PodDisruptionBudgetSpec{
-				MaxUnavailable: &redisCluster.Spec.Pdb.PdbSizeUnavailable,
+				MaxUnavailable: &redkeyCluster.Spec.Pdb.PdbSizeUnavailable,
 				Selector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{redis.RedisClusterLabel: req.Name, r.getStatefulSetSelectorLabel(redisCluster): "redis"},
+					MatchLabels: map[string]string{redis.RedKeyClusterLabel: req.Name, r.getStatefulSetSelectorLabel(redkeyCluster): "redis"},
 				},
 			},
 		}
@@ -41,9 +41,9 @@ func (r *RedisClusterReconciler) createPodDisruptionBudget(req ctrl.Request, red
 				Labels:    labels,
 			},
 			Spec: pv1.PodDisruptionBudgetSpec{
-				MinAvailable: &redisCluster.Spec.Pdb.PdbSizeAvailable,
+				MinAvailable: &redkeyCluster.Spec.Pdb.PdbSizeAvailable,
 				Selector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{redis.RedisClusterLabel: req.Name, r.getStatefulSetSelectorLabel(redisCluster): "redis"},
+					MatchLabels: map[string]string{redis.RedKeyClusterLabel: req.Name, r.getStatefulSetSelectorLabel(redkeyCluster): "redis"},
 				},
 			},
 		}
@@ -52,24 +52,24 @@ func (r *RedisClusterReconciler) createPodDisruptionBudget(req ctrl.Request, red
 	return pdb
 }
 
-func (r *RedisClusterReconciler) updatePodDisruptionBudget(ctx context.Context, redisCluster *redkeyv1.RedKeyCluster) error {
+func (r *RedKeyClusterReconciler) updatePodDisruptionBudget(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) error {
 	refreshedPdb := &pv1.PodDisruptionBudget{}
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		// get a fresh rediscluster to minimize conflicts
-		err := r.Client.Get(ctx, types.NamespacedName{Namespace: redisCluster.Namespace, Name: redisCluster.Name + "-pdb"}, refreshedPdb)
+		// get a fresh redkeycluster to minimize conflicts
+		err := r.Client.Get(ctx, types.NamespacedName{Namespace: redkeyCluster.Namespace, Name: redkeyCluster.Name + "-pdb"}, refreshedPdb)
 		if err != nil {
-			r.logError(redisCluster.NamespacedName(), err, "Error getting a refreshed RedisCluster before updating it. It may have been deleted?")
+			r.logError(redkeyCluster.NamespacedName(), err, "Error getting a refreshed RedKeyCluster before updating it. It may have been deleted?")
 			return err
 		}
-		if redisCluster.Spec.Pdb.PdbSizeUnavailable.IntVal != 0 || redisCluster.Spec.Pdb.PdbSizeUnavailable.StrVal != "" {
+		if redkeyCluster.Spec.Pdb.PdbSizeUnavailable.IntVal != 0 || redkeyCluster.Spec.Pdb.PdbSizeUnavailable.StrVal != "" {
 			refreshedPdb.Spec.MinAvailable = nil
-			refreshedPdb.Spec.MaxUnavailable = &redisCluster.Spec.Pdb.PdbSizeUnavailable
+			refreshedPdb.Spec.MaxUnavailable = &redkeyCluster.Spec.Pdb.PdbSizeUnavailable
 		} else {
 			refreshedPdb.Spec.MaxUnavailable = nil
-			refreshedPdb.Spec.MinAvailable = &redisCluster.Spec.Pdb.PdbSizeAvailable
+			refreshedPdb.Spec.MinAvailable = &redkeyCluster.Spec.Pdb.PdbSizeAvailable
 		}
-		refreshedPdb.ObjectMeta.Labels = *redisCluster.Spec.Labels
-		refreshedPdb.Spec.Selector.MatchLabels = map[string]string{redis.RedisClusterLabel: redisCluster.ObjectMeta.Name, r.getStatefulSetSelectorLabel(redisCluster): "redis"}
+		refreshedPdb.ObjectMeta.Labels = *redkeyCluster.Spec.Labels
+		refreshedPdb.Spec.Selector.MatchLabels = map[string]string{redis.RedKeyClusterLabel: redkeyCluster.ObjectMeta.Name, r.getStatefulSetSelectorLabel(redkeyCluster): "redis"}
 
 		var updateErr = r.Client.Update(ctx, refreshedPdb)
 		return updateErr
@@ -80,126 +80,126 @@ func (r *RedisClusterReconciler) updatePodDisruptionBudget(ctx context.Context, 
 	return nil
 }
 
-func (r *RedisClusterReconciler) checkAndManagePodDisruptionBudget(ctx context.Context, req ctrl.Request, redisCluster *redkeyv1.RedKeyCluster) {
-	if redisCluster.Spec.Pdb.Enabled && redisCluster.Spec.Replicas > 1 {
-		_, err := r.FindExistingPodDisruptionBudgetFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-pdb", Namespace: redisCluster.Namespace}})
+func (r *RedKeyClusterReconciler) checkAndManagePodDisruptionBudget(ctx context.Context, req ctrl.Request, redkeyCluster *redkeyv1.RedKeyCluster) {
+	if redkeyCluster.Spec.Pdb.Enabled && redkeyCluster.Spec.Replicas > 1 {
+		_, err := r.FindExistingPodDisruptionBudgetFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redkeyCluster.Name + "-pdb", Namespace: redkeyCluster.Namespace}})
 		if err != nil {
 			if errors.IsNotFound(err) {
 				// Create PodDisruptionBudget
-				pdb := r.createPodDisruptionBudget(req, redisCluster, *redisCluster.Spec.Labels)
-				ctrl.SetControllerReference(redisCluster, pdb, r.Scheme)
+				pdb := r.createPodDisruptionBudget(req, redkeyCluster, *redkeyCluster.Spec.Labels)
+				ctrl.SetControllerReference(redkeyCluster, pdb, r.Scheme)
 				pdbCreateErr := r.Client.Create(ctx, pdb)
 				if pdbCreateErr != nil {
-					r.logError(redisCluster.NamespacedName(), pdbCreateErr, "Error creating PodDisruptionBudget")
+					r.logError(redkeyCluster.NamespacedName(), pdbCreateErr, "Error creating PodDisruptionBudget")
 				}
 			} else {
-				r.logError(redisCluster.NamespacedName(), err, "Error getting existing PodDisruptionBudget")
+				r.logError(redkeyCluster.NamespacedName(), err, "Error getting existing PodDisruptionBudget")
 			}
 		}
 	}
-	if redisCluster.Spec.Replicas == 1 || !redisCluster.Spec.Pdb.Enabled {
-		r.deletePodDisruptionBudget(ctx, redisCluster)
+	if redkeyCluster.Spec.Replicas == 1 || !redkeyCluster.Spec.Pdb.Enabled {
+		r.deletePodDisruptionBudget(ctx, redkeyCluster)
 	}
 }
 
-func (r *RedisClusterReconciler) checkAndUpdatePodDisruptionBudget(ctx context.Context, redisCluster *redkeyv1.RedKeyCluster) error {
-	if redisCluster.Spec.Pdb.Enabled && redisCluster.Spec.Replicas > 1 {
+func (r *RedKeyClusterReconciler) checkAndUpdatePodDisruptionBudget(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) error {
+	if redkeyCluster.Spec.Pdb.Enabled && redkeyCluster.Spec.Replicas > 1 {
 		// Check if the pdb availables are changed
 
-		pdb, err := r.FindExistingPodDisruptionBudgetFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-pdb", Namespace: redisCluster.Namespace}})
+		pdb, err := r.FindExistingPodDisruptionBudgetFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redkeyCluster.Name + "-pdb", Namespace: redkeyCluster.Namespace}})
 		if err != nil {
-			r.logError(redisCluster.NamespacedName(), err, "Failed to get PodDisruptionBudget")
+			r.logError(redkeyCluster.NamespacedName(), err, "Failed to get PodDisruptionBudget")
 		}
 		if pdb != nil {
 			proceedToUpdate := false
-			maxUnavailableFromRedisCluster := &redisCluster.Spec.Pdb.PdbSizeUnavailable
-			minAvailableFromRedisCluster := &redisCluster.Spec.Pdb.PdbSizeAvailable
-			if redisCluster.Spec.Pdb.PdbSizeAvailable.IntVal == 0 && redisCluster.Spec.Pdb.PdbSizeAvailable.StrVal == "" {
-				minAvailableFromRedisCluster = nil
+			maxUnavailableFromRedKeyCluster := &redkeyCluster.Spec.Pdb.PdbSizeUnavailable
+			minAvailableFromRedKeyCluster := &redkeyCluster.Spec.Pdb.PdbSizeAvailable
+			if redkeyCluster.Spec.Pdb.PdbSizeAvailable.IntVal == 0 && redkeyCluster.Spec.Pdb.PdbSizeAvailable.StrVal == "" {
+				minAvailableFromRedKeyCluster = nil
 			}
-			if redisCluster.Spec.Pdb.PdbSizeUnavailable.IntVal == 0 && redisCluster.Spec.Pdb.PdbSizeUnavailable.StrVal == "" {
-				maxUnavailableFromRedisCluster = nil
+			if redkeyCluster.Spec.Pdb.PdbSizeUnavailable.IntVal == 0 && redkeyCluster.Spec.Pdb.PdbSizeUnavailable.StrVal == "" {
+				maxUnavailableFromRedKeyCluster = nil
 			}
-			if maxUnavailableFromRedisCluster != nil {
+			if maxUnavailableFromRedKeyCluster != nil {
 				if pdb.Spec.MaxUnavailable != nil {
-					if pdb.Spec.MaxUnavailable.IntVal != redisCluster.Spec.Pdb.PdbSizeUnavailable.IntVal || pdb.Spec.MaxUnavailable.StrVal != redisCluster.Spec.Pdb.PdbSizeUnavailable.StrVal {
-						r.logInfo(redisCluster.NamespacedName(), "Cluster Configured Issued", "reason", "PDB changed update pdb deployed", "OldMaxUnavailable", pdb.Spec.MaxUnavailable, "NewMaxUnavailable", maxUnavailableFromRedisCluster)
+					if pdb.Spec.MaxUnavailable.IntVal != redkeyCluster.Spec.Pdb.PdbSizeUnavailable.IntVal || pdb.Spec.MaxUnavailable.StrVal != redkeyCluster.Spec.Pdb.PdbSizeUnavailable.StrVal {
+						r.logInfo(redkeyCluster.NamespacedName(), "Cluster Configured Issued", "reason", "PDB changed update pdb deployed", "OldMaxUnavailable", pdb.Spec.MaxUnavailable, "NewMaxUnavailable", maxUnavailableFromRedKeyCluster)
 						proceedToUpdate = true
 					}
 				} else {
-					r.logInfo(redisCluster.NamespacedName(), "Cluster Configured Issued", "reason", "PBD changed update pdb deployed", "OldMaxUnavailable", pdb.Spec.MaxUnavailable, "NewMaxUnavailable", maxUnavailableFromRedisCluster)
+					r.logInfo(redkeyCluster.NamespacedName(), "Cluster Configured Issued", "reason", "PBD changed update pdb deployed", "OldMaxUnavailable", pdb.Spec.MaxUnavailable, "NewMaxUnavailable", maxUnavailableFromRedKeyCluster)
 					proceedToUpdate = true
 				}
 
-			} else if minAvailableFromRedisCluster != nil {
+			} else if minAvailableFromRedKeyCluster != nil {
 				if pdb.Spec.MinAvailable != nil {
-					if pdb.Spec.MinAvailable.IntVal != redisCluster.Spec.Pdb.PdbSizeAvailable.IntVal || pdb.Spec.MinAvailable.StrVal != redisCluster.Spec.Pdb.PdbSizeAvailable.StrVal {
-						r.logInfo(redisCluster.NamespacedName(), "Cluster Configured Issued", "reason", "PDB changed update pdb deployed", "OldMinAvailable", pdb.Spec.MinAvailable, "NewMinAvailable", minAvailableFromRedisCluster)
+					if pdb.Spec.MinAvailable.IntVal != redkeyCluster.Spec.Pdb.PdbSizeAvailable.IntVal || pdb.Spec.MinAvailable.StrVal != redkeyCluster.Spec.Pdb.PdbSizeAvailable.StrVal {
+						r.logInfo(redkeyCluster.NamespacedName(), "Cluster Configured Issued", "reason", "PDB changed update pdb deployed", "OldMinAvailable", pdb.Spec.MinAvailable, "NewMinAvailable", minAvailableFromRedKeyCluster)
 						proceedToUpdate = true
 					}
 				} else {
-					r.logInfo(redisCluster.NamespacedName(), "Cluster Configured Issued", "reason", "PDB changed update pdb deployed", "OldMinAvailable", pdb.Spec.MinAvailable, "NewMinAvailable", minAvailableFromRedisCluster)
+					r.logInfo(redkeyCluster.NamespacedName(), "Cluster Configured Issued", "reason", "PDB changed update pdb deployed", "OldMinAvailable", pdb.Spec.MinAvailable, "NewMinAvailable", minAvailableFromRedKeyCluster)
 					proceedToUpdate = true
 				}
 			}
 			// Selector match labels check
-			desiredLabels := map[string]string{redis.RedisClusterLabel: redisCluster.ObjectMeta.Name, r.getStatefulSetSelectorLabel(redisCluster): "redis"}
+			desiredLabels := map[string]string{redis.RedKeyClusterLabel: redkeyCluster.ObjectMeta.Name, r.getStatefulSetSelectorLabel(redkeyCluster): "redis"}
 			if len(pdb.Spec.Selector.MatchLabels) != len(desiredLabels) {
-				r.logInfo(redisCluster.NamespacedName(), "Cluster Configured Issued", "reason", "PDB selector match labels", "existing labels", pdb.Spec.Selector.MatchLabels, "desired labels", desiredLabels)
+				r.logInfo(redkeyCluster.NamespacedName(), "Cluster Configured Issued", "reason", "PDB selector match labels", "existing labels", pdb.Spec.Selector.MatchLabels, "desired labels", desiredLabels)
 				proceedToUpdate = true
 			}
 			for k, v := range desiredLabels {
 				if pdb.Spec.Selector.MatchLabels[k] != v {
-					r.logInfo(redisCluster.NamespacedName(), "Cluster Configured Issued", "reason", "PDB selector match labels", "existing labels", pdb.Spec.Selector.MatchLabels, "desired labels", desiredLabels)
+					r.logInfo(redkeyCluster.NamespacedName(), "Cluster Configured Issued", "reason", "PDB selector match labels", "existing labels", pdb.Spec.Selector.MatchLabels, "desired labels", desiredLabels)
 					proceedToUpdate = true
 				}
 			}
 
 			if proceedToUpdate {
-				r.Recorder.Event(redisCluster, "Normal", "UpdatePdb", "PDB configuration updated")
-				return r.updatePodDisruptionBudget(ctx, redisCluster)
+				r.Recorder.Event(redkeyCluster, "Normal", "UpdatePdb", "PDB configuration updated")
+				return r.updatePodDisruptionBudget(ctx, redkeyCluster)
 
 			}
 		}
 	} else {
 		// Delete PodDisruptionBudget if exists
-		pdb, err := r.FindExistingPodDisruptionBudgetFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-pdb", Namespace: redisCluster.Namespace}})
+		pdb, err := r.FindExistingPodDisruptionBudgetFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redkeyCluster.Name + "-pdb", Namespace: redkeyCluster.Namespace}})
 		if err == nil && pdb != nil {
-			pdb.Name = redisCluster.Name + "-pdb"
-			pdb.Namespace = redisCluster.Namespace
-			err := r.deleteExistingPodDisruptionBudget(ctx, pdb, redisCluster)
+			pdb.Name = redkeyCluster.Name + "-pdb"
+			pdb.Namespace = redkeyCluster.Namespace
+			err := r.deleteExistingPodDisruptionBudget(ctx, pdb, redkeyCluster)
 			if err != nil {
-				r.logError(redisCluster.NamespacedName(), err, "Failed to delete PodDisruptionBudget")
+				r.logError(redkeyCluster.NamespacedName(), err, "Failed to delete PodDisruptionBudget")
 			} else {
-				r.logInfo(redisCluster.NamespacedName(), "Existing PodDisruptionBudget Deleted")
+				r.logInfo(redkeyCluster.NamespacedName(), "Existing PodDisruptionBudget Deleted")
 			}
 		}
 	}
 	return nil
 }
 
-func (r *RedisClusterReconciler) deletePodDisruptionBudget(ctx context.Context, redisCluster *redkeyv1.RedKeyCluster) {
+func (r *RedKeyClusterReconciler) deletePodDisruptionBudget(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) {
 	// Delete PodDisruptionBudget
-	pdb, err := r.FindExistingPodDisruptionBudgetFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-pdb", Namespace: redisCluster.Namespace}})
+	pdb, err := r.FindExistingPodDisruptionBudgetFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redkeyCluster.Name + "-pdb", Namespace: redkeyCluster.Namespace}})
 	if err != nil {
-		r.logInfo(redisCluster.NamespacedName(), "PodDisruptionBudget not deployed", "PodDisruptionBudget Name", redisCluster.Name+"-pdb")
+		r.logInfo(redkeyCluster.NamespacedName(), "PodDisruptionBudget not deployed", "PodDisruptionBudget Name", redkeyCluster.Name+"-pdb")
 	} else {
-		err = r.deleteExistingPodDisruptionBudget(ctx, pdb, redisCluster)
+		err = r.deleteExistingPodDisruptionBudget(ctx, pdb, redkeyCluster)
 		if err != nil {
-			r.logError(redisCluster.NamespacedName(), err, "Failed to delete PodDisruptionBudget")
+			r.logError(redkeyCluster.NamespacedName(), err, "Failed to delete PodDisruptionBudget")
 		} else {
-			r.logInfo(redisCluster.NamespacedName(), "PodDisruptionBudget Deleted")
+			r.logInfo(redkeyCluster.NamespacedName(), "PodDisruptionBudget Deleted")
 		}
 	}
 }
 
-func (r *RedisClusterReconciler) deleteExistingPodDisruptionBudget(ctx context.Context, pdb *pv1.PodDisruptionBudget, redisCluster *redkeyv1.RedKeyCluster) error {
+func (r *RedKeyClusterReconciler) deleteExistingPodDisruptionBudget(ctx context.Context, pdb *pv1.PodDisruptionBudget, redkeyCluster *redkeyv1.RedKeyCluster) error {
 	refreshedPdb := &pv1.PodDisruptionBudget{}
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		// get a fresh rediscluster to minimize conflicts
+		// get a fresh redkeycluster to minimize conflicts
 		err := r.Client.Get(ctx, types.NamespacedName{Namespace: pdb.Namespace, Name: pdb.Name}, refreshedPdb)
 		if err != nil {
-			r.logError(redisCluster.NamespacedName(), err, "Error getting a refreshed RedisCluster before updating it. It may have been deleted?")
+			r.logError(redkeyCluster.NamespacedName(), err, "Error getting a refreshed RedKeyCluster before updating it. It may have been deleted?")
 			return err
 		}
 		var updateErr = r.Client.Delete(ctx, refreshedPdb)

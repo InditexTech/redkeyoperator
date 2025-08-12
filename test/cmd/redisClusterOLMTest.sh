@@ -27,7 +27,7 @@ readonly name="redis-cluster"
 #   None
 #######################################
 initializeRedisCluster() {
-    REDIS_POD=$(kubectl get po -n $namespace -l='redis.rediscluster.operator/component=redis' -o custom-columns=':metadata.name' --no-headers | head)
+    REDIS_POD=$(kubectl get po -n $namespace -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name' --no-headers | head)
     # validate if exists an instance of redisCluster installed
     if [ -z "$REDIS_POD" ]; then
         installRedisCluster
@@ -228,7 +228,7 @@ validateRedisMasterSlave() {
     elif [[ $minRepStatefulSet -lt $stsReplicas ]]; then
         resultMessage="ERROR:: Minimum configuration required StateFulSet minRepStatefulSet"
     else
-        REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.rediscluster.operator/component=redis' -o custom-columns=':metadata.name')
+        REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name')
         for POD in $REDIS_POD; do
             # get and parse the info about nodes configured in the Redis Cluster
             nodes=$(kubectl -n $namespace exec -i $POD -- redis-cli CLUSTER NODES | tr " " "&" | tr "\r" ";")
@@ -287,7 +287,7 @@ validateBasicRedisMasterSlave() {
         resultMessage=$message
         result=1
     else
-        REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.rediscluster.operator/component=redis' -o custom-columns=':metadata.name')
+        REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name')
         for POD in $REDIS_POD; do
             # get and parse the info about nodes configured in the Redis Cluster
             kubectl -n $namespace exec -i $POD -- redis-cli CLUSTER NODES

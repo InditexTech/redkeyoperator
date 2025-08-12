@@ -2,13 +2,13 @@
 
 ## CRD
 
-Redis operator CRD defines a new resource type `RedisCluster`.
+Redis operator CRD defines a new resource type `RedKeyCluster`.
 
 Below you'll find an example of manifest conforming to the resource definition that will deploy a Redis cluster:
 
 ```yaml
 apiVersion: redis.inditex.dev/v1
-kind: RedisCluster
+kind: RedKeyCluster
 metadata:
   name: rediscluster-sample
   namespace: default

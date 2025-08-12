@@ -17,7 +17,7 @@ type DeletePVCFinalizer struct {
 
 func (ef *DeletePVCFinalizer) DeleteMethod(ctx context.Context, redis *redkeyv1.RedKeyCluster, c client.Client) error {
 	pvc := &corev1.PersistentVolumeClaim{}
-	err := c.DeleteAllOf(ctx, pvc, client.InNamespace(redis.Namespace), client.MatchingLabels{"redis-cluster-name": redis.Name})
+	err := c.DeleteAllOf(ctx, pvc, client.InNamespace(redis.Namespace), client.MatchingLabels{"redkey-cluster-name": redis.Name})
 	return err
 }
 

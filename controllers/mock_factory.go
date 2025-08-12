@@ -41,17 +41,17 @@ func newScheme() *runtime.Scheme {
 	return s
 }
 
-func newReconciler(redis *redkeyv1.RedKeyCluster, recorder record.EventRecorder) *RedisClusterReconciler {
+func newReconciler(redis *redkeyv1.RedKeyCluster, recorder record.EventRecorder) *RedKeyClusterReconciler {
 	ctrl.SetLogger(zap.New(zap.WriteTo(ginkgo.GinkgoWriter), zap.UseDevMode(true)))
 
 	var defaultReplicas int32 = 3
 
 	scheme := newScheme()
 
-	reconciler := &RedisClusterReconciler{
+	reconciler := &RedKeyClusterReconciler{
 		Client:                      newClient(redis, scheme),
 		Scheme:                      scheme,
-		Log:                         ctrl.Log.WithName("controllers").WithName("rediscluster"),
+		Log:                         ctrl.Log.WithName("controllers").WithName("redkeycluster"),
 		MaxConcurrentReconciles:     10,
 		ConcurrentMigrate:           3,
 		Recorder:                    recorder,
@@ -76,7 +76,7 @@ func newRequest(rc *redkeyv1.RedKeyCluster) ctrl.Request {
 	}
 }
 
-func newRedisCluster() *redkeyv1.RedKeyCluster {
+func newRedKeyCluster() *redkeyv1.RedKeyCluster {
 	om := metav1.ObjectMeta{
 		Name:      "redis-cluster",
 		Namespace: "unittest",
@@ -113,8 +113,8 @@ func newLimits() corev1.ResourceList {
 	}
 }
 
-func mockReadyNodes(nodes map[string]*redkeyv1.RedisNode) func(ctx context.Context, redisCluster *redkeyv1.RedKeyCluster) (map[string]*redkeyv1.RedisNode, error) {
-	return func(ctx context.Context, redisCluster *redkeyv1.RedKeyCluster) (map[string]*redkeyv1.RedisNode, error) {
+func mockReadyNodes(nodes map[string]*redkeyv1.RedisNode) func(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) (map[string]*redkeyv1.RedisNode, error) {
+	return func(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) (map[string]*redkeyv1.RedisNode, error) {
 		return nodes, nil
 	}
 }
