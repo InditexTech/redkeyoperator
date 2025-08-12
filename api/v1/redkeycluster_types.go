@@ -203,9 +203,9 @@ type RobinSpec struct {
 type RedKeyClusterStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make manifests" to regenerate code after modifying this file
-	Nodes      map[string]*RedisNode `json:"nodes"`
-	Status     string                `json:"status"`
-	Conditions []metav1.Condition    `json:"conditions,omitempty"`
+	Nodes      map[string]*RedisNode  `json:"nodes"`
+	Status     string                 `json:"status"`
+	Conditions []metav1.Condition     `json:"conditions,omitempty"`
 	Substatus  RedKeyClusterSubstatus `json:"substatus"`
 }
 

@@ -219,7 +219,7 @@ var _ = Describe("Redis Operator & RedisCluster E2E", Label("operator", "cluster
 			name        string
 			initial     *redisv1.RedKeyClusterOverrideSpec
 			update      *redisv1.RedKeyClusterOverrideSpec // nil → no update step
-			validateSTS func(*appsv1.StatefulSet) bool    // after last step
+			validateSTS func(*appsv1.StatefulSet) bool     // after last step
 		}
 
 		entries := []entry{
@@ -373,7 +373,7 @@ var _ = Describe("Redis Operator & RedisCluster E2E", Label("operator", "cluster
 				clusterName,
 				3, 0, // replicas / per-master
 				"", getRedisImage(), true, true, // storage / image / purgeKeys / ephemeral
-				redisv1.Pdb{},                      // no-PDB
+				redisv1.Pdb{},                       // no-PDB
 				redisv1.RedKeyClusterOverrideSpec{}, // no override
 			)
 		})
@@ -1023,10 +1023,10 @@ var _ = Describe("Redis Operator & RedisCluster E2E", Label("operator", "cluster
 		}
 
 		type tc struct {
-			desc     string                               // human-readable
+			desc     string                                // human-readable
 			operate  func(rc *redisv1.RedKeyCluster) error // action that "breaks" the cluster
-			preHook  func()                               // run before operate  (may be nil)
-			postHook func()                               // run after  operate  (may be nil)
+			preHook  func()                                // run before operate  (may be nil)
+			postHook func()                                // run after  operate  (may be nil)
 		}
 
 		DescribeTable("self-heals after disruptive events",
