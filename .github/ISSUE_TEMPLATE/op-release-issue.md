@@ -1,7 +1,7 @@
 ---
 name: Release new operator version
 about: Use this template to create a incoming release
-title: 'Release Redis Operator X.Y.Z'
+title: 'Release RedKey Operator X.Y.Z'
 labels: kind/internal
 assignees: ''
 

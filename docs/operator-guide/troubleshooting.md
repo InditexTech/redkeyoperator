@@ -1,6 +1,6 @@
 # Troubleshooting
 
-The Redis Operator is a complex piece of software. In some cases it can self-recover from service losses but in other cases a cluster administrator has to intervene. This document helps administrators how to solve failing redis clusters.
+The RedKey Operator is a complex piece of software. In some cases it can self-recover from service losses but in other cases a cluster administrator has to intervene. This document helps administrators how to solve failing redis clusters.
 
 The first section describes [redis cluster failure scenarios](#redis-cluster-failure-scenarios) and show to solve them.
 
@@ -10,7 +10,7 @@ The second section lists [commands](#redis-cluster-manager-commands) used to sol
 
 ### Openshift 3 does not support OLM and runs on an older kube-api version
 
-Redis Operator is deployed in a production intranet cluster, which runs on Openshift 3. Openshift 3 uses an old `kube-api` version which comes with `CRD apiextension v1beta1`. The solution is to [generate Openshift 3 CRDs](#generate-openshift-3-crds).
+RedKey Operator is deployed in a production intranet cluster, which runs on Openshift 3. Openshift 3 uses an old `kube-api` version which comes with `CRD apiextension v1beta1`. The solution is to [generate Openshift 3 CRDs](#generate-openshift-3-crds).
 
 ### Downgrade a failing operator
 

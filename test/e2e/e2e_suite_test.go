@@ -58,7 +58,7 @@ func NewCachingClientFunc() client.NewClientFunc {
 
 func TestE2E(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Redis Operator E2E Suite", Label("e2e"))
+	RunSpecs(t, "RedKey Operator E2E Suite", Label("e2e"))
 }
 
 var _ = BeforeSuite(func() {

@@ -253,7 +253,7 @@ func TestUpdateUpgradingStatus_Upgrading_Image_Changed(t *testing.T) {
 	rc.Spec.Config = redis.GenerateRedisConfig(rc)
 
 	sset := newStatefulSet(rc, numStatefulSetReplicas)
-	sset.Spec.Template.Spec.Containers[0].Image = "redis-operator:9.9.9"
+	sset.Spec.Template.Spec.Containers[0].Image = "redkey-operator:9.9.9"
 
 	reconciler.FindExistingStatefulSetFunc = mockStatefulSet(sset)
 	reconciler.FindExistingConfigMapFunc = mockConfigMap(configMap)

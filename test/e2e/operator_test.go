@@ -118,7 +118,7 @@ func newOperatorDeployment(ns string) *appsv1.Deployment {
 						"control-plane": "redis-operator",
 						"domain":        "DOMAIN",
 						"environment":   "ENVIRONMENT",
-						"layer":         "middleware-redisoperator",
+						"layer":         "middleware-redkeyoperator",
 						"slot":          "default",
 						"tenant":        "TENANT",
 						"type":          "middleware",

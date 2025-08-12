@@ -1,11 +1,11 @@
-Redis Operator
+RedKey Operator
 
 ©2025 Inditex. All Rights Reserved. See LICENSE.txt for license information.
 
 NOTICES:
 --------
 
-This document includes a list of open source components used in Redis Operator, including those that have been modified.
+This document includes a list of open source components used in RedKey Operator, including those that have been modified.
 
 --------
 

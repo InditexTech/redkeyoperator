@@ -83,9 +83,9 @@ connect_registry_to_cluster_network() {
 
 # Push operator image to local registry
 push_operator_image_local_registry() {
-  echo "Building redis-operator image... ${redis_operator_name}:${redis_operator_version}"
+  echo "Building redkey-operator image... ${redis_operator_name}:${redis_operator_version}"
   docker build -t "${redis_operator_name}:${redis_operator_version}" .
-  echo "Pushing redis-operator image to Kind cluster..."
+  echo "Pushing redkey-operator image to Kind cluster..."
   docker tag "${redis_operator_name}:${redis_operator_version}" "${host}:${registry_port}/${redis_operator_name}:${redis_operator_version}"
   docker push "${host}:${registry_port}/${redis_operator_name}:${redis_operator_version}"
   echo "Image pushed to local registry."

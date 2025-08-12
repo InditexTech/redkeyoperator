@@ -56,7 +56,7 @@ type RedisConfig struct {
 	Metrics    RedisMetricsConfig    `yaml:"metrics"`
 }
 
-// RedisOperatorConfig holds operator-level Redis configuration.
+// RedKeyOperatorConfig holds operator-level Redis configuration.
 type RedisReconcilerConfig struct {
 	IntervalSeconds                 int `yaml:"interval_seconds"`
 	OperationCleanupIntervalSeconds int `yaml:"operation_cleanup_interval_seconds"`

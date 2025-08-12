@@ -1414,7 +1414,7 @@ allTest() {
 }
 
 #######################################
-# Initialize a new redis operator in local environment.
+# Initialize a new RedKey operator in local environment.
 # Globals:
 #   namespace=$1
 #   image=$2
@@ -1524,7 +1524,7 @@ All)
 esac
 
 # ./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.8" "Initialize" "true" "storage"
-# ./test/cmd/redisClusterTest.sh test-${{ github.event.pull_request.head.sha }} ${{env.JFROG_SNAPSHOT_REGISTRY}}/redis-operator:sha-${{ github.event.pull_request.head.sha }} "Initialize" "true" "storage"
+# ./test/cmd/redisClusterTest.sh test-${{ github.event.pull_request.head.sha }} ${{env.JFROG_SNAPSHOT_REGISTRY}}/redkey-operator:sha-${{ github.event.pull_request.head.sha }} "Initialize" "true" "storage"
 # ./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:1.0.2" "ScalingUpPatch" "true" "storage"
 # ./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.8" "ScalingDownPatch" "true" "storage"
 # ./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:1.0.2" "ScalingUp" "true" "storage"

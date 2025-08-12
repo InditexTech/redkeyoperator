@@ -355,7 +355,7 @@ undeploy-webhook: process-manifests-webhook ##		Delete the webhook from the K8s 
 	$(info $(M) deleting Webhook)
 	kubectl delete -f deployment/webhook.yaml
 
-OPERATOR=$(shell kubectl -n ${NAMESPACE} get po -l='control-plane=redis-operator' -o=jsonpath='{.items[0].metadata.name}')
+OPERATOR=$(shell kubectl -n ${NAMESPACE} get po -l='control-plane=redkey-operator' -o=jsonpath='{.items[0].metadata.name}')
 dev-deploy: ## 		Build a new manager binary, copy the file to the operator pod and run it.
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -gcflags="all=-N -l" -o bin/manager ./cmd/main.go
 	kubectl wait -n ${NAMESPACE} --for=condition=ready pod -l control-plane=redkey-operator
@@ -386,7 +386,7 @@ apply-all: docker-build docker-push process-manifests install deploy apply-rkcl
 
 delete-all: delete-rkcl undeploy uninstall
 
-WEBHOOK=$(shell kubectl -n ${WEBHOOK_NAMESPACE} get po -l='control-plane=redis-operator-webhook' -o=jsonpath='{.items[0].metadata.name}')
+WEBHOOK=$(shell kubectl -n ${WEBHOOK_NAMESPACE} get po -l='control-plane=redkey-operator-webhook' -o=jsonpath='{.items[0].metadata.name}')
 dev-deploy-webhook: ## 		Build a new webhook binary, copy the file to the webhook pod and run it.
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -gcflags="all=-N -l" -C webhook -o ../bin/webhook  main.go
 	kubectl wait -n ${WEBHOOK_NAMESPACE} --for=condition=ready pod -l control-plane=redkey-operator-webhook

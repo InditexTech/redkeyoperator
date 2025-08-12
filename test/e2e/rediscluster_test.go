@@ -112,7 +112,7 @@ func deleteNamespace(ctx context.Context, c client.Client, ns *corev1.Namespace)
 	}, defaultWait, defaultPoll).Should(BeTrue(), "namespace %s should be gone", ns.Name)
 }
 
-var _ = Describe("Redis Operator & RedisCluster E2E", Label("operator", "cluster"), func() {
+var _ = Describe("RedKey Operator & RedisCluster E2E", Label("operator", "cluster"), func() {
 	var (
 		namespace *corev1.Namespace
 	)

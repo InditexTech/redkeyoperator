@@ -1,6 +1,6 @@
 # Ephemeral Mode / Zero Persistent Volume Claims
 
-Ephemeral mode, also known as Zero Persistent Volume Claims (PVCs), disables persistent volume claims for storing the `redis.conf` configuration file. This mode frees up storage, removes the need for managing persistent volume claims and decreases pod start-up time. When using Redis as a cache it is recommended to enable ephemeral mode. Ephemeral mode is supported in Redis Operator 0.2.27 for new clusters.
+Ephemeral mode, also known as Zero Persistent Volume Claims (PVCs), disables persistent volume claims for storing the `redis.conf` configuration file. This mode frees up storage, removes the need for managing persistent volume claims and decreases pod start-up time. When using Redis as a cache it is recommended to enable ephemeral mode. Ephemeral mode is supported in RedKey Operator 0.2.27 for new clusters.
 
 ## How To Enable Ephemeral Mode
 

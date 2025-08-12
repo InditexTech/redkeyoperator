@@ -1,4 +1,4 @@
-# Funtional Test for Kubernetes and Openshift Redis Operator
+# Funtional Test for Kubernetes and Openshift RedKey Operator
 
 ## Purpose
 
@@ -32,7 +32,7 @@ Manifests:
 ```
 
 * `namespace` name of namespace where the funtional will be executed
-* `image` name of image that deploy the Redis Operator 
+* `image` name of image that deploy the RedKey Operator 
 * `test` name of the desired test `Initialize,ScalingUp,ScalingDown,ChangeStorage,ChangeStorageReplicas,AddLabel,DeleteLabel,InsertData,InsertDataWhileScaling,InsertDataWhileScalingDown,GetSpecificKey,ValidateBasicRedisMasterSlave,ScalingUpRedisMasterSlave,ScalingDownRedisMasterSlave,KillPodRedisMasterSlave`
 * `newRedisCluster` allows to create a new instance of Redis Cluster `true,false`
 * `typeRedisCluster`  type of deployment of the Redis Cluster `storage,ephemeral,repmaster`
@@ -70,7 +70,7 @@ Tests can be run with (examples):
 
 
  * ```./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.0" "Initialize" "true" "storage" ```
- * ```./test/cmd/redisClusterTest.sh test-${{ github.event.pull_request.head.sha }} ${{env.JFROG_SNAPSHOT_REGISTRY}}/redis-operator:sha-${{ github.event.pull_request. head.sha }} "Initialize" "true" "storage"```
+ * ```./test/cmd/redisClusterTest.sh test-${{ github.event.pull_request.head.sha }} ${{env.JFROG_SNAPSHOT_REGISTRY}}/redkey-operator:sha-${{ github.event.pull_request. head.sha }} "Initialize" "true" "storage"```
  * ```./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.0" "ScalingUp" "true" "storage"```
  * ```./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.0" "ScalingDown" "true" "storage" ```
  * ```./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.0" "ChangeStorage" "true" "storage" ```

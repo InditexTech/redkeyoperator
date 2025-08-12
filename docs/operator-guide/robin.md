@@ -11,7 +11,7 @@ of reconcile any addition, update or delete in the `spec.robin` of a RedisCluste
 
 ## How to deploy Robin
 
-Robin deployment can be configured in `spec.robin.template`. This field is an object representing a [PodSpecTemplate](https://github.com/kubernetes/kubernetes/blob/v1.32.2/staging/src/k8s.io/api/core/v1/types.go#L5050). The template is then used by the Redis Operator to create, update or delete a Deployment with Robin, whose name is `<RedisClusterName>-robin`.
+Robin deployment can be configured in `spec.robin.template`. This field is an object representing a [PodSpecTemplate](https://github.com/kubernetes/kubernetes/blob/v1.32.2/staging/src/k8s.io/api/core/v1/types.go#L5050). The template is then used by the RedKey Operator to create, update or delete a Deployment with Robin, whose name is `<RedisClusterName>-robin`.
 
 Robin connects to all the nodes of the Redis Cluster using port 6379 and the K8s Redis Pod domain name (e.g.: rediscluster-sample-0.redis-cluster-sample). Therefore, a DNS resolving that name 
 to the Pod IP is needed for Robin to work.
@@ -51,7 +51,7 @@ spec:
 Robin configuration can be included in `spec.robin.config`. This field is an string whose content is included in the key `application-configmap.yml` of the ConfigMap `<RedisClusterName>-robin`. 
 The content is expected to be a valid YAML with several fields which can be seen in [Configuration fields](#configuration-fields) section
 
-The Redis Operator applies the MD5 algorithm to the `spec.robin.config` content and adds the result in the `checksum/config` annotation of the Robin Deployment template. This way, any change 
+The RedKey Operator applies the MD5 algorithm to the `spec.robin.config` content and adds the result in the `checksum/config` annotation of the Robin Deployment template. This way, any change 
 in the configuration content will trigger a Robin POD recreation, which will have always the latest content applied to the RedisCluster object.
 
 ### Configuration fields
@@ -93,7 +93,7 @@ spec:
         domain: swdelivery
         slot: sample
         layer: middleware-redis
-        namespace: redis-operator
+        namespace: redkey-operator
         platformid: "meccanoarteixo2"
         service: "showpaas"
       redis:
@@ -102,7 +102,7 @@ spec:
         cluster:
           replicas: 1
           name: "rediscluster-sample"
-          namespace: redis-operator
+          namespace: redkey-operator
           health_probe_interval_seconds: 60
           healing_time_seconds: 60
           max_retries: 2

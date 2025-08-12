@@ -93,7 +93,7 @@ func newRedKeyCluster() *redkeyv1.RedKeyCluster {
 		Spec: redkeyv1.RedKeyClusterSpec{
 			Replicas: 3,
 			Config:   r.MapToConfigString(r.MergeWithDefaultConfig(nil, false, 0)),
-			Image:    "redis-operator:0.3.0",
+			Image:    "redkey-operator:0.3.0",
 			Resources: &corev1.ResourceRequirements{
 				Limits:   newLimits(),
 				Requests: newRequests(),

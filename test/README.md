@@ -1,4 +1,4 @@
-# End to End Test for Kubernetes Redis Operator
+# End to End Test for Kubernetes RedKey Operator
 
 ## Purpose
 
@@ -30,7 +30,7 @@ In the terminal execute this make command
 make test-e2e-cov
 ```
 
-The command creates a new instance for the redis operator and continues to run the available test
+The command creates a new instance for the RedKey operator and continues to run the available test
 
 ## Clean environment
 
