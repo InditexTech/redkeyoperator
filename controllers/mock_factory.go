@@ -8,8 +8,8 @@ import (
 	"context"
 	"fmt"
 
-	redisv1 "github.com/inditextech/redisoperator/api/v1"
-	r "github.com/inditextech/redisoperator/internal/redis"
+	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
+	r "github.com/inditextech/redkeyoperator/internal/redis"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/apps/v1"
@@ -28,12 +28,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-func newClient(rc *redisv1.RedKeyCluster, s *runtime.Scheme) client.Client {
+func newClient(rc *redkeyv1.RedKeyCluster, s *runtime.Scheme) client.Client {
 	return fake.NewClientBuilder().WithObjects(rc).WithScheme(s).Build()
 }
 
 func newScheme() *runtime.Scheme {
-	sb := redisv1.SchemeBuilder
+	sb := redkeyv1.SchemeBuilder
 	s, err := sb.Build()
 	if err != nil {
 		fmt.Println(err)
@@ -41,7 +41,7 @@ func newScheme() *runtime.Scheme {
 	return s
 }
 
-func newReconciler(redis *redisv1.RedKeyCluster, recorder record.EventRecorder) *RedisClusterReconciler {
+func newReconciler(redis *redkeyv1.RedKeyCluster, recorder record.EventRecorder) *RedisClusterReconciler {
 	ctrl.SetLogger(zap.New(zap.WriteTo(ginkgo.GinkgoWriter), zap.UseDevMode(true)))
 
 	var defaultReplicas int32 = 3
@@ -55,7 +55,7 @@ func newReconciler(redis *redisv1.RedKeyCluster, recorder record.EventRecorder) 
 		MaxConcurrentReconciles:     10,
 		ConcurrentMigrate:           3,
 		Recorder:                    recorder,
-		GetReadyNodesFunc:           mockReadyNodes(make(map[string]*redisv1.RedisNode)),
+		GetReadyNodesFunc:           mockReadyNodes(make(map[string]*redkeyv1.RedisNode)),
 		FindExistingStatefulSetFunc: mockStatefulSet(newStatefulSet(redis, defaultReplicas)),
 		FindExistingConfigMapFunc:   mockConfigMap(newConfigMap()),
 	}
@@ -67,7 +67,7 @@ func newContext() context.Context {
 	return context.Background()
 }
 
-func newRequest(rc *redisv1.RedKeyCluster) ctrl.Request {
+func newRequest(rc *redkeyv1.RedKeyCluster) ctrl.Request {
 	return ctrl.Request{
 		NamespacedName: types.NamespacedName{
 			Namespace: rc.Namespace,
@@ -76,7 +76,7 @@ func newRequest(rc *redisv1.RedKeyCluster) ctrl.Request {
 	}
 }
 
-func newRedisCluster() *redisv1.RedKeyCluster {
+func newRedisCluster() *redkeyv1.RedKeyCluster {
 	om := metav1.ObjectMeta{
 		Name:      "redis-cluster",
 		Namespace: "unittest",
@@ -84,13 +84,13 @@ func newRedisCluster() *redisv1.RedKeyCluster {
 			"label-key": "label-value",
 		},
 	}
-	return &redisv1.RedKeyCluster{
+	return &redkeyv1.RedKeyCluster{
 		ObjectMeta: om,
-		Status: redisv1.RedKeyClusterStatus{
-			Status:     redisv1.StatusReady,
+		Status: redkeyv1.RedKeyClusterStatus{
+			Status:     redkeyv1.StatusReady,
 			Conditions: []metav1.Condition{},
 		},
-		Spec: redisv1.RedKeyClusterSpec{
+		Spec: redkeyv1.RedKeyClusterSpec{
 			Replicas: 3,
 			Config:   r.MapToConfigString(r.MergeWithDefaultConfig(nil, false, 0)),
 			Image:    "redis-operator:0.3.0",
@@ -113,16 +113,16 @@ func newLimits() corev1.ResourceList {
 	}
 }
 
-func mockReadyNodes(nodes map[string]*redisv1.RedisNode) func(ctx context.Context, redisCluster *redisv1.RedKeyCluster) (map[string]*redisv1.RedisNode, error) {
-	return func(ctx context.Context, redisCluster *redisv1.RedKeyCluster) (map[string]*redisv1.RedisNode, error) {
+func mockReadyNodes(nodes map[string]*redkeyv1.RedisNode) func(ctx context.Context, redisCluster *redkeyv1.RedKeyCluster) (map[string]*redkeyv1.RedisNode, error) {
+	return func(ctx context.Context, redisCluster *redkeyv1.RedKeyCluster) (map[string]*redkeyv1.RedisNode, error) {
 		return nodes, nil
 	}
 }
 
-func newReadyNodes(amount int) map[string]*redisv1.RedisNode {
-	readyNodes := make(map[string]*redisv1.RedisNode)
+func newReadyNodes(amount int) map[string]*redkeyv1.RedisNode {
+	readyNodes := make(map[string]*redkeyv1.RedisNode)
 	for i := 0; i < amount; i++ {
-		readyNodes[strconv.Itoa(i)] = &redisv1.RedisNode{}
+		readyNodes[strconv.Itoa(i)] = &redkeyv1.RedisNode{}
 	}
 	return readyNodes
 }
@@ -133,7 +133,7 @@ func mockStatefulSet(sset *v1.StatefulSet) func(ctx context.Context, req ctrl.Re
 	}
 }
 
-func newStatefulSet(redis *redisv1.RedKeyCluster, numReplicas int32) *v1.StatefulSet {
+func newStatefulSet(redis *redkeyv1.RedKeyCluster, numReplicas int32) *v1.StatefulSet {
 	req := newRequest(redis)
 	spec := redis.Spec
 	labels := make(map[string]string)

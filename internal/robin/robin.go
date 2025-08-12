@@ -17,12 +17,12 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/inditextech/redisoperator/internal/common"
-	"github.com/inditextech/redisoperator/internal/kubernetes"
-	"github.com/inditextech/redisoperator/internal/redis"
+	"github.com/inditextech/redkeyoperator/internal/common"
+	"github.com/inditextech/redkeyoperator/internal/kubernetes"
+	"github.com/inditextech/redkeyoperator/internal/redis"
 	"gopkg.in/yaml.v3"
 
-	redisv1 "github.com/inditextech/redisoperator/api/v1"
+	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -134,7 +134,7 @@ type Robin struct {
 }
 
 // Gets Robin initialized from a RedisCluster.
-func NewRobin(ctx context.Context, client ctrlClient.Client, redisCluster *redisv1.RedKeyCluster, logger logr.Logger) (Robin, error) {
+func NewRobin(ctx context.Context, client ctrlClient.Client, redisCluster *redkeyv1.RedKeyCluster, logger logr.Logger) (Robin, error) {
 	componentLabel := kubernetes.GetStatefulSetSelectorLabel(ctx, client, redisCluster)
 	labelSelector := labels.SelectorFromSet(
 		map[string]string{
@@ -402,7 +402,7 @@ func (cn *ClusterNodes) GetReplicaNodes() []*Node {
 }
 
 // Updates configuration in Robin ConfigMap with the new status.
-func PersistRobinStatut(ctx context.Context, client ctrlClient.Client, redisCluster *redisv1.RedKeyCluster, newStatus string) error {
+func PersistRobinStatut(ctx context.Context, client ctrlClient.Client, redisCluster *redkeyv1.RedKeyCluster, newStatus string) error {
 	cmap := &corev1.ConfigMap{}
 	err := client.Get(ctx, types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}, cmap)
 	if err != nil {
@@ -426,7 +426,7 @@ func PersistRobinStatut(ctx context.Context, client ctrlClient.Client, redisClus
 }
 
 // Updates configuration in Robin ConfigMap with the new replicas.
-func PersistRobinReplicas(ctx context.Context, client ctrlClient.Client, redisCluster *redisv1.RedKeyCluster, replicas int, replicasPerMaster int) error {
+func PersistRobinReplicas(ctx context.Context, client ctrlClient.Client, redisCluster *redkeyv1.RedKeyCluster, replicas int, replicasPerMaster int) error {
 	cmap := &corev1.ConfigMap{}
 	err := client.Get(ctx, types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}, cmap)
 	if err != nil {

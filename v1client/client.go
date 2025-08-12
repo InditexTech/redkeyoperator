@@ -7,7 +7,7 @@ package redisv1client
 import (
 	"context"
 
-	redisv1 "github.com/inditextech/redisoperator/api/v1"
+	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
@@ -17,8 +17,8 @@ import (
 
 // RdclInterface defines the methods to be implemented by Redis Clients
 type RdclInterface interface {
-	List(ctx context.Context, opts metav1.ListOptions) (*redisv1.RedKeyClusterList, error)
-	Get(ctx context.Context, name string, options metav1.GetOptions) (*redisv1.RedKeyCluster, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*redkeyv1.RedKeyClusterList, error)
+	Get(ctx context.Context, name string, options metav1.GetOptions) (*redkeyv1.RedKeyCluster, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 }
 
@@ -27,8 +27,8 @@ type rdclClient struct {
 	ns         string
 }
 
-func (c *rdclClient) List(ctx context.Context, opts metav1.ListOptions) (*redisv1.RedKeyClusterList, error) {
-	result := redisv1.RedKeyClusterList{}
+func (c *rdclClient) List(ctx context.Context, opts metav1.ListOptions) (*redkeyv1.RedKeyClusterList, error) {
+	result := redkeyv1.RedKeyClusterList{}
 	err := c.restClient.
 		Get().
 		AbsPath("/apis/redis.inditex.dev/redisv1").
@@ -41,8 +41,8 @@ func (c *rdclClient) List(ctx context.Context, opts metav1.ListOptions) (*redisv
 	return &result, err
 }
 
-func (c *rdclClient) Get(ctx context.Context, name string, opts metav1.GetOptions) (*redisv1.RedKeyCluster, error) {
-	result := redisv1.RedKeyCluster{}
+func (c *rdclClient) Get(ctx context.Context, name string, opts metav1.GetOptions) (*redkeyv1.RedKeyCluster, error) {
+	result := redkeyv1.RedKeyCluster{}
 	err := c.restClient.
 		Get().
 		AbsPath("/apis/redis.inditex.dev/v1").
@@ -78,7 +78,7 @@ type V1Client struct {
 // NewForConfig creates V1Client by using the given rest.Config. Returns error if something is amiss in the config.
 func NewForConfig(c *rest.Config) (*V1Client, error) {
 	config := *c
-	config.ContentConfig.GroupVersion = &schema.GroupVersion{Group: redisv1.GroupVersion.Group, Version: redisv1.GroupVersion.Version}
+	config.ContentConfig.GroupVersion = &schema.GroupVersion{Group: redkeyv1.GroupVersion.Group, Version: redkeyv1.GroupVersion.Version}
 	config.APIPath = "/apis"
 	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 	config.UserAgent = rest.DefaultKubernetesUserAgent()

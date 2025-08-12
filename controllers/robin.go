@@ -11,9 +11,9 @@ import (
 	"maps"
 	"reflect"
 
-	redisv1 "github.com/inditextech/redisoperator/api/v1"
-	redis "github.com/inditextech/redisoperator/internal/redis"
-	"github.com/inditextech/redisoperator/internal/robin"
+	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
+	redis "github.com/inditextech/redkeyoperator/internal/redis"
+	"github.com/inditextech/redkeyoperator/internal/robin"
 	"gopkg.in/yaml.v3"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -25,10 +25,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (r *RedisClusterReconciler) checkAndCreateRobin(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedKeyCluster) error {
+func (r *RedisClusterReconciler) checkAndCreateRobin(ctx context.Context, req ctrl.Request, redisCluster *redkeyv1.RedKeyCluster) error {
 	// Populate robin spec if not provided. This to handle the case where the user removes the robin spec of an existing cluster. The robin objects will be deleted.
 	if redisCluster.Spec.Robin == nil {
-		redisCluster.Spec.Robin = &redisv1.RobinSpec{
+		redisCluster.Spec.Robin = &redkeyv1.RobinSpec{
 			Config:   nil,
 			Template: nil,
 		}
@@ -45,7 +45,7 @@ func (r *RedisClusterReconciler) checkAndCreateRobin(ctx context.Context, req ct
 	return nil
 }
 
-func (r *RedisClusterReconciler) handleRobinConfig(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedKeyCluster) error {
+func (r *RedisClusterReconciler) handleRobinConfig(ctx context.Context, req ctrl.Request, redisCluster *redkeyv1.RedKeyCluster) error {
 	// Get robin configmap
 	existingConfigMap, err := r.FindExistingConfigMapFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}})
 
@@ -99,7 +99,7 @@ func (r *RedisClusterReconciler) handleRobinConfig(ctx context.Context, req ctrl
 	return nil
 }
 
-func (r *RedisClusterReconciler) handleRobinDeployment(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedKeyCluster) {
+func (r *RedisClusterReconciler) handleRobinDeployment(ctx context.Context, req ctrl.Request, redisCluster *redkeyv1.RedKeyCluster) {
 	// Get robin deployment
 	deployment, err := r.FindExistingDeployment(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}})
 
@@ -134,7 +134,7 @@ func (r *RedisClusterReconciler) handleRobinDeployment(ctx context.Context, req 
 	r.updateRobinObject(ctx, deployment, redisCluster, "deployment")
 }
 
-func (r *RedisClusterReconciler) createRobinObject(ctx context.Context, obj client.Object, redisCluster *redisv1.RedKeyCluster, kind string) error {
+func (r *RedisClusterReconciler) createRobinObject(ctx context.Context, obj client.Object, redisCluster *redkeyv1.RedKeyCluster, kind string) error {
 	if obj.DeepCopyObject() == nil {
 		return nil
 	}
@@ -156,7 +156,7 @@ func (r *RedisClusterReconciler) createRobinObject(ctx context.Context, obj clie
 	return nil
 }
 
-func (r *RedisClusterReconciler) updateRobinObject(ctx context.Context, obj client.Object, redisCluster *redisv1.RedKeyCluster, kind string) error {
+func (r *RedisClusterReconciler) updateRobinObject(ctx context.Context, obj client.Object, redisCluster *redkeyv1.RedKeyCluster, kind string) error {
 	if obj.DeepCopyObject() == nil {
 		return nil
 	}
@@ -172,7 +172,7 @@ func (r *RedisClusterReconciler) updateRobinObject(ctx context.Context, obj clie
 	return nil
 }
 
-func (r *RedisClusterReconciler) deleteRobinObject(ctx context.Context, obj client.Object, redisCluster *redisv1.RedKeyCluster, kind string) error {
+func (r *RedisClusterReconciler) deleteRobinObject(ctx context.Context, obj client.Object, redisCluster *redkeyv1.RedKeyCluster, kind string) error {
 	if obj.DeepCopyObject() == nil {
 		return nil
 	}
@@ -188,7 +188,7 @@ func (r *RedisClusterReconciler) deleteRobinObject(ctx context.Context, obj clie
 	return nil
 }
 
-func (r *RedisClusterReconciler) overrideRobinDeployment(req ctrl.Request, redisCluster *redisv1.RedKeyCluster, podTemplateSpec corev1.PodTemplateSpec) (corev1.PodTemplateSpec, bool) {
+func (r *RedisClusterReconciler) overrideRobinDeployment(req ctrl.Request, redisCluster *redkeyv1.RedKeyCluster, podTemplateSpec corev1.PodTemplateSpec) (corev1.PodTemplateSpec, bool) {
 	// Apply the override
 	patchedPodTemplateSpec, err := redis.ApplyPodTemplateSpecOverride(podTemplateSpec, *redisCluster.Spec.Robin.Template)
 	if err != nil {
@@ -206,7 +206,7 @@ func (r *RedisClusterReconciler) overrideRobinDeployment(req ctrl.Request, redis
 	return *patchedPodTemplateSpec, changed
 }
 
-func (r *RedisClusterReconciler) createRobinDeployment(req ctrl.Request, rediscluster *redisv1.RedKeyCluster, labels map[string]string) *v1.Deployment {
+func (r *RedisClusterReconciler) createRobinDeployment(req ctrl.Request, rediscluster *redkeyv1.RedKeyCluster, labels map[string]string) *v1.Deployment {
 	var replicas = int32(1)
 	d := &v1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -248,7 +248,7 @@ func (r *RedisClusterReconciler) createRobinDeployment(req ctrl.Request, rediscl
 	return d
 }
 
-func (r *RedisClusterReconciler) createRobinConfigMap(req ctrl.Request, spec redisv1.RedKeyClusterSpec, labels map[string]string) *corev1.ConfigMap {
+func (r *RedisClusterReconciler) createRobinConfigMap(req ctrl.Request, spec redkeyv1.RedKeyClusterSpec, labels map[string]string) *corev1.ConfigMap {
 	cm := corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      req.Name + "-robin",
@@ -262,7 +262,7 @@ func (r *RedisClusterReconciler) createRobinConfigMap(req ctrl.Request, spec red
 	return &cm
 }
 
-func (r *RedisClusterReconciler) scaleDownRobin(ctx context.Context, redisCluster *redisv1.RedKeyCluster) {
+func (r *RedisClusterReconciler) scaleDownRobin(ctx context.Context, redisCluster *redkeyv1.RedKeyCluster) {
 	if redisCluster.Spec.Robin != nil {
 		if redisCluster.Spec.Robin.Template != nil {
 			mdep, err := r.FindExistingDeployment(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}})

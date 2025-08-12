@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/inditextech/redisoperator/internal/common"
+	"github.com/inditextech/redkeyoperator/internal/common"
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"

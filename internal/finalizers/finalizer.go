@@ -7,11 +7,11 @@ package finalizer
 import (
 	"context"
 
-	redisv1 "github.com/inditextech/redisoperator/api/v1"
+	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type Finalizer interface {
-	DeleteMethod(context.Context, *redisv1.RedKeyCluster, client.Client) error
+	DeleteMethod(context.Context, *redkeyv1.RedKeyCluster, client.Client) error
 	GetId() string
 }

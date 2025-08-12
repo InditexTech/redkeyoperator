@@ -6,19 +6,19 @@ package controllers
 
 import (
 	"github.com/go-logr/logr"
-	redisv1 "github.com/inditextech/redisoperator/api/v1"
+	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (r *RedisClusterReconciler) setConditionTrue(rc *redisv1.RedKeyCluster, condition metav1.Condition, message string) {
+func (r *RedisClusterReconciler) setConditionTrue(rc *redkeyv1.RedKeyCluster, condition metav1.Condition, message string) {
 	if !meta.IsStatusConditionTrue(rc.Status.Conditions, condition.Type) {
 		meta.SetStatusCondition(&rc.Status.Conditions, condition)
 		r.Recorder.Event(rc, "Normal", condition.Reason, message)
 	}
 }
 
-func setConditionFalse(log logr.Logger, redisCluster *redisv1.RedKeyCluster, condition metav1.Condition) {
+func setConditionFalse(log logr.Logger, redisCluster *redkeyv1.RedKeyCluster, condition metav1.Condition) {
 	condition.Status = metav1.ConditionFalse
 	changed := meta.SetStatusCondition(&redisCluster.Status.Conditions, condition)
 	if changed {
@@ -26,8 +26,8 @@ func setConditionFalse(log logr.Logger, redisCluster *redisv1.RedKeyCluster, con
 	}
 }
 
-func setAllConditionsFalse(log logr.Logger, redisCluster *redisv1.RedKeyCluster) {
-	for _, condition := range redisv1.AllConditions {
+func setAllConditionsFalse(log logr.Logger, redisCluster *redkeyv1.RedKeyCluster) {
+	for _, condition := range redkeyv1.AllConditions {
 		setConditionFalse(log, redisCluster, condition)
 	}
 }

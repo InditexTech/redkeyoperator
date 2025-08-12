@@ -26,8 +26,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	redisv1 "github.com/inditextech/redisoperator/api/v1"
-	finalizer "github.com/inditextech/redisoperator/internal/finalizers"
+	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
+	finalizer "github.com/inditextech/redkeyoperator/internal/finalizers"
 )
 
 // RedisClusterReconciler reconciles a RedisCluster object
@@ -39,7 +39,7 @@ type RedisClusterReconciler struct {
 	Finalizers                          []finalizer.Finalizer
 	MaxConcurrentReconciles             int
 	ConcurrentMigrate                   int
-	GetReadyNodesFunc                   func(ctx context.Context, redisCluster *redisv1.RedKeyCluster) (map[string]*redisv1.RedisNode, error)
+	GetReadyNodesFunc                   func(ctx context.Context, redisCluster *redkeyv1.RedKeyCluster) (map[string]*redkeyv1.RedisNode, error)
 	FindExistingStatefulSetFunc         func(ctx context.Context, req ctrl.Request) (*v1.StatefulSet, error)
 	FindExistingConfigMapFunc           func(ctx context.Context, req ctrl.Request) (*corev1.ConfigMap, error)
 	FindExistingDeploymentFunc          func(ctx context.Context, req ctrl.Request) (*v1.Deployment, error)
@@ -57,7 +57,7 @@ type RedisClusterReconciler struct {
 // +kubebuilder:rbac:groups=apps,resources=statefulsets;deployments,verbs=create;delete;patch;update
 func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.Log.Info("RedisCluster reconciler called", "redis-cluster", req.NamespacedName, "name", req.Name, "ns", req.Namespace)
-	redisCluster := &redisv1.RedKeyCluster{}
+	redisCluster := &redkeyv1.RedKeyCluster{}
 	err := r.Client.Get(ctx, req.NamespacedName, redisCluster)
 	if err == nil {
 		r.Log.Info("Found RedisCluster", "redis-cluster", req.NamespacedName, "name", redisCluster.GetName(), "GVK", redisCluster.GroupVersionKind().String(), "status", redisCluster.Status.Status)
@@ -72,7 +72,7 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 // SetupWithManager sets up the controller with the Manager.
 func (r *RedisClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&redisv1.RedKeyCluster{}).
+		For(&redkeyv1.RedKeyCluster{}).
 		Watches(&corev1.ConfigMap{}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(r.PreFilter())).
 		Owns(&v1.StatefulSet{}).
 		WithOptions(controller.Options{MaxConcurrentReconciles: 10}).

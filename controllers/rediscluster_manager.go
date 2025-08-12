@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	redisv1 "github.com/inditextech/redisoperator/api/v1"
-	finalizer "github.com/inditextech/redisoperator/internal/finalizers"
-	"github.com/inditextech/redisoperator/internal/kubernetes"
-	"github.com/inditextech/redisoperator/internal/robin"
+	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
+	finalizer "github.com/inditextech/redkeyoperator/internal/finalizers"
+	"github.com/inditextech/redkeyoperator/internal/kubernetes"
+	"github.com/inditextech/redkeyoperator/internal/robin"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
@@ -60,7 +60,7 @@ func NewRedisClusterReconciler(mgr ctrl.Manager, maxConcurrentReconciles int, co
 	return reconciler
 }
 
-func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedKeyCluster) (ctrl.Result, error) {
+func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req ctrl.Request, redisCluster *redkeyv1.RedKeyCluster) (ctrl.Result, error) {
 	var err error
 	var requeueAfter time.Duration = DefaultRequeueTimeout
 	currentStatus := redisCluster.Status
@@ -79,7 +79,7 @@ func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req
 	}
 
 	// Check storage configuration consistency, updating status if needed.
-	r.checkStorageConfigConsistency(ctx, redisCluster, redisCluster.Status.Status != redisv1.StatusError)
+	r.checkStorageConfigConsistency(ctx, redisCluster, redisCluster.Status.Status != redkeyv1.StatusError)
 
 	// Redis cluster scaled to 0 replicas?
 	// If it's a newly deployed cluster it won't have a status set yet and won't be catched here.
@@ -103,19 +103,19 @@ func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req
 	switch redisCluster.Status.Status {
 	case "":
 		requeue, requeueAfter = r.reconcileStatusNew(redisCluster)
-	case redisv1.StatusInitializing:
+	case redkeyv1.StatusInitializing:
 		requeue, requeueAfter = r.reconcileStatusInitializing(ctx, redisCluster)
-	case redisv1.StatusConfiguring:
+	case redkeyv1.StatusConfiguring:
 		requeue, requeueAfter = r.reconcileStatusConfiguring(ctx, redisCluster)
-	case redisv1.StatusReady:
+	case redkeyv1.StatusReady:
 		requeue, requeueAfter = r.reconcileStatusReady(ctx, redisCluster)
-	case redisv1.StatusUpgrading:
+	case redkeyv1.StatusUpgrading:
 		requeue, requeueAfter = r.reconcileStatusUpgrading(ctx, redisCluster)
-	case redisv1.StatusScalingDown:
+	case redkeyv1.StatusScalingDown:
 		requeue, requeueAfter = r.reconcileStatusScalingDown(ctx, redisCluster)
-	case redisv1.StatusScalingUp:
+	case redkeyv1.StatusScalingUp:
 		requeue, requeueAfter = r.reconcileStatusScalingUp(ctx, redisCluster)
-	case redisv1.StatusError:
+	case redkeyv1.StatusError:
 		requeue, requeueAfter = r.reconcileStatusError(ctx, redisCluster)
 	default:
 		r.logError(redisCluster.NamespacedName(), nil, "Status not allowed", "status", redisCluster.Status.Status)
@@ -127,7 +127,7 @@ func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req
 	}
 
 	var updateErr error
-	if !redisv1.IsFastOperationStatus(redisCluster.Status.Substatus) && !redisv1.CompareStatuses(&redisCluster.Status, &currentStatus) {
+	if !redkeyv1.IsFastOperationStatus(redisCluster.Status.Substatus) && !redkeyv1.CompareStatuses(&redisCluster.Status, &currentStatus) {
 		updateErr = r.updateClusterStatus(ctx, redisCluster)
 	}
 
@@ -139,17 +139,17 @@ func (r *RedisClusterReconciler) ReconcileClusterObject(ctx context.Context, req
 	return ctrl.Result{}, updateErr
 }
 
-func (r *RedisClusterReconciler) reconcileStatusNew(redisCluster *redisv1.RedKeyCluster) (bool, time.Duration) {
+func (r *RedisClusterReconciler) reconcileStatusNew(redisCluster *redkeyv1.RedKeyCluster) (bool, time.Duration) {
 	var requeue = true
 	r.logInfo(redisCluster.NamespacedName(), "New RedisCluster. Initializing...")
 	if redisCluster.Status.Nodes == nil {
-		redisCluster.Status.Nodes = make(map[string]*redisv1.RedisNode, 0)
+		redisCluster.Status.Nodes = make(map[string]*redkeyv1.RedisNode, 0)
 	}
-	redisCluster.Status.Status = redisv1.StatusInitializing
+	redisCluster.Status.Status = redkeyv1.StatusInitializing
 	return requeue, DefaultRequeueTimeout
 }
 
-func (r *RedisClusterReconciler) reconcileStatusInitializing(ctx context.Context, redisCluster *redisv1.RedKeyCluster) (bool, time.Duration) {
+func (r *RedisClusterReconciler) reconcileStatusInitializing(ctx context.Context, redisCluster *redkeyv1.RedKeyCluster) (bool, time.Duration) {
 
 	// Check Redis node pods rediness
 	nodePodsReady, err := r.allPodsReady(ctx, redisCluster)
@@ -189,12 +189,12 @@ func (r *RedisClusterReconciler) reconcileStatusInitializing(ctx context.Context
 	r.logInfo(redisCluster.NamespacedName(), "Status", "status", status)
 
 	// Redis pods and Robin are ok, moving to Configuring status
-	redisCluster.Status.Status = redisv1.StatusConfiguring
+	redisCluster.Status.Status = redkeyv1.StatusConfiguring
 
 	return false, DefaultRequeueTimeout
 }
 
-func (r *RedisClusterReconciler) reconcileStatusConfiguring(ctx context.Context, redisCluster *redisv1.RedKeyCluster) (bool, time.Duration) {
+func (r *RedisClusterReconciler) reconcileStatusConfiguring(ctx context.Context, redisCluster *redkeyv1.RedKeyCluster) (bool, time.Duration) {
 	var requeue = true
 
 	// Ask Robin for Redis cluster readiness
@@ -240,12 +240,12 @@ func (r *RedisClusterReconciler) reconcileStatusConfiguring(ctx context.Context,
 	}
 
 	// Redis cluster is ok, moving to Ready status
-	redisCluster.Status.Status = redisv1.StatusReady
+	redisCluster.Status.Status = redkeyv1.StatusReady
 
 	return requeue, DefaultRequeueTimeout
 }
 
-func (r *RedisClusterReconciler) reconcileStatusReady(ctx context.Context, redisCluster *redisv1.RedKeyCluster) (bool, time.Duration) {
+func (r *RedisClusterReconciler) reconcileStatusReady(ctx context.Context, redisCluster *redkeyv1.RedKeyCluster) (bool, time.Duration) {
 	var requeue = true
 	var requeueAfter time.Duration = ReadyRequeueTimeout
 
@@ -257,14 +257,14 @@ func (r *RedisClusterReconciler) reconcileStatusReady(ctx context.Context, redis
 
 	// Check and update RedisCluster status value accordingly to its configuration and status
 	// -> Cluster needs to be scaled?
-	if redisCluster.Status.Status == redisv1.StatusReady {
+	if redisCluster.Status.Status == redkeyv1.StatusReady {
 		err = r.updateScalingStatus(ctx, redisCluster)
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Error when updating scaling status")
 		}
 	}
 	// -> Cluster needs to be upgraded?
-	if redisCluster.Status.Status == redisv1.StatusReady {
+	if redisCluster.Status.Status == redkeyv1.StatusReady {
 		err = r.updateUpgradingStatus(ctx, redisCluster)
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Error when updating upgrading status")
@@ -275,7 +275,7 @@ func (r *RedisClusterReconciler) reconcileStatusReady(ctx context.Context, redis
 	return requeue, requeueAfter
 }
 
-func (r *RedisClusterReconciler) reconcileStatusUpgrading(ctx context.Context, redisCluster *redisv1.RedKeyCluster) (bool, time.Duration) {
+func (r *RedisClusterReconciler) reconcileStatusUpgrading(ctx context.Context, redisCluster *redkeyv1.RedKeyCluster) (bool, time.Duration) {
 	var requeue = true
 
 	err := r.upgradeCluster(ctx, redisCluster)
@@ -287,13 +287,13 @@ func (r *RedisClusterReconciler) reconcileStatusUpgrading(ctx context.Context, r
 	return requeue, DefaultRequeueTimeout
 }
 
-func (r *RedisClusterReconciler) reconcileStatusScalingDown(ctx context.Context, redisCluster *redisv1.RedKeyCluster) (bool, time.Duration) {
+func (r *RedisClusterReconciler) reconcileStatusScalingDown(ctx context.Context, redisCluster *redkeyv1.RedKeyCluster) (bool, time.Duration) {
 	var requeue = true
 	immediateRequeue, err := r.scaleCluster(ctx, redisCluster)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Error when scaling down")
 		r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
-		redisCluster.Status.Status = redisv1.StatusError
+		redisCluster.Status.Status = redkeyv1.StatusError
 		return requeue, DefaultRequeueTimeout
 	}
 	if immediateRequeue {
@@ -308,13 +308,13 @@ func (r *RedisClusterReconciler) reconcileStatusScalingDown(ctx context.Context,
 	return requeue, ScalingDefaultTimeout
 }
 
-func (r *RedisClusterReconciler) reconcileStatusScalingUp(ctx context.Context, redisCluster *redisv1.RedKeyCluster) (bool, time.Duration) {
+func (r *RedisClusterReconciler) reconcileStatusScalingUp(ctx context.Context, redisCluster *redkeyv1.RedKeyCluster) (bool, time.Duration) {
 	var requeue = true
 	immediateRequeue, err := r.scaleCluster(ctx, redisCluster)
 	if err != nil {
 		r.logError(redisCluster.NamespacedName(), err, "Error when scaling up")
 		r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
-		redisCluster.Status.Status = redisv1.StatusError
+		redisCluster.Status.Status = redkeyv1.StatusError
 		return requeue, DefaultRequeueTimeout
 	}
 	if immediateRequeue {
@@ -329,7 +329,7 @@ func (r *RedisClusterReconciler) reconcileStatusScalingUp(ctx context.Context, r
 	return requeue, ScalingDefaultTimeout
 }
 
-func (r *RedisClusterReconciler) reconcileStatusError(ctx context.Context, redisCluster *redisv1.RedKeyCluster) (bool, time.Duration) {
+func (r *RedisClusterReconciler) reconcileStatusError(ctx context.Context, redisCluster *redkeyv1.RedKeyCluster) (bool, time.Duration) {
 	var requeue = true
 	var requeueAfter = ErrorRequeueTimeout
 
@@ -340,7 +340,7 @@ func (r *RedisClusterReconciler) reconcileStatusError(ctx context.Context, redis
 
 	// Check and update RedisCluster status value accordingly to its configuration and status
 	// -> Cluster needs to be scaled?
-	if redisCluster.Status.Status == redisv1.StatusError {
+	if redisCluster.Status.Status == redkeyv1.StatusError {
 		err := r.updateScalingStatus(ctx, redisCluster)
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Error when updating scaling status")
@@ -348,7 +348,7 @@ func (r *RedisClusterReconciler) reconcileStatusError(ctx context.Context, redis
 		}
 	}
 	// -> Cluster needs to be upgraded?
-	if redisCluster.Status.Status == redisv1.StatusError {
+	if redisCluster.Status.Status == redkeyv1.StatusError {
 		err := r.updateUpgradingStatus(ctx, redisCluster)
 		if err != nil {
 			r.logError(redisCluster.NamespacedName(), err, "Error when updating upgrading status")
@@ -359,10 +359,10 @@ func (r *RedisClusterReconciler) reconcileStatusError(ctx context.Context, redis
 	return requeue, requeueAfter
 }
 
-func (r *RedisClusterReconciler) refreshClusterNodesInfo(ctx context.Context, redisCluster *redisv1.RedKeyCluster) error {
+func (r *RedisClusterReconciler) refreshClusterNodesInfo(ctx context.Context, redisCluster *redkeyv1.RedKeyCluster) error {
 
 	// Redis cluster must be in Configuring status (or greater) to be able to query Robin for nodes.
-	if redisCluster.Status.Status == "" || redisCluster.Status.Status == redisv1.StatusInitializing {
+	if redisCluster.Status.Status == "" || redisCluster.Status.Status == redkeyv1.StatusInitializing {
 		return nil
 	}
 
@@ -378,9 +378,9 @@ func (r *RedisClusterReconciler) refreshClusterNodesInfo(ctx context.Context, re
 		return err
 	}
 
-	updatedNodes := make(map[string]*redisv1.RedisNode, 0)
+	updatedNodes := make(map[string]*redkeyv1.RedisNode, 0)
 	for _, node := range clusterNodes.Nodes {
-		updatedNodes[node.Id] = &redisv1.RedisNode{IP: node.Ip, Name: node.Name, ReplicaOf: node.MasterId}
+		updatedNodes[node.Id] = &redkeyv1.RedisNode{IP: node.Ip, Name: node.Name, ReplicaOf: node.MasterId}
 		updatedNodes[node.Id].IsMaster = strings.Contains(node.Flags, "master")
 	}
 
@@ -392,7 +392,7 @@ func (r *RedisClusterReconciler) refreshClusterNodesInfo(ctx context.Context, re
 // Checks storage configuration for inconsistencies.
 // If the parameter is set to true if a check fail the function returns issuing log info, generating an event and setting the Redis cluster Status to Error.
 // Returns true if all checks pass or false if any checks fail.
-func (r *RedisClusterReconciler) checkStorageConfigConsistency(ctx context.Context, redisCluster *redisv1.RedKeyCluster, updateRDCL bool) bool {
+func (r *RedisClusterReconciler) checkStorageConfigConsistency(ctx context.Context, redisCluster *redkeyv1.RedKeyCluster, updateRDCL bool) bool {
 	var stsStorage, stsStorageClassName string
 
 	sts, err := r.FindExistingStatefulSet(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name, Namespace: redisCluster.Namespace}})
@@ -425,7 +425,7 @@ func (r *RedisClusterReconciler) checkStorageConfigConsistency(ctx context.Conte
 		r.logError(redisCluster.NamespacedName(), err, "Redis cluster storage configuration updates are forbidden", "STS storage", stsStorage, "RDCL storage", redisCluster.Spec.Storage)
 		if updateRDCL {
 			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
-			redisCluster.Status.Status = redisv1.StatusError
+			redisCluster.Status.Status = redkeyv1.StatusError
 		}
 		return false
 	}
@@ -435,7 +435,7 @@ func (r *RedisClusterReconciler) checkStorageConfigConsistency(ctx context.Conte
 		r.logError(redisCluster.NamespacedName(), err, "Redis cluster storage configuration updates are forbidden", "STS storage", stsStorage, "RDCL storage", redisCluster.Spec.Storage)
 		if updateRDCL {
 			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
-			redisCluster.Status.Status = redisv1.StatusError
+			redisCluster.Status.Status = redkeyv1.StatusError
 		}
 		return false
 	}
@@ -445,7 +445,7 @@ func (r *RedisClusterReconciler) checkStorageConfigConsistency(ctx context.Conte
 		r.logError(redisCluster.NamespacedName(), err, "Redis cluster storage configuration updates are forbidden", "STS storageClassName", stsStorageClassName, "RDCL storageClassName", redisCluster.Spec.StorageClassName)
 		if updateRDCL {
 			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
-			redisCluster.Status.Status = redisv1.StatusError
+			redisCluster.Status.Status = redkeyv1.StatusError
 		}
 		return false
 	}
@@ -455,7 +455,7 @@ func (r *RedisClusterReconciler) checkStorageConfigConsistency(ctx context.Conte
 		r.logError(redisCluster.NamespacedName(), err, "Redis cluster storage configuration updates are forbidden", "STS storageClassName", stsStorageClassName, "RDCL storageClassName", redisCluster.Spec.StorageClassName)
 		if updateRDCL {
 			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
-			redisCluster.Status.Status = redisv1.StatusError
+			redisCluster.Status.Status = redkeyv1.StatusError
 		}
 		return false
 	}
@@ -465,7 +465,7 @@ func (r *RedisClusterReconciler) checkStorageConfigConsistency(ctx context.Conte
 		r.logError(redisCluster.NamespacedName(), err, "Redis cluster storage configuration updates are forbidden", "STS stsStorageClassName", stsStorageClassName, "RDCL stsStorageClassName", redisCluster.Spec.StorageClassName)
 		if updateRDCL {
 			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
-			redisCluster.Status.Status = redisv1.StatusError
+			redisCluster.Status.Status = redkeyv1.StatusError
 		}
 		return false
 	}
@@ -475,7 +475,7 @@ func (r *RedisClusterReconciler) checkStorageConfigConsistency(ctx context.Conte
 		r.logError(redisCluster.NamespacedName(), err, "Redis cluster misconfigured (probably trying to change from ephemeral to non ephemeral)")
 		if updateRDCL {
 			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
-			redisCluster.Status.Status = redisv1.StatusError
+			redisCluster.Status.Status = redkeyv1.StatusError
 		}
 		return false
 	}
@@ -486,7 +486,7 @@ func (r *RedisClusterReconciler) checkStorageConfigConsistency(ctx context.Conte
 		r.logError(redisCluster.NamespacedName(), err, "Redis cluster misconfigured (probably trying to change from non ephemeral to ephemeral)")
 		if updateRDCL {
 			r.Recorder.Event(redisCluster, "Warning", "ClusterError", err.Error())
-			redisCluster.Status.Status = redisv1.StatusError
+			redisCluster.Status.Status = redkeyv1.StatusError
 		}
 		return false
 	}
@@ -494,7 +494,7 @@ func (r *RedisClusterReconciler) checkStorageConfigConsistency(ctx context.Conte
 	return true
 }
 
-func (r *RedisClusterReconciler) checkFinalizers(ctx context.Context, redisCluster *redisv1.RedKeyCluster) (bool, error) {
+func (r *RedisClusterReconciler) checkFinalizers(ctx context.Context, redisCluster *redkeyv1.RedKeyCluster) (bool, error) {
 	var pvcFinalizer = (&finalizer.DeletePVCFinalizer{}).GetId()
 	if redisCluster.Spec.DeletePVC && !redisCluster.Spec.Ephemeral {
 		r.logInfo(redisCluster.NamespacedName(), "Delete PVCs feature enabled in cluster spec")

@@ -7,8 +7,8 @@ package controllers
 import (
 	"context"
 
-	redisv1 "github.com/inditextech/redisoperator/api/v1"
-	redis "github.com/inditextech/redisoperator/internal/redis"
+	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
+	redis "github.com/inditextech/redkeyoperator/internal/redis"
 	pv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,7 +17,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-func (r *RedisClusterReconciler) createPodDisruptionBudget(req ctrl.Request, redisCluster *redisv1.RedKeyCluster, labels map[string]string) *pv1.PodDisruptionBudget {
+func (r *RedisClusterReconciler) createPodDisruptionBudget(req ctrl.Request, redisCluster *redkeyv1.RedKeyCluster, labels map[string]string) *pv1.PodDisruptionBudget {
 	pdb := &pv1.PodDisruptionBudget{}
 	if redisCluster.Spec.Pdb.PdbSizeUnavailable.StrVal != "" || redisCluster.Spec.Pdb.PdbSizeUnavailable.IntVal != 0 {
 		pdb = &pv1.PodDisruptionBudget{
@@ -52,7 +52,7 @@ func (r *RedisClusterReconciler) createPodDisruptionBudget(req ctrl.Request, red
 	return pdb
 }
 
-func (r *RedisClusterReconciler) updatePodDisruptionBudget(ctx context.Context, redisCluster *redisv1.RedKeyCluster) error {
+func (r *RedisClusterReconciler) updatePodDisruptionBudget(ctx context.Context, redisCluster *redkeyv1.RedKeyCluster) error {
 	refreshedPdb := &pv1.PodDisruptionBudget{}
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		// get a fresh rediscluster to minimize conflicts
@@ -80,7 +80,7 @@ func (r *RedisClusterReconciler) updatePodDisruptionBudget(ctx context.Context, 
 	return nil
 }
 
-func (r *RedisClusterReconciler) checkAndManagePodDisruptionBudget(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedKeyCluster) {
+func (r *RedisClusterReconciler) checkAndManagePodDisruptionBudget(ctx context.Context, req ctrl.Request, redisCluster *redkeyv1.RedKeyCluster) {
 	if redisCluster.Spec.Pdb.Enabled && redisCluster.Spec.Replicas > 1 {
 		_, err := r.FindExistingPodDisruptionBudgetFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-pdb", Namespace: redisCluster.Namespace}})
 		if err != nil {
@@ -102,7 +102,7 @@ func (r *RedisClusterReconciler) checkAndManagePodDisruptionBudget(ctx context.C
 	}
 }
 
-func (r *RedisClusterReconciler) checkAndUpdatePodDisruptionBudget(ctx context.Context, redisCluster *redisv1.RedKeyCluster) error {
+func (r *RedisClusterReconciler) checkAndUpdatePodDisruptionBudget(ctx context.Context, redisCluster *redkeyv1.RedKeyCluster) error {
 	if redisCluster.Spec.Pdb.Enabled && redisCluster.Spec.Replicas > 1 {
 		// Check if the pdb availables are changed
 
@@ -178,7 +178,7 @@ func (r *RedisClusterReconciler) checkAndUpdatePodDisruptionBudget(ctx context.C
 	return nil
 }
 
-func (r *RedisClusterReconciler) deletePodDisruptionBudget(ctx context.Context, redisCluster *redisv1.RedKeyCluster) {
+func (r *RedisClusterReconciler) deletePodDisruptionBudget(ctx context.Context, redisCluster *redkeyv1.RedKeyCluster) {
 	// Delete PodDisruptionBudget
 	pdb, err := r.FindExistingPodDisruptionBudgetFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-pdb", Namespace: redisCluster.Namespace}})
 	if err != nil {
@@ -193,7 +193,7 @@ func (r *RedisClusterReconciler) deletePodDisruptionBudget(ctx context.Context, 
 	}
 }
 
-func (r *RedisClusterReconciler) deleteExistingPodDisruptionBudget(ctx context.Context, pdb *pv1.PodDisruptionBudget, redisCluster *redisv1.RedKeyCluster) error {
+func (r *RedisClusterReconciler) deleteExistingPodDisruptionBudget(ctx context.Context, pdb *pv1.PodDisruptionBudget, redisCluster *redkeyv1.RedKeyCluster) error {
 	refreshedPdb := &pv1.PodDisruptionBudget{}
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		// get a fresh rediscluster to minimize conflicts

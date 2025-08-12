@@ -8,9 +8,9 @@ import (
 	"context"
 	"testing"
 
-	redisv1 "github.com/inditextech/redisoperator/api/v1"
-	"github.com/inditextech/redisoperator/internal/common"
-	"github.com/inditextech/redisoperator/internal/redis"
+	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
+	"github.com/inditextech/redkeyoperator/internal/common"
+	"github.com/inditextech/redkeyoperator/internal/redis"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -167,7 +167,7 @@ func TestGetStatefulSetSelectorLabelReturnsCorrectLabels(t *testing.T) {
 		},
 	}
 	for name, test := range testMap {
-		labelKey := GetStatefulSetSelectorLabel(context.TODO(), test.client, &redisv1.RedKeyCluster{
+		labelKey := GetStatefulSetSelectorLabel(context.TODO(), test.client, &redkeyv1.RedKeyCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "redis-cluster",
 				Namespace: "default",

@@ -7,8 +7,8 @@ package kubernetes
 import (
 	"context"
 
-	redisv1 "github.com/inditextech/redisoperator/api/v1"
-	"github.com/inditextech/redisoperator/internal/redis"
+	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
+	"github.com/inditextech/redkeyoperator/internal/redis"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	pv1 "k8s.io/api/policy/v1"
@@ -37,7 +37,7 @@ func FindExistingConfigMap(ctx context.Context, client client.Client, req ctrl.R
 	return cmap, nil
 }
 
-func GetStatefulSetSelectorLabel(ctx context.Context, client client.Client, redisCluster *redisv1.RedKeyCluster) string {
+func GetStatefulSetSelectorLabel(ctx context.Context, client client.Client, redisCluster *redkeyv1.RedKeyCluster) string {
 	statefulset, err := FindExistingStatefulSet(ctx, client, reconcile.Request{NamespacedName: types.NamespacedName{
 		Name:      redisCluster.Name,
 		Namespace: redisCluster.Namespace,
