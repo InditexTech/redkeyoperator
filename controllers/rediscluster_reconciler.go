@@ -7,8 +7,6 @@ package controllers
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -41,7 +39,6 @@ type RedisClusterReconciler struct {
 	Finalizers                          []finalizer.Finalizer
 	MaxConcurrentReconciles             int
 	ConcurrentMigrate                   int
-	GetClusterInfoFunc                  func(ctx context.Context, redisCluster *redisv1.RedisCluster) map[string]string
 	GetReadyNodesFunc                   func(ctx context.Context, redisCluster *redisv1.RedisCluster) (map[string]*redisv1.RedisNode, error)
 	FindExistingStatefulSetFunc         func(ctx context.Context, req ctrl.Request) (*v1.StatefulSet, error)
 	FindExistingConfigMapFunc           func(ctx context.Context, req ctrl.Request) (*corev1.ConfigMap, error)
@@ -62,7 +59,6 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	r.Log.Info("RedisCluster reconciler called", "redis-cluster", req.NamespacedName, "name", req.Name, "ns", req.Namespace)
 	redisCluster := &redisv1.RedisCluster{}
 	err := r.Client.Get(ctx, req.NamespacedName, redisCluster)
-	r.RefreshRedisClients(ctx, redisCluster)
 	if err == nil {
 		r.Log.Info("Found RedisCluster", "redis-cluster", req.NamespacedName, "name", redisCluster.GetName(), "GVK", redisCluster.GroupVersionKind().String(), "status", redisCluster.Status.Status)
 		return r.ReconcileClusterObject(ctx, req, redisCluster)
@@ -97,23 +93,16 @@ func (r *RedisClusterReconciler) PreFilter() predicate.Predicate {
 	}
 }
 
-func (r *RedisClusterReconciler) SetConditionTrue(rc *redisv1.RedisCluster, condition metav1.Condition, message string) {
-	if !meta.IsStatusConditionTrue(rc.Status.Conditions, condition.Type) {
-		meta.SetStatusCondition(&rc.Status.Conditions, condition)
-		r.Recorder.Event(rc, "Normal", condition.Reason, message)
-	}
-}
-
-func (r *RedisClusterReconciler) LogInfo(RCNamespacedName types.NamespacedName, msg string, keysAndValues ...interface{}) {
-	redisClusterInfo := []interface{}{"redis-cluster", RCNamespacedName}
+func (r *RedisClusterReconciler) logInfo(RCNamespacedName types.NamespacedName, msg string, keysAndValues ...any) {
+	redisClusterInfo := []any{"redis-cluster", RCNamespacedName}
 	r.Log.Info(msg, append(redisClusterInfo, keysAndValues...)...)
 }
 
-func (r *RedisClusterReconciler) LogError(RCNamespacedName types.NamespacedName, err error, msg string, keysAndValues ...interface{}) {
-	redisClusterInfo := []interface{}{"redis-cluster", RCNamespacedName}
+func (r *RedisClusterReconciler) logError(RCNamespacedName types.NamespacedName, err error, msg string, keysAndValues ...any) {
+	redisClusterInfo := []any{"redis-cluster", RCNamespacedName}
 	r.Log.Error(err, msg, append(redisClusterInfo, keysAndValues...)...)
 }
 
-func (r *RedisClusterReconciler) GetHelperLogger(RCNamespacedName types.NamespacedName) logr.Logger {
+func (r *RedisClusterReconciler) getHelperLogger(RCNamespacedName types.NamespacedName) logr.Logger {
 	return r.Log.WithValues("redis-cluster", RCNamespacedName)
 }

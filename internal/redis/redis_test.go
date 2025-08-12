@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	redisv1 "github.com/inditextech/redisoperator/api/v1"
+	"github.com/inditextech/redisoperator/internal/common"
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -19,47 +19,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-type slotsTests struct {
-	Nodes int
-	Slots []*NodesSlots
-}
-
-var slots = []slotsTests{
-	{
-		0, []*NodesSlots{},
-	},
-	{
-		1, []*NodesSlots{
-			{Start: 0, End: 16383},
-		},
-	},
-	{
-		2, []*NodesSlots{
-			{Start: 0, End: 8191},
-			{Start: 8192, End: 16383},
-		},
-	},
-	{
-		3, []*NodesSlots{
-			{Start: 0, End: 5460},
-			{Start: 5461, End: 10921},
-			{Start: 10922, End: 16383},
-		},
-	},
-	{
-		4, []*NodesSlots{
-			{Start: 0, End: 4095},
-			{Start: 4096, End: 8191},
-			{Start: 8192, End: 12287},
-			{Start: 12288, End: 16383},
-		},
-	},
-}
-
 var replicas = int32(3)
 var defaultLabels = map[string]string{
 	RedisClusterLabel:          "rediscluster",
-	RedisClusterComponentLabel: "redis",
+	RedisClusterComponentLabel: common.ComponentLabelRedis,
 }
 
 var redisStatefulSet = &appsv1.StatefulSet{
@@ -152,7 +115,7 @@ var redisService = &corev1.Service{
 				},
 			},
 		},
-		Selector:  map[string]string{RedisClusterLabel: "rediscluster", RedisClusterComponentLabel: "redis"},
+		Selector:  map[string]string{RedisClusterLabel: "rediscluster", RedisClusterComponentLabel: common.ComponentLabelRedis},
 		ClusterIP: "None",
 	},
 }
@@ -209,29 +172,6 @@ var podTemplateSpec = &corev1.PodTemplateSpec{
 			},
 		},
 	},
-}
-
-func TestSlotsPerNode(t *testing.T) {
-	slotsNum, _ := slotsPerNode(3, 16384)
-	slotsShouldBe := 5461
-	if slotsNum != slotsShouldBe {
-		t.Errorf("Slots should be %d", slotsShouldBe)
-	}
-}
-
-func TestSlotsNode(t *testing.T) {
-	for i := range slots {
-		nodeSlots := SplitNodeSlots(slots[i].Nodes)
-		if len(nodeSlots) != slots[i].Nodes {
-			t.Errorf("(seq %d) NodeSlots number should be %d, got %d", i, slots[i].Nodes, len(nodeSlots))
-			t.FailNow()
-		}
-		for j := 0; j < len(slots[i].Slots); j++ {
-			if slots[i].Slots[j].Start != nodeSlots[j].Start {
-				t.Errorf("Expected sequence %d, Start:%d (got %d), End:%d (got %d)", slots[i].Nodes, slots[i].Slots[j].Start, nodeSlots[j].Start, slots[i].Slots[j].End, nodeSlots[j].End)
-			}
-		}
-	}
 }
 
 func TestConfigStringToMap(t *testing.T) {
@@ -394,29 +334,6 @@ func TestMapToConfigString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := MapToConfigString(tt.args.config); strings.TrimSpace(got) != tt.want {
-				t.Errorf("MapToConfigString() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestStateParser(t *testing.T) {
-	tests := []struct {
-		name string
-		args string
-		want map[string]string
-	}{
-		{"test_conf_empty", "", map[string]string{}},
-		{"test_conf_3_lines", `
-cluster_state:ok
-cluster_slots_ok:16384
-cluster_slots_pfail:0
-`, map[string]string{"cluster_state": "ok", "cluster_slots_ok": "16384", "cluster_slots_pfail": "0"},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := GetClusterInfo(tt.args); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("MapToConfigString() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1163,7 +1080,7 @@ func Test_ApplyServiceOverride(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "rediscluster",
 					Namespace:   "default",
-					Labels:      map[string]string{RedisClusterLabel: "rediscluster", RedisClusterComponentLabel: "redis", "new-label": "new-value"},
+					Labels:      map[string]string{RedisClusterLabel: "rediscluster", RedisClusterComponentLabel: common.ComponentLabelRedis, "new-label": "new-value"},
 					Annotations: map[string]string{"new-annotation": "new-value"},
 				},
 				Spec: corev1.ServiceSpec{
@@ -1177,7 +1094,7 @@ func Test_ApplyServiceOverride(t *testing.T) {
 							},
 						},
 					},
-					Selector:  map[string]string{RedisClusterLabel: "rediscluster", RedisClusterComponentLabel: "redis"},
+					Selector:  map[string]string{RedisClusterLabel: "rediscluster", RedisClusterComponentLabel: common.ComponentLabelRedis},
 					ClusterIP: "None",
 				},
 			},
@@ -1211,7 +1128,7 @@ func Test_ApplyServiceOverride(t *testing.T) {
 							},
 						},
 					},
-					Selector:  map[string]string{RedisClusterLabel: "rediscluster", RedisClusterComponentLabel: "redis", "new-selector": "new-value"},
+					Selector:  map[string]string{RedisClusterLabel: "rediscluster", RedisClusterComponentLabel: common.ComponentLabelRedis, "new-selector": "new-value"},
 					ClusterIP: "None",
 				},
 			},
@@ -1239,7 +1156,7 @@ func Test_ApplyServiceOverride(t *testing.T) {
 							},
 						},
 					},
-					Selector:  map[string]string{RedisClusterLabel: "rediscluster", RedisClusterComponentLabel: "redis", "new-selector": "new-value"},
+					Selector:  map[string]string{RedisClusterLabel: "rediscluster", RedisClusterComponentLabel: common.ComponentLabelRedis, "new-selector": "new-value"},
 					ClusterIP: "None",
 				},
 			},
@@ -1347,162 +1264,6 @@ func Test_ApplyServiceOverride(t *testing.T) {
 			} else {
 				assert.Equal(t, tt.expected, ret)
 			}
-		})
-	}
-}
-
-func Test_ParseClusterNodes(t *testing.T) {
-	tests := []struct {
-		name     string
-		nodes    string
-		expected map[string]redisv1.RedisNode
-	}{
-		{
-			name:     "empty",
-			nodes:    "",
-			expected: map[string]redisv1.RedisNode{},
-		},
-		{
-			name:  "one node",
-			nodes: "99a26dea0546294e0c71116d3bf19988e7e0c8d6 10.253.11.163:6379@16379 master - 0 1731943294050 2 connected 10924-16383",
-			expected: map[string]redisv1.RedisNode{
-				"99a26dea0546294e0c71116d3bf19988e7e0c8d6": {
-					IP:        "10.253.11.163",
-					IsMaster:  true,
-					ReplicaOf: "-",
-				},
-			},
-		},
-		{
-			name:  "three nodes",
-			nodes: "99a26dea0546294e0c71116d3bf19988e7e0c8d6 10.253.11.163:6379@16379 master - 0 1731943294050 2 connected 10924-16383\nd0c6e27fb02809df7d5228495271bb913c00b9b6 10.252.50.249:6379@16379 myself,master - 0 1731943295000 3 connected 0-5461\nc741da5670690ac369554920b2104fcea497dd39 10.253.22.151:6379@16379 master - 0 1731943295054 1 connected 5462-10923",
-			expected: map[string]redisv1.RedisNode{
-				"99a26dea0546294e0c71116d3bf19988e7e0c8d6": {
-					IP:        "10.253.11.163",
-					IsMaster:  true,
-					ReplicaOf: "-",
-				},
-				"d0c6e27fb02809df7d5228495271bb913c00b9b6": {
-					IP:        "10.252.50.249",
-					IsMaster:  true,
-					ReplicaOf: "-",
-				},
-				"c741da5670690ac369554920b2104fcea497dd39": {
-					IP:        "10.253.22.151",
-					IsMaster:  true,
-					ReplicaOf: "-",
-				},
-			},
-		},
-		{
-			name: "masters and slaves",
-			nodes: `99a26dea0546294e0c71116d3bf19988e7e0c8d6 10.253.11.163:6379@16379 master - 0 1731943294050 2 connected 10924-16383
-f7384d326d1288d709e0e601e3e26522b88c5f18 10.252.52.88:6379@16379 slave d0c6e27fb02809df7d5228495271bb913c00b9b6 0 1731943296058 3 connected
-d0c6e27fb02809df7d5228495271bb913c00b9b6 10.252.50.249:6379@16379 myself,master - 0 1731943295000 3 connected 0-5461
-a0229f5ef1220384f08b1181c3c02cdc8003be91 10.252.27.66:6379@16379 slave c741da5670690ac369554920b2104fcea497dd39 0 1731943293000 1 connected
-c741da5670690ac369554920b2104fcea497dd39 10.253.22.151:6379@16379 master - 0 1731943295054 1 connected 5462-10923
-f6568b0764978967697713eb26f8434ee78442f4 10.252.31.54:6379@16379 slave 99a26dea0546294e0c71116d3bf19988e7e0c8d6 0 1731943293044 2 connected`,
-			expected: map[string]redisv1.RedisNode{
-				"99a26dea0546294e0c71116d3bf19988e7e0c8d6": {
-					IP:        "10.253.11.163",
-					IsMaster:  true,
-					ReplicaOf: "-",
-				},
-				"f7384d326d1288d709e0e601e3e26522b88c5f18": {
-					IP:        "10.252.52.88",
-					IsMaster:  false,
-					ReplicaOf: "d0c6e27fb02809df7d5228495271bb913c00b9b6",
-				},
-				"d0c6e27fb02809df7d5228495271bb913c00b9b6": {
-					IP:        "10.252.50.249",
-					IsMaster:  true,
-					ReplicaOf: "-",
-				},
-				"a0229f5ef1220384f08b1181c3c02cdc8003be91": {
-					IP:        "10.252.27.66",
-					IsMaster:  false,
-					ReplicaOf: "c741da5670690ac369554920b2104fcea497dd39",
-				},
-				"c741da5670690ac369554920b2104fcea497dd39": {
-					IP:        "10.253.22.151",
-					IsMaster:  true,
-					ReplicaOf: "-",
-				},
-				"f6568b0764978967697713eb26f8434ee78442f4": {
-					IP:        "10.252.31.54",
-					IsMaster:  false,
-					ReplicaOf: "99a26dea0546294e0c71116d3bf19988e7e0c8d6",
-				},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ret := ParseClusterNodes(tt.nodes)
-			assert.Equal(t, tt.expected, ret)
-		})
-	}
-}
-
-func Test_GetRedisCLIFromInfo(t *testing.T) {
-	tests := []struct {
-		name     string
-		nodeInfo string
-		expected string
-	}{
-		{
-			name:     "empty",
-			nodeInfo: "",
-			expected: "",
-		},
-		{
-			name: "no version",
-			nodeInfo: `# Clients
-connected_clients:1
-cluster_connections:0
-maxclients:10000
-client_recent_max_input_buffer:0
-client_recent_max_output_buffer:0
-blocked_clients:0
-tracking_clients:0
-clients_in_timeout_table:0`,
-			expected: "",
-		},
-		{
-			name: "version found",
-			nodeInfo: `# Server
-redis_version:6.2.6
-redis_git_sha1:00000000
-redis_git_dirty:0
-redis_build_id:e8e2bc7f9bdc37ba
-redis_mode:cluster
-os:Linux 5.14.0-284.90.1.el9_2.x86_64 x86_64
-arch_bits:64
-multiplexing_api:epoll
-atomicvar_api:c11-builtin
-gcc_version:7.5.0
-process_id:1
-process_supervised:no
-run_id:7ad9465f02d5c6833ddfd85e56e0db4d93ff12ed
-tcp_port:6379
-server_time_usec:1737964466814572
-uptime_in_seconds:329258
-uptime_in_days:3
-hz:10
-configured_hz:10
-lru_clock:9911218
-executable:/data/redis-server
-config_file:/conf/redis.conf
-io_threads_active:0`,
-			expected: "6.2.6",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ret := GetRedisCLIFromInfo(tt.nodeInfo)
-			assert.Equal(t, tt.expected, ret)
 		})
 	}
 }
@@ -1620,7 +1381,7 @@ func Test_ApplyPodTemplateSpecOverride(t *testing.T) {
 			},
 			expected: &corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:      map[string]string{"new-label": "new-value", RedisClusterLabel: "rediscluster", RedisClusterComponentLabel: "redis"},
+					Labels:      map[string]string{"new-label": "new-value", RedisClusterLabel: "rediscluster", RedisClusterComponentLabel: common.ComponentLabelRedis},
 					Annotations: map[string]string{"new-annotation": "new-value"},
 				},
 				Spec: corev1.PodSpec{},

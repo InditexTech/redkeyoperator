@@ -7969,8 +7969,6 @@ spec:
                       type: boolean
                     name:
                       type: string
-                    redisCLI:
-                      type: string
                     replicaOf:
                       type: string
                   required:
@@ -7987,7 +7985,7 @@ spec:
                   status:
                     type: string
                   upgradingPartition:
-                    type: integer
+                    type: string
                 type: object
             required:
             - nodes

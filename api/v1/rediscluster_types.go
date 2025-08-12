@@ -46,19 +46,28 @@ import (
 //   - Scaling up when in StatusScalingUp status goes wrong.
 //   - Scaling down when in StatusScalingDown status goes wrong.
 //     The operator tries to recover the cluster from error checking the configuration and/or scaling the cluster.
-var StatusUpgrading = "Upgrading"
-var StatusScalingDown = "ScalingDown"
-var StatusScalingUp = "ScalingUp"
+const (
+	StatusUpgrading    = "Upgrading"
+	StatusScalingDown  = "ScalingDown"
+	StatusScalingUp    = "ScalingUp"
+	StatusReady        = "Ready"
+	StatusConfiguring  = "Configuring"
+	StatusInitializing = "Initializing"
+	StatusError        = "Error"
 
-var StatusReady = "Ready"
-var StatusConfiguring = "Configuring"
-var StatusInitializing = "Initializing"
-var StatusError = "Error"
+	SubstatusFastUpgrading        = "FastUpgrading"
+	SubstatusEndingFastUpgrading  = "EndingFastUpgrading"
+	SubstatusSlowUpgrading        = "SlowUpgrading"
+	SubstatusUpgradingScalingUp   = "ScalingUp"
+	SubstatusUpgradingScalingDown = "ScalingDown"
+	SubstatusEndingSlowUpgrading  = "EndingSlowUpgrading"
 
-var SubstatusFastUpgrading = "FastUpgrading"
-var SubstatusScalingUp = "ScalingUp"
-var SubstatusSlowUpgrading = "SlowUpgrading"
-var SubstatusScalingDown = "ScalingDown"
+	SubstatusFastScaling       = "FastScaling"
+	SubstatusEndingFastScaling = "EndingFastScaling"
+	SubstatusScalingPods       = "PodScaling"
+	SubstatusScalingRobin      = "RobinScaling"
+	SubstatusEndingScaling     = "EndingScaling"
+)
 
 var ConditionUpgrading = metav1.Condition{
 	Type:               "Upgrading",
@@ -202,7 +211,7 @@ type RedisClusterStatus struct {
 
 type RedisClusterSubstatus struct {
 	Status             string `json:"status,omitempty"`
-	UpgradingPartition int    `json:"upgradingPartition,omitempty"`
+	UpgradingPartition string `json:"upgradingPartition,omitempty"`
 }
 
 type SlotRange struct {
@@ -215,7 +224,6 @@ type RedisNode struct {
 	IP        string `json:"ip"`
 	IsMaster  bool   `json:"isMaster"`
 	ReplicaOf string `json:"replicaOf"`
-	RedisCLI  string `json:"redisCLI,omitempty"`
 }
 
 type RedisAuth struct {
@@ -268,4 +276,32 @@ func (r RedisCluster) NamespacedName() types.NamespacedName {
 		Namespace: r.GetNamespace(),
 		Name:      r.GetName(),
 	}
+}
+
+func CompareStatuses(a, b *RedisClusterStatus) bool {
+	if a.Status != b.Status {
+		return false
+	}
+	if a.Substatus.Status != b.Substatus.Status {
+		return false
+	}
+	for _, nodeA := range a.Nodes {
+		nodeB := RedisNode{}
+		for _, node := range b.Nodes {
+			if node.Name == nodeA.Name {
+				nodeB = *node
+				break
+			}
+		}
+		if nodeA.Name != nodeB.Name || nodeA.IP != nodeB.IP || nodeA.IsMaster != nodeB.IsMaster || nodeA.ReplicaOf != nodeB.ReplicaOf {
+			return false
+		}
+	}
+
+	return true
+}
+
+func IsFastOperationStatus(status RedisClusterSubstatus) bool {
+	return status.Status == SubstatusFastScaling || status.Status == SubstatusEndingFastScaling ||
+		status.Status == SubstatusFastUpgrading || status.Status == SubstatusEndingFastUpgrading
 }

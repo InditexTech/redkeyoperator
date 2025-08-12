@@ -10,7 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"net"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -19,11 +19,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	redisclient "github.com/redis/go-redis/v9"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	redisv1 "github.com/inditextech/redisoperator/api/v1"
+	"github.com/inditextech/redisoperator/internal/common"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -35,8 +32,6 @@ const RedisGossPort = 16379
 const RedisClusterLabel = "redis-cluster-name"
 const RedisClusterComponentLabel = "redis.rediscluster.operator/component"
 
-const TotalClusterSlots = 16384
-
 var defaultPort = corev1.ServicePort{
 	Name:     "client",
 	Protocol: "TCP",
@@ -45,117 +40,6 @@ var defaultPort = corev1.ServicePort{
 		Type:   0,
 		IntVal: RedisCommPort,
 	},
-}
-
-type NodesSlots struct {
-	Start int
-	End   int
-}
-
-func GetRedisSecret(ctx context.Context, client client.Client, redisCluster *redisv1.RedisCluster) (string, error) {
-	if redisCluster.Spec.Auth.SecretName == "" {
-		return "", nil
-	}
-
-	secret := &corev1.Secret{}
-	err := client.Get(ctx, types.NamespacedName{Name: redisCluster.Spec.Auth.SecretName, Namespace: redisCluster.Namespace}, secret)
-	if err != nil {
-		return "", err
-	}
-	redisSecret := string(secret.Data["requirepass"])
-	return redisSecret, nil
-}
-
-func GetRedisClient(ctx context.Context, ip string, secret string) *redisclient.Client {
-	redisclient.NewClusterClient(&redisclient.ClusterOptions{})
-	rdb := redisclient.NewClient(&redisclient.Options{
-		Addr:     fmt.Sprintf("%s:%d", ip, RedisCommPort),
-		Password: secret,
-		DB:       0,
-	})
-	return rdb
-}
-
-func NeedsClusterMeet(ctx context.Context, client client.Client, nodes map[string]*redisv1.RedisNode, redisCluster *redisv1.RedisCluster) (bool, error) {
-	// Compile a map of all the IPs which should be listed for each node.
-	// We are using a map to make it faster, as searching a has table is better than a list
-	ipList := map[string]struct{}{}
-	for _, node := range nodes {
-		ipList[node.IP] = struct{}{}
-	}
-
-	// Now for every node, make sure that the nodes it knows about, is the same as the nodes we know about.
-	for _, node := range nodes {
-		secret, _ := GetRedisSecret(ctx, client, redisCluster)
-		redisClient := GetRedisClient(ctx, node.IP, secret)
-		err := redisClient.Ping(ctx).Err()
-		if err != nil {
-			redisClient.Close()
-			return false, err
-		}
-		clusterNodes, err := redisClient.Do(ctx, "CLUSTER", "NODES").Text()
-		redisClient.Close()
-		if err != nil {
-			return false, err
-		}
-		clusterNodeStrings := strings.Split(clusterNodes, "\n")
-		// name addr flags role ping_sent ping_recv link_status slots
-		for _, val := range clusterNodeStrings {
-			parts := strings.Split(val, " ")
-			if len(parts) <= 3 {
-				continue
-			}
-
-			addr := strings.Split(parts[1], "@")[0]
-			host, _, _ := net.SplitHostPort(addr)
-			// If the IP does not exist in our list,
-			// we are probably using an outdated one and should ClusterMeet.
-			if _, ok := ipList[host]; !ok {
-				return true, nil
-			}
-		}
-	}
-	return false, nil
-}
-
-func ParseClusterNodes(nodes string) map[string]redisv1.RedisNode {
-	clusterNodes := make(map[string]redisv1.RedisNode, 0)
-
-	if nodes == "" {
-		return clusterNodes
-	}
-
-	nodesSplit := strings.Split(nodes, "\n")
-
-	for _, val := range nodesSplit {
-		// name addr flags role ping_sent ping_recv link_status slots
-		parts := strings.Split(val, " ")
-		if len(parts) < 4 {
-			continue
-		}
-
-		clusterNodes[parts[0]] = redisv1.RedisNode{
-			IP:        strings.Split(parts[1], ":")[0],
-			IsMaster:  strings.Contains(parts[2], "master"),
-			ReplicaOf: parts[3],
-		}
-	}
-
-	return clusterNodes
-}
-
-func GetRedisCLIFromInfo(nodeInfo string) string {
-	if nodeInfo == "" {
-		return ""
-	}
-
-	infoSplit := strings.Split(nodeInfo, "\n")
-	for _, val := range infoSplit {
-		if strings.Contains(val, "redis_version") {
-			return strings.TrimRight(strings.Split(val, ":")[1], "\r")
-		}
-	}
-	return ""
 }
 
 func CreateStatefulSet(ctx context.Context, req ctrl.Request, spec redisv1.RedisClusterSpec, labels map[string]string) (*v1.StatefulSet, error) {
@@ -170,7 +54,7 @@ func CreateStatefulSet(ctx context.Context, req ctrl.Request, spec redisv1.Redis
 
 	defaultLabels := map[string]string{
 		RedisClusterLabel:          req.Name,
-		RedisClusterComponentLabel: "redis",
+		RedisClusterComponentLabel: common.ComponentLabelRedis,
 	}
 
 	// Add default labels and apply them to the statefulset.
@@ -195,7 +79,7 @@ func CreateStatefulSet(ctx context.Context, req ctrl.Request, spec redisv1.Redis
 			ServiceName: req.Name,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{RedisClusterLabel: req.Name, RedisClusterComponentLabel: "redis"},
+					Labels: map[string]string{RedisClusterLabel: req.Name, RedisClusterComponentLabel: common.ComponentLabelRedis},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -375,11 +259,12 @@ func AddStatefulSetStorage(statefulSet *v1.StatefulSet, req ctrl.Request, spec r
 	accessModesTypes := make([]corev1.PersistentVolumeAccessMode, 0, 3)
 	if accessModes != nil {
 		for _, volumeAccessMode := range accessModes {
-			if volumeAccessMode == corev1.ReadOnlyMany {
+			switch volumeAccessMode {
+			case corev1.ReadOnlyMany:
 				accessModesTypes = append(accessModesTypes, corev1.ReadOnlyMany)
-			} else if volumeAccessMode == corev1.ReadWriteMany {
+			case corev1.ReadWriteMany:
 				accessModesTypes = append(accessModesTypes, corev1.ReadWriteMany)
-			} else {
+			default:
 				accessModesTypes = append(accessModesTypes, corev1.ReadWriteOnce)
 			}
 		}
@@ -446,7 +331,7 @@ func CreateService(Namespace, Name string, labels map[string]string) *corev1.Ser
 			Ports: []corev1.ServicePort{
 				defaultPort,
 			},
-			Selector:  map[string]string{RedisClusterLabel: Name, RedisClusterComponentLabel: "redis"},
+			Selector:  map[string]string{RedisClusterLabel: Name, RedisClusterComponentLabel: common.ComponentLabelRedis},
 			ClusterIP: "None",
 		},
 	}
@@ -507,7 +392,7 @@ func cleanServiceResult(result, original, override *corev1.Service) {
 
 	// Assure to clean selector if override does not set them
 	if len(override.Spec.Selector) == 0 {
-		result.Spec.Selector = map[string]string{RedisClusterLabel: original.Name, RedisClusterComponentLabel: "redis"}
+		result.Spec.Selector = map[string]string{RedisClusterLabel: original.Name, RedisClusterComponentLabel: common.ComponentLabelRedis}
 	}
 }
 
@@ -604,7 +489,7 @@ func ConfigStringToMap(config string) map[string][]string {
 		value := strings.Join(kv[1:], " ")
 
 		// Add the value to the slice associated with the key
-		if !contains(configMap[key], value) {
+		if !slices.Contains(configMap[key], value) {
 			configMap[key] = append(configMap[key], value)
 		} else {
 			log.Printf("Duplicate configuration detected for key %s: %s", key, value)
@@ -612,16 +497,6 @@ func ConfigStringToMap(config string) map[string][]string {
 	}
 
 	return configMap
-}
-
-// Helper function to check if a slice contains a specific string.
-func contains(slice []string, str string) bool {
-	for _, v := range slice {
-		if v == str {
-			return true
-		}
-	}
-	return false
 }
 
 func GenerateRedisConfig(redisCluster *redisv1.RedisCluster) string {
@@ -800,47 +675,6 @@ func MergeWithDefaultConfig(newConfig map[string][]string, ephemeral bool, repli
 	return allowConfiguration
 }
 
-func slotsPerNode(numOfNodes int, slots int) (int, int) {
-	if numOfNodes == 0 {
-		return 0, 0
-	}
-	slotsNodes := slots / numOfNodes
-	resto := slots % numOfNodes
-	return slotsNodes, resto
-}
-
-func SplitNodeSlots(nodesTotal int) []*NodesSlots {
-	nodesSlots := []*NodesSlots{}
-	numOfNodes := nodesTotal
-	slotsNode, resto := slotsPerNode(numOfNodes, TotalClusterSlots)
-	slotsAsigment := []string{}
-	for i := 0; i < numOfNodes; i++ {
-		if i == 0 {
-			slotsAsigment = append(slotsAsigment, fmt.Sprintf("0,%s", strconv.Itoa(slotsNode-1)))
-		} else if i == 1 {
-			slotsAsigment = append(slotsAsigment, fmt.Sprintf("%s,%s", strconv.Itoa(slotsNode*i), strconv.Itoa(slotsNode*(i+1)-1)))
-		} else if i == numOfNodes-1 {
-			slotsAsigment = append(slotsAsigment, fmt.Sprintf("%s,%s", strconv.Itoa(slotsNode*i), strconv.Itoa(slotsNode*(i+1)-1+resto)))
-		} else {
-			slotsAsigment = append(slotsAsigment, fmt.Sprintf("%s,%s", strconv.Itoa((slotsNode*i)), strconv.Itoa(slotsNode*(i+1)-1)))
-		}
-	}
-	for i := 0; i < numOfNodes; i++ {
-		stringRangeSplit := strings.Split(slotsAsigment[i], ",")
-		start, err := strconv.Atoi(stringRangeSplit[0])
-		if err != nil {
-			log.Printf("Error assignSlotsToNodes: strconv.Atoi(stringRangeSplit[0] - %s", err)
-		}
-
-		end, err := strconv.Atoi(stringRangeSplit[1])
-		if err != nil {
-			log.Printf("Error assignSlotsToNodes: strconv.Atoi(stringRangeSplit[1] - %s", err)
-		}
-		nodesSlots = append(nodesSlots, &NodesSlots{start, end})
-	}
-	return nodesSlots
-}
-
 func convertRedisMemToMbytes(maxMemory string) (int, error) {
 	maxMemory = strings.ToLower(maxMemory)
 	var maxMemoryInt int
@@ -865,16 +699,4 @@ func convertRedisMemToMbytes(maxMemory string) (int, error) {
 		maxMemoryInt = maxMemoryInt / 1024 / 1024
 	}
 	return maxMemoryInt, err
-}
-
-func GetClusterInfo(state string) map[string]string {
-	lines := strings.Split(strings.ReplaceAll(state, "\r\n", "\n"), "\n")
-	clusterstate := make(map[string]string)
-	for _, line := range lines {
-		kvmap := strings.Split(line, ":")
-		if len(kvmap) == 2 {
-			clusterstate[kvmap[0]] = kvmap[1]
-		}
-	}
-	return clusterstate
 }

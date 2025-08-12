@@ -127,12 +127,6 @@ func newReadyNodes(amount int) map[string]*redisv1.RedisNode {
 	return readyNodes
 }
 
-func mockClusterInfo(ci map[string]string) func(ctx context.Context, redisCluster *redisv1.RedisCluster) map[string]string {
-	return func(ctx context.Context, redisCluster *redisv1.RedisCluster) map[string]string {
-		return ci
-	}
-}
-
 func mockStatefulSet(sset *v1.StatefulSet) func(ctx context.Context, req ctrl.Request) (*v1.StatefulSet, error) {
 	return func(ctx context.Context, req ctrl.Request) (*v1.StatefulSet, error) {
 		return sset, nil

@@ -10,6 +10,7 @@ import (
 	redisv1 "github.com/inditextech/redisoperator/api/v1"
 	"github.com/inditextech/redisoperator/internal/redis"
 	v1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	pv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -25,6 +26,15 @@ func FindExistingStatefulSet(ctx context.Context, client client.Client, req ctrl
 		return nil, err
 	}
 	return statefulset, nil
+}
+
+func FindExistingConfigMap(ctx context.Context, client client.Client, req ctrl.Request) (*corev1.ConfigMap, error) {
+	cmap := &corev1.ConfigMap{}
+	err := client.Get(ctx, types.NamespacedName{Name: req.Name, Namespace: req.Namespace}, cmap)
+	if err != nil {
+		return nil, err
+	}
+	return cmap, nil
 }
 
 func GetStatefulSetSelectorLabel(ctx context.Context, client client.Client, redisCluster *redisv1.RedisCluster) string {

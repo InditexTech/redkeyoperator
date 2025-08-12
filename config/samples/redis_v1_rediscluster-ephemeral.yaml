@@ -27,67 +27,72 @@ spec:
     limits:
       cpu: 100m
       memory: 128Mi
-  # robin:
-  #   config: |
-  #     metadata:
-  #       namespace: redis-operator
-  #     redis:
-  #       operator:
-  #         collection_interval_seconds: 60
-  #       cluster:
-  #         replicas: 1
-  #         namespace: redis-operator
-  #         health_probe_interval_seconds: 60
-  #         healing_time_seconds: 60
-  #         service_name: "rediscluster-ephemeral"
-  #         max_retries: 2
-  #         back_off: 10s
-  #       metrics:
-  #         version: 0.10.2.0
-  #         redis_info_keys:
-  #           - keyspace_hits
-  #           - evicted_keys
-  #           - connected_clients
-  #           - total_commands_processed
-  #           - keyspace_misses
-  #           - expired_keys
-  #           - redis_version
-  #           - used_memory_rss
-  #           - maxmemory
-  #           - used_cpu_sys
-  #           - used_cpu_sys_children
-  #           - used_cpu_user
-  #           - used_cpu_user_children
-  #           - total_net_input_bytes
-  #           - total_net_output_bytes
-  #           - aof_base_size
-  #           - aof_current_size
-  #           - mem_aof_buffer
-  #   template:
-  #     spec:
-  #       containers:
-  #         - image: 'redis-robin:0.1.0'
-  #           name: robin
-  #           imagePullPolicy: Always
-  #           ports:
-  #             - containerPort: 8080
-  #               name: prometheus
-  #               protocol: TCP
-  #           volumeMounts:
-  #             - mountPath: /opt/conf/configmap
-  #               name: redis-cluster-ephemeral-robin-config
-  #           resources:
-  #             requests:
-  #               cpu: 500m
-  #               memory: 100Mi
-  #             limits:
-  #               cpu: 1
-  #               memory: 200Mi
-  #       volumes:
-  #         - configMap:
-  #             defaultMode: 420
-  #             name: redis-cluster-ephemeral-robin
-  #           name: redis-cluster-ephemeral-robin-config
+  robin:
+    config: |
+      metadata:
+        namespace: redis-operator
+      redis:
+        standalone: false
+        reconciler:
+          interval_seconds: 30
+          operation_cleanup_interval_seconds: 30
+        cluster:
+          namespace: redis-operator
+          name: redis-cluster-ephemeral
+          replicas: 3
+          replicas_per_master: 0
+          status: 'Unknown'
+          ephemeral: true
+          health_probe_interval_seconds: 60
+          healing_time_seconds: 60
+          max_retries: 10
+          back_off: 10s
+        metrics:
+          interval_seconds: 60
+          redis_info_keys:
+            - keyspace_hits
+            - evicted_keys
+            - connected_clients
+            - total_commands_processed
+            - keyspace_misses
+            - expired_keys
+            - redis_version
+            - used_memory_rss
+            - maxmemory
+            - used_cpu_sys
+            - used_cpu_sys_children
+            - used_cpu_user
+            - used_cpu_user_children
+            - total_net_input_bytes
+            - total_net_output_bytes
+            - aof_base_size
+            - aof_current_size
+            - mem_aof_buffer
+    template:
+      spec:
+        containers:
+          - image: k3d-redis.localhost:5005/redis-robin:0.1.0
+            name: robin
+            imagePullPolicy: Always
+            ports:
+              - containerPort: 8080
+                name: prometheus
+                protocol: TCP
+            volumeMounts:
+              - mountPath: /opt/conf/configmap
+                name: redis-cluster-ephemeral-robin-config
+            resources:
+              requests:
+                cpu: 500m
+                memory: 100Mi
+              limits:
+                cpu: 1
+                memory: 200Mi
+        volumes:
+          - configMap:
+              defaultMode: 420
+              name: redis-cluster-ephemeral-robin
+            name: redis-cluster-ephemeral-robin-config
   # override:
   #   service:
   #     metadata:
