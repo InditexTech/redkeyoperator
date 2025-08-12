@@ -111,6 +111,7 @@ type RedKeyClusterSpec struct {
 	Replicas int32 `json:"replicas"`
 
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=0
 	// ReplicasPerMaster specifies how many replicas should be attached to each Redis Master
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Number of replicas per Master Node"
 	ReplicasPerMaster int32 `json:"replicasPerMaster,omitempty"`
@@ -239,7 +240,10 @@ type Pdb struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=rkcl
 // +kubebuilder:storageversion
-// +kubebuilder:printcolumn:name="Replicas",type="integer",JSONPath=".spec.replicas",description="Amount of Redis nodes"
+// +kubebuilder:printcolumn:name="Masters",type="integer",JSONPath=".spec.replicas",description="Amount of Redis master nodes"
+// +kubebuilder:printcolumn:name="Replicas",type="integer",JSONPath=".spec.replicasPerMaster",description="Amount of Redis replicas per master node"
+// +kubebuilder:printcolumn:name="Ephemeral",type="boolean",JSONPath=".spec.ephemeral",description="Redis cluster ephemeral"
+// +kubebuilder:printcolumn:name="PurgeKeys",type="boolean",JSONPath=".spec.purgeKeysOnRebalance",description="Purge keys on rebalance"
 // +kubebuilder:printcolumn:name="Image",type="string",JSONPath=".spec.image",description="Source image for Redis instance"
 // +kubebuilder:printcolumn:name="Storage",type="string",JSONPath=".spec.storage",description="Amount of storage for Redis"
 // +kubebuilder:printcolumn:name="StorageClassName",type="string",JSONPath=".spec.storageClassName",description="Storage Class to be used by the PVC"
