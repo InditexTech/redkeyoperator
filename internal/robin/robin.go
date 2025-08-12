@@ -52,7 +52,7 @@ type Configuration struct {
 type RedisConfig struct {
 	Standalone bool                  `yaml:"standalone"`
 	Reconciler RedisReconcilerConfig `yaml:"reconciler"`
-	Cluster    RedKeyClusterConfig    `yaml:"cluster"`
+	Cluster    RedKeyClusterConfig   `yaml:"cluster"`
 	Metrics    RedisMetricsConfig    `yaml:"metrics"`
 }
 
