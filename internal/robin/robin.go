@@ -40,6 +40,15 @@ const (
 	StatusMaintenance  = "Maintenance"
 	StatusUnknown      = "Unknown"
 	Port               = 8080
+
+	EndpoingProtocolPrefix = "http://"
+	EndpointStatus         = "/v1/redkeycluster/status"
+	EndpointReplicas       = "/v1/redkeycluster/replicas"
+	EndpointClusterCheck   = "/v1/cluster/check"
+	EndpointClusterNodes   = "/v1/cluster/nodes"
+	EndpointClusterFix     = "/v1/cluster/fix"
+	EndpointClusterMove    = "/v1/cluster/move"
+	EndpointClusterReset   = "/v1/cluster/reset/"
 )
 
 // Configuration is the top-level configuration struct.
@@ -168,7 +177,7 @@ func NewRobin(ctx context.Context, client ctrlClient.Client, redkeyCluster *redk
 }
 
 func (r *Robin) GetStatus() (string, error) {
-	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/rediscluster/status"
+	url := EndpoingProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointStatus
 
 	body, err := doSimpleGet(url)
 	if err != nil {
@@ -185,7 +194,7 @@ func (r *Robin) GetStatus() (string, error) {
 }
 
 func (r *Robin) SetStatus(status string) error {
-	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/rediscluster/status"
+	url := EndpoingProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointStatus
 
 	var statusParam Status
 	statusParam.Status = status
@@ -204,7 +213,7 @@ func (r *Robin) SetStatus(status string) error {
 }
 
 func (r *Robin) GetReplicas() (int, int, error) {
-	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/rediscluster/replicas"
+	url := EndpoingProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointReplicas
 
 	body, err := doSimpleGet(url)
 	if err != nil {
@@ -221,7 +230,7 @@ func (r *Robin) GetReplicas() (int, int, error) {
 }
 
 func (r *Robin) SetReplicas(clusterReplicas int, clusterReplicasPerMaster int) error {
-	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/rediscluster/replicas"
+	url := EndpoingProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointReplicas
 
 	var replicas ClusterReplicas
 	replicas.Replicas = clusterReplicas
@@ -241,7 +250,7 @@ func (r *Robin) SetReplicas(clusterReplicas int, clusterReplicasPerMaster int) e
 }
 
 func (r *Robin) ClusterCheck() (bool, []string, []string, error) {
-	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/cluster/check"
+	url := EndpoingProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointClusterCheck
 
 	body, err := doSimpleGet(url)
 	if err != nil {
@@ -262,7 +271,7 @@ func (r *Robin) ClusterCheck() (bool, []string, []string, error) {
 }
 
 func (r *Robin) GetClusterNodes() (ClusterNodes, error) {
-	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/cluster/nodes"
+	url := EndpoingProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointClusterNodes
 	var clusterNodes ClusterNodes
 
 	body, err := doSimpleGet(url)
@@ -278,7 +287,7 @@ func (r *Robin) GetClusterNodes() (ClusterNodes, error) {
 }
 
 func (r *Robin) ClusterFix() error {
-	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/cluster/fix"
+	url := EndpoingProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointClusterFix
 
 	var payload []byte
 	body, err := doPut(url, payload)
@@ -291,7 +300,7 @@ func (r *Robin) ClusterFix() error {
 }
 
 func (r *Robin) ClusterResetNode(nodeIndex int) error {
-	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/cluster/reset/" + strconv.Itoa(nodeIndex)
+	url := EndpoingProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointClusterReset + strconv.Itoa(nodeIndex)
 
 	var payload []byte
 	body, err := doPut(url, payload)
@@ -304,7 +313,7 @@ func (r *Robin) ClusterResetNode(nodeIndex int) error {
 }
 
 func (r *Robin) MoveSlots(nodeIndexFrom int, nodeIndexTo int, numSlots int) (bool, error) {
-	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/cluster/move"
+	url := EndpoingProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointClusterMove
 
 	var moveParam MoveSlots
 	moveParam.NodeIndexFrom = strconv.Itoa(nodeIndexFrom)
