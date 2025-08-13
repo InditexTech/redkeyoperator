@@ -240,15 +240,17 @@ type Pdb struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=rkcl
 // +kubebuilder:storageversion
-// +kubebuilder:printcolumn:name="Masters",type="integer",JSONPath=".spec.replicas",description="Amount of Redis master nodes"
-// +kubebuilder:printcolumn:name="Replicas",type="integer",JSONPath=".spec.replicasPerMaster",description="Amount of Redis replicas per master node"
-// +kubebuilder:printcolumn:name="Ephemeral",type="boolean",JSONPath=".spec.ephemeral",description="Redis cluster ephemeral"
-// +kubebuilder:printcolumn:name="PurgeKeys",type="boolean",JSONPath=".spec.purgeKeysOnRebalance",description="Purge keys on rebalance"
-// +kubebuilder:printcolumn:name="Image",type="string",JSONPath=".spec.image",description="Source image for Redis instance"
-// +kubebuilder:printcolumn:name="Storage",type="string",JSONPath=".spec.storage",description="Amount of storage for Redis"
-// +kubebuilder:printcolumn:name="StorageClassName",type="string",JSONPath=".spec.storageClassName",description="Storage Class to be used by the PVC"
-// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.status",description="The status of Redis cluster"
-// +kubebuilder:printcolumn:name="Substatus",type="string",JSONPath=".status.substatus.status",description="The substatus of Redis cluster"
+// +kubebuilder:printcolumn:name="Masters",type="integer",priority=0,JSONPath=".spec.replicas",description="Amount of Redis master nodes"
+// +kubebuilder:printcolumn:name="Replicas",type="integer",priority=0,JSONPath=".spec.replicasPerMaster",description="Amount of Redis replicas per master node"
+// +kubebuilder:printcolumn:name="Ephemeral",type="boolean",priority=0,JSONPath=".spec.ephemeral",description="Redis cluster ephemeral"
+// +kubebuilder:printcolumn:name="PurgeKeys",type="boolean",priority=0,JSONPath=".spec.purgeKeysOnRebalance",description="Purge keys on rebalance"
+// +kubebuilder:printcolumn:name="Image",type="string",priority=0,JSONPath=".spec.image",description="Source image for Redis instance"
+// +kubebuilder:printcolumn:name="Storage",type="string",priority=0,JSONPath=".spec.storage",description="Amount of storage for Redis"
+// +kubebuilder:printcolumn:name="StorageClassName",type="string",priority=10,JSONPath=".spec.storageClassName",description="Storage Class to be used by the PVC"
+// +kubebuilder:printcolumn:name="DeletePVC",type="boolean",priority=5,JSONPath=".spec.deletePVC",description="Deleve PVC"
+// +kubebuilder:printcolumn:name="Status",type="string",priority=0,JSONPath=".status.status",description="The status of Redis cluster"
+// +kubebuilder:printcolumn:name="Substatus",type="string",priority=0,JSONPath=".status.substatus.status",description="The substatus of Redis cluster"
+// +kubebuilder:printcolumn:name="Partition",type="string",priority=5,JSONPath=".status.substatus.upgradingPartition",description="Upgrading partition"
 // +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas,selectorpath=.status.selector
 // RedKeyCluster is the Schema for the redkeyclusters API
 type RedKeyCluster struct {

@@ -44,7 +44,13 @@ spec:
     - description: Storage Class to be used by the PVC
       jsonPath: .spec.storageClassName
       name: StorageClassName
+      priority: 10
       type: string
+    - description: Deleve PVC
+      jsonPath: .spec.deletePVC
+      name: DeletePVC
+      priority: 5
+      type: boolean
     - description: The status of Redis cluster
       jsonPath: .status.status
       name: Status
@@ -52,6 +58,11 @@ spec:
     - description: The substatus of Redis cluster
       jsonPath: .status.substatus.status
       name: Substatus
+      type: string
+    - description: Upgrading partition
+      jsonPath: .status.substatus.upgradingPartition
+      name: Partition
+      priority: 5
       type: string
     name: v1
     schema:
