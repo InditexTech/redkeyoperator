@@ -21,11 +21,11 @@ spec:
       jsonPath: .spec.replicas
       name: Masters
       type: integer
-    - description: Amount of Redis replicas per master node
+    - description: Amount of replicas per master node
       jsonPath: .spec.replicasPerMaster
       name: Replicas
       type: integer
-    - description: Redis cluster ephemeral
+    - description: Cluster ephemeral
       jsonPath: .spec.ephemeral
       name: Ephemeral
       type: boolean
@@ -51,11 +51,11 @@ spec:
       name: DeletePVC
       priority: 5
       type: boolean
-    - description: The status of Redis cluster
+    - description: The cluster status
       jsonPath: .status.status
       name: Status
       type: string
-    - description: The substatus of Redis cluster
+    - description: The cluster substatus
       jsonPath: .status.substatus.status
       name: Substatus
       type: string
