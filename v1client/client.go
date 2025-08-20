@@ -65,7 +65,7 @@ func (c *rdclClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.
 		Watch(ctx)
 }
 
-// V1Interface defines the interface to communicate with all GroupVersion. It now just bears a client fdr Redis Clusters
+// V1Interface defines the interface to communicate with all GroupVersion. It now just bears a client for RedKey Clusters
 type V1Interface interface {
 	RedKeyClusters(namespace string) RdclInterface
 }

@@ -1,8 +1,8 @@
 # Developer Guide
 
-Quickly provision Redis cluster environments in Kubernetes or Openshift.
+Quickly provision RedKey cluster environments in Kubernetes or Openshift.
 
-The operator relies on Redis cluster functionality to serve client requests.
+The operator relies on RedKey cluster functionality to serve client requests.
 
 ## Local development and testing
 
@@ -10,7 +10,7 @@ A *local K8s cluster* can be used to deploy the RedKey Operator from a pre-built
 
 This will be helpfull to develop and test new features, fix bugs, and test releases locally.
 
-As we will see below, you can use the `make` command to deploy the different components, as well as to deploy a sample Redis Cluster, or use the scripts that automate the basic workflows.
+As we will see below, you can use the `make` command to deploy the different components, as well as to deploy a sample RedKey Cluster, or use the scripts that automate the basic workflows.
 
 ## Development profiles
 
@@ -355,9 +355,9 @@ make uninstall
 kubectl delete ns redkey-operator
 ```
 
-## Deploying a Redis cluster
+## Deploying a RedKey cluster
 
-You can deploy a sample Redis Cluster from `config/samples` folder running:
+You can deploy a sample RedKey Cluster from `config/samples` folder running:
 
 ```shell
 make apply-rdcl

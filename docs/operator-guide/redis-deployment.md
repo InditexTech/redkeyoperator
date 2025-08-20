@@ -4,7 +4,7 @@
 
 RedKey operator CRD defines a new resource type `RedKeyCluster`.
 
-Below you'll find an example of manifest conforming to the resource definition that will deploy a Redis cluster:
+Below you'll find an example of manifest conforming to the resource definition that will deploy a RedKey cluster:
 
 ```yaml
 apiVersion: redis.inditex.dev/v1
@@ -55,19 +55,19 @@ spec:
 The `config` item contains the Redis specific configuration attributes that are usually set in the `redis.conf` Redis configuration file (you'll find a complete self-documented [redis.conf](https://redis.io/docs/management/config-file/) file in Redis documentation).
 
 
-## Redis cluster vs Standalone
+## Cluster vs Standalone
 
 Currently, RedKey operator **only deploys Rdis in cluster mode**.
 
-However, it's possible to set `replicas: 1` to deploy a single instance Redis cluster. With this configuration, all the slots will be by force allocated to that instance.
+However, it's possible to set `replicas: 1` to deploy a single instance RedKey cluster. With this configuration, all the slots will be by force allocated to that instance.
 
 ## Live reloading
 
 The configuration from `config` item will be placed under a ConfigMap created and managed by the Operator. This ConfigMap shares its name with the RedisCluster.
 
-The configuration contained in this ConfigMap is the `source of truth` that RedKey operator will use to create and configure the Redis cluster nodes.
+The configuration contained in this ConfigMap is the `source of truth` that RedKey operator will use to create and configure the RedKey cluster nodes.
 
-Config reloading is supported by RedKey operator. When ConfigMap contents are updated RedKey operator's reconciliation loop will detect it and update the underlying mapping upgrading the Redis cluster and restarting the Redis nodes to get the new configuration.
+Config reloading is supported by RedKey operator. When ConfigMap contents are updated RedKey operator's reconciliation loop will detect it and update the underlying mapping upgrading the RedKey cluster and restarting the Redis nodes to get the new configuration.
 
 ## Resources layout
 

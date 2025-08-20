@@ -40,7 +40,7 @@ sleep 10
 
 if [[ "$LOCAL" == "false" ]]; then
     if ! patch_statefulset "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
-        log_error "Patch Redis cluster StatefulSet"
+        log_error "Patch cluster StatefulSet"
         exit 1
     fi
     log_info "Patched StatefulSet/$REDIS_CLUSTER_NAME security context."
@@ -61,17 +61,17 @@ K6_PID=$!
 
 sleep 2
 
-# Scale Redis cluster
+# Scale cluster
 if ! scale_redis "$REPLICAS" "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
     echo "Error: Scaling Redis failed"
     exit 1
 fi
 
-log_info "Redis cluster scaled to $REPLICAS replicas."
+log_info "Cluster scaled to $REPLICAS replicas."
 
 if [[ "$LOCAL" == "false" ]]; then
     if ! patch_statefulset "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
-        log_error "Patch Redis cluster StatefulSet"
+        log_error "Patch cluster StatefulSet"
         exit 1
     fi
     log_info "Patched StatefulSet/$REDIS_CLUSTER_NAME security context."

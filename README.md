@@ -1,14 +1,14 @@
 # ![RedKey Operator icon](docs/images/badge.png) RedKey Operator for Kubernetes
 
-The easiest way to deploy and manage a Redis cluster in Kubernetes implementing the [operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/).
+The easiest way to deploy and manage a RedKey cluster in Kubernetes implementing the [operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/).
 
-This operator implements a controller that extends the Kubernetes API allowing to seamlessly deploy a Redis cluster, monitor the deployed resources implementing a reconciliation loop, logging events, manage cluster scaling and recover from errors.
+This operator implements a controller that extends the Kubernetes API allowing to seamlessly deploy a RedKey cluster, monitor the deployed resources implementing a reconciliation loop, logging events, manage cluster scaling and recover from errors.
 
 RedKey operator is built using [kubebuilder](https://github.com/kubernetes-sigs/kubebuilder) and [operator-sdk](https://github.com/operator-framework/operator-sdk).
 
 ## Features
 
-- Redis cluster creation
+- RedKey cluster creation
 - Cluster scaling up and down
 - CLuster upgrading
   - Update node pods image
@@ -25,7 +25,7 @@ Refer to [operator guide](./docs/operator-guide/toc.md) to have an overview of t
 
 If you are a developer, you'll find interesting information in the [developer guide](./docs/developer-guide.md).
 
-Learn about [Redis cluster status](./docs/redis-cluster-status.md).
+Learn about [RedKey cluster status](./docs/redkey-cluster-status.md).
 
 ## Versions
 

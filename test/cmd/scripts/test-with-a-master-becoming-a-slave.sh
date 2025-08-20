@@ -17,7 +17,7 @@ LOCAL="${4:-false}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib-test.sh"
 
-log_info "Starting Redis cluster test for cluster '$REDIS_CLUSTER_NAME' in namespace '$NAMESPACE'."
+log_info "Starting cluster test for cluster '$REDIS_CLUSTER_NAME' in namespace '$NAMESPACE'."
 
 # # Restart the Redis manager process and wait for the cluster to become ready again
 # if ! ensure_manager "$NAMESPACE" "$TEST_NAME" ; then
@@ -35,7 +35,7 @@ sleep 5
 
 if [[ "$LOCAL" == "false" ]]; then
     if ! patch_statefulset "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
-        log_error "Patch Redis cluster StatefulSet"
+        log_error "Patch cluster StatefulSet"
         exit 1
     fi
     log_info "Patched StatefulSet/$REDIS_CLUSTER_NAME security context."
@@ -83,4 +83,4 @@ if ! wait_redis_ready "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
     exit 1
 fi
 
-log_info "Redis cluster slot reassignment test completed successfully."
+log_info "Cluster slot reassignment test completed successfully."

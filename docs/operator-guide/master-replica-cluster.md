@@ -1,8 +1,8 @@
 # Master-Replica Clusters
 
-Starting with the release 0.2.34, RedKey Operator supports master-replica architecture of Redis Cluster. This architecture increases resiliency of Redis clusters as each master has one or more replicas and in case of a master goes down, its replica (or one of its replicas) can take over the role of its master and continue to serve without a downtime and data loss in practice. Theoretically, there will be a small downtime and a possibility of a data loss if a data on a master gets updated and master go down before the data change propagate to its replicas but these are negligible.
+Starting with the release 0.2.34, RedKey Operator supports master-replica architecture of RedKey Cluster. This architecture increases resiliency of RedKey clusters as each master has one or more replicas and in case of a master goes down, its replica (or one of its replicas) can take over the role of its master and continue to serve without a downtime and data loss in practice. Theoretically, there will be a small downtime and a possibility of a data loss if a data on a master gets updated and master go down before the data change propagate to its replicas but these are negligible.
 
-Clusters with master-replica architecture can be created by adding `replicas_per_master` specification and setting to an integer value inside the `spec` definition of a Redis Cluster object. RedKey Operator will create replica nodes matching the count of `replicas_per_master` definition for each master nodes.
+Clusters with master-replica architecture can be created by adding `replicas_per_master` specification and setting to an integer value inside the `spec` definition of a RedKey Cluster object. RedKey Operator will create replica nodes matching the count of `replicas_per_master` definition for each master nodes.
 
 The minimum configuration for the correct operation of this function is:
 

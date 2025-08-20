@@ -39,7 +39,7 @@ sleep 2
 
 if [[ "$LOCAL" == "false" ]]; then
     if ! patch_statefulset "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
-        log_error "Patch Redis cluster StatefulSet"
+        log_error "Patch cluster StatefulSet"
         exit 1
     fi
     log_info "Patched StatefulSet/$REDIS_CLUSTER_NAME security context."
@@ -47,24 +47,24 @@ fi
 
 # Wait for Redis to be ready
 if ! wait_redis_ready "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
-    log_error "Redis cluster failed to become ready."
+    log_error "Cluster failed to become ready."
     exit 1
 fi
 
-log_info "Redis Cluster is Ready."
+log_info "Cluster is Ready."
 
-# Scale Redis cluster
+# Scale cluster
 if ! scale_redis "$REPLICAS" "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
-    echo "Error: Scaling Redis failed"
+    echo "Error: Cluster scaling failed"
     exit 1
 fi
 
-log_info "Scaled Redis Cluster to $REPLICAS replicas."
+log_info "Scaled Cluster to $REPLICAS replicas."
 sleep 10  # Allow time for scaling
 
 # Wait until Redis is ready after scaling
 if ! wait_redis_ready "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
-    log_error "Redis cluster is not ready after scaling."
+    log_error "Cluster is not ready after scaling."
     exit 1
 fi
 
@@ -91,10 +91,10 @@ if [[ ${#PODS_TO_DELETE[@]} -gt 0 ]]; then
         fi
     done
 
-    log_info "Waiting for Redis Cluster to recover from pod deletion..."
+    log_info "Waiting for Cluster to recover from pod deletion..."
     sleep 30  # Allow Kubernetes to recognize deleted pods
     if ! wait_redis_ready "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
-        log_error "Redis cluster did not recover after pod deletion."
+        log_error "Cluster did not recover after pod deletion."
         exit 1
     fi
 fi

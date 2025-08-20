@@ -2,7 +2,7 @@
 
 ## Purpose
 
-End to End tests for provision Redis cluster environments in Kubernetes or Openshift.
+End to End tests for provision RedKey cluster environments in Kubernetes or Openshift.
 
 ## How to run the test
 

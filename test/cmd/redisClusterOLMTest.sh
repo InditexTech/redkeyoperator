@@ -60,7 +60,7 @@ EOF
         sed -i "s|TYPE_REDISCLUSTER|redis_v1alpha1_rediscluster-repmaster.yaml|g" "config/samples/kustomization.yaml"
     fi
 
-    # build and apply redis cluster in the cluster
+    # build and apply cluster in the cluster
     make dev-apply-rdcl
 
     echo 'INFO::waiting for Initializing status in redisCluster'
@@ -230,7 +230,7 @@ validateRedisMasterSlave() {
     else
         REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name')
         for POD in $REDIS_POD; do
-            # get and parse the info about nodes configured in the Redis Cluster
+            # get and parse the info about nodes configured in the Cluster
             nodes=$(kubectl -n $namespace exec -i $POD -- redis-cli CLUSTER NODES | tr " " "&" | tr "\r" ";")
             break
         done
@@ -281,7 +281,7 @@ validateBasicRedisMasterSlave() {
     fi
     kubectl get all,rdcl -n $namespace
     echo '##########################################'
-    echo "INFO:: Validating basic configuration in Redis Cluster with master-slave configuration"
+    echo "INFO:: Validating basic configuration in Cluster with master-slave configuration"
     message=$(validateRedisMasterSlave)
     if [[ "$message" != "0" ]]; then
         resultMessage=$message
@@ -289,7 +289,7 @@ validateBasicRedisMasterSlave() {
     else
         REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name')
         for POD in $REDIS_POD; do
-            # get and parse the info about nodes configured in the Redis Cluster
+            # get and parse the info about nodes configured in the Cluster
             kubectl -n $namespace exec -i $POD -- redis-cli CLUSTER NODES
             echo '##########################################'
             break

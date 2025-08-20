@@ -24,11 +24,11 @@ function test_list {
     t $minutes_5 test-with-a-master-becoming-a-slave.sh 3 redis-operator redis-cluster-test
     t $minutes_14 test-size-change.sh 3 redis-operator redis-cluster-test
     t $minutes_19 test-template-change.sh 3 redis-operator redis-cluster-test
-    # Does the Redis cluster scale before the timeout?
+    # Does the cluster scale before the timeout?
     t $minutes_14 test-scaling-up-and-delete.sh 21 redis-operator redis-cluster-test
     t $minutes_10 test-scaling-up-and-delete.sh 25 redis-operator redis-cluster-test
     t $minutes_10 test-scaling-up-and-delete.sh 28 redis-operator redis-cluster-test
-    # Does the Redis cluster scale with load before the timeout?
+    # Does the cluster scale with load before the timeout?
     t $minutes_6 test-scaling-up-with-load.sh 5 redis-operator redis-cluster-test
     t $minutes_11 test-scaling-up-with-load.sh 15 redis-operator redis-cluster-test
     # Chaos and timeout - Does minimum a cycle before the timeout

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Funtional test for provision Redis cluster environments in Kubernetes or Openshift.
+Funtional test for provision RedKey cluster environments in Kubernetes or Openshift.
 
 
 ## Folder structure
@@ -34,18 +34,18 @@ Manifests:
 * `namespace` name of namespace where the funtional will be executed
 * `image` name of image that deploy the RedKey Operator 
 * `test` name of the desired test `Initialize,ScalingUp,ScalingDown,ChangeStorage,ChangeStorageReplicas,AddLabel,DeleteLabel,InsertData,InsertDataWhileScaling,InsertDataWhileScalingDown,GetSpecificKey,ValidateBasicRedisMasterSlave,ScalingUpRedisMasterSlave,ScalingDownRedisMasterSlave,KillPodRedisMasterSlave`
-* `newRedisCluster` allows to create a new instance of Redis Cluster `true,false`
-* `typeRedisCluster`  type of deployment of the Redis Cluster `storage,ephemeral,repmaster`
+* `newRedisCluster` allows to create a new instance of RedKey Cluster `true,false`
+* `typeRedisCluster`  type of deployment of the RedKey Cluster `storage,ephemeral,repmaster`
 
-## Deploying a Redis cluster
+## Deploying a RedKey cluster
 
-There are 3 commands for creating Redis clusters. 
+There are 3 commands for creating RedKey clusters. 
 
-* `./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.0" "Initialize" "true" "storage"` creates a persistent redis cluster 
-* `./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.0" "Initialize" "true" "ephemeral"` creates an ephemeral redis cluster. 
-* `./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.0" "Initialize" "true" "repmaster"` creates a master slave redis cluster. 
+* `./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.0" "Initialize" "true" "storage"` creates a persistent cluster 
+* `./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.0" "Initialize" "true" "ephemeral"` creates an ephemeral cluster. 
+* `./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.0" "Initialize" "true" "repmaster"` creates a master slave cluster. 
 
-Please note that some of the following tooling (such as PoMonitor and load tester) are dependent of the Redis cluster name, so both share the same name.
+Please note that some of the following tooling (such as PoMonitor and load tester) are dependent of the cluster name, so both share the same name.
 
 ## Available Test
 

@@ -27,7 +27,7 @@ fi
 start_time=$(date +%s)
 end_time=$(( start_time + MINUTES * 60 ))
 
-log_info "Starting Redis cluster chaos test for cluster '$REDIS_CLUSTER_NAME' in namespace '$NAMESPACE'."
+log_info "Starting cluster chaos test for cluster '$REDIS_CLUSTER_NAME' in namespace '$NAMESPACE'."
 
 # Ensure Kubernetes namespace exists
 if ! ensure_namespace "$NAMESPACE"; then
@@ -50,7 +50,7 @@ sleep 2
 
 if [[ "$LOCAL" == "false" ]]; then
     if ! patch_statefulset "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
-        log_error "Patch Redis cluster StatefulSet"
+        log_error "Patch cluster StatefulSet"
         exit 1
     fi
     log_info "Patched StatefulSet/$REDIS_CLUSTER_NAME security context."
@@ -58,11 +58,11 @@ fi
 
 # Wait for Redis to be ready
 if ! wait_redis_ready "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
-    log_error "Redis cluster failed to become ready."
+    log_error "cluster failed to become ready."
     exit 1
 fi
 
-log_info "Redis Cluster is Ready."
+log_info "Cluster is Ready."
 
 
 log_info "Launching K6 (${MINUTES} minutes) and patching to ${REPLICAS} replicas."
@@ -78,7 +78,7 @@ while [ "$(date +%s)" -lt "$end_time" ]; do
     log_info "LOOPING - Scale Redis - Delete 2 - Wait Ready - delete ${random} random pods."
 
     
-    # Scale Redis cluster
+    # Scale cluster
     if ! scale_redis "$REPLICAS" "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
         echo "Error: Scaling Redis failed"
         exit 1
@@ -86,26 +86,26 @@ while [ "$(date +%s)" -lt "$end_time" ]; do
     sleep 3  # Allow time for upgrade.
     
     if ! delete_n_random_pods 2 "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
-        log_error "Redis cluster is not ready after scaling."
+        log_error "Cluster is not ready after scaling."
         exit 1
     fi
     sleep 10  # Allow time for upgrade.
     
     # Wait until Redis is ready after scaling
     if ! wait_redis_ready "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
-        log_error "Redis cluster is not ready after scaling."
+        log_error "Cluster is not ready after scaling."
         exit 1
     fi
     sleep 5
     
     if ! delete_n_random_pods "$random" "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
-        log_error "Redis cluster is not ready after scaling."
+        log_error "Cluster is not ready after scaling."
         exit 1
     fi
     sleep 30
     # Wait until Redis is ready after scaling
     if ! wait_redis_ready "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
-        log_error "Redis cluster is not ready after scaling."
+        log_error "Cluster is not ready after scaling."
         exit 1
     fi
     
@@ -117,7 +117,7 @@ while [ "$(date +%s)" -lt "$end_time" ]; do
     
     # Calculate a random downscale value between 1 and (REPLICAS - 1)
     random_downscale=$(( RANDOM % (REPLICAS - 1) + 1 ))
-    log_info "Scaling Redis cluster down to ${random_downscale} replicas."
+    log_info "Scaling cluster down to ${random_downscale} replicas."
     if ! scale_redis "$random_downscale" "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
         log_error "Error: Scaling Redis down failed."
         exit 1
@@ -125,18 +125,18 @@ while [ "$(date +%s)" -lt "$end_time" ]; do
     
     # Wait until Redis is ready after scaling
     if ! wait_redis_ready "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
-        log_error "Redis cluster is not ready after scaling."
+        log_error "Cluster is not ready after scaling."
         exit 1
     fi
 done
 
 # Wait until Redis is ready after scaling
 if ! wait_redis_ready "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
-    log_error "Redis cluster is not ready after scaling."
+    log_error "Cluster is not ready after scaling."
     exit 1
 fi
 
 if ! check_redis "$REDIS_CLUSTER_NAME" "$NAMESPACE"; then
-    log_error "Redis cluster is not ready after scaling."
+    log_error "Cluster is not ready after scaling."
     exit 1
 fi

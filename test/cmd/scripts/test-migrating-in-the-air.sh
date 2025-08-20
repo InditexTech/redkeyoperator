@@ -20,7 +20,7 @@ LOCAL="${4:-false}"
 # Define the slot number to work with (example: slot 0)
 SLOT=0
 
-log_info "Starting Redis cluster test for cluster '$REDIS_CLUSTER_NAME' in namespace '$NAMESPACE'."
+log_info "Starting cluster test for cluster '$REDIS_CLUSTER_NAME' in namespace '$NAMESPACE'."
 
 # # Start the Redis manager process
 # if ! ensure_manager "$NAMESPACE" "$TEST_NAME" ; then
@@ -38,13 +38,13 @@ sleep 10
 
 if [[ "$LOCAL" == "false" ]]; then
     if ! patch_statefulset "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
-        log_error "Patch Redis cluster StatefulSet"
+        log_error "Patch cluster StatefulSet"
         exit 1
     fi
     log_info "Patched StatefulSet/$REDIS_CLUSTER_NAME security context."
 fi
 
-log_info "Waiting for Redis Cluster to become ready"
+log_info "Waiting for Cluster to become ready"
 
 if ! wait_redis_ready "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
     log_error "Error: Redis not ready after patch"
@@ -93,4 +93,4 @@ if ! wait_redis_ready "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
     exit 1
 fi
 
-log_info "Redis cluster slot reassignment test completed successfully."
+log_info "Cluster slot reassignment test completed successfully."

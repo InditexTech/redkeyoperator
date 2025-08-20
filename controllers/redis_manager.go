@@ -33,12 +33,12 @@ const (
 	ConfigChecksumAnnotation = "inditex.dev/redis-conf"
 )
 
-// Redis cluster is set to 0 replicas
+// RedKey cluster is set to 0 replicas
 //
 //	 -> terminate all cluster pods (StatefulSet replicas set to 0)
 //	 -> terminate robin pod (Deployment replicas set to 0)
 //	 -> delete pdb
-//	 -> Redis cluster status set to 'Ready'
+//	 -> RedKey cluster status set to 'Ready'
 //		-> All conditions set to false
 func (r *RedKeyClusterReconciler) clusterScaledToZeroReplicas(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) error {
 	r.logInfo(redkeyCluster.NamespacedName(), "Cluster spec replicas is set to 0", "SpecReplicas", redkeyCluster.Spec.Replicas)
@@ -87,7 +87,7 @@ func (r *RedKeyClusterReconciler) upgradeCluster(ctx context.Context, redkeyClus
 	return r.doSlowUpgrade(ctx, redkeyCluster)
 }
 
-// If PurgeKeysOnRebalance flag is active and Redis cluster is not configures as master-replica we can
+// If PurgeKeysOnRebalance flag is active and RedKey cluster is not configures as master-replica we can
 // do a Fast Upgrade, applying the changes to the StatefulSet and recreaing it. Slots move will be avoided.
 func (r *RedKeyClusterReconciler) doFastUpgrade(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) (bool, error) {
 	switch redkeyCluster.Status.Substatus.Status {
@@ -151,7 +151,7 @@ func (r *RedKeyClusterReconciler) doFastUpgrade(ctx context.Context, redkeyClust
 			return true, err
 		}
 		if !check {
-			r.logInfo(redkeyCluster.NamespacedName(), "Waiting for Redis cluster readiness before ending the fast upgrade", "errors", errors, "warnings", warnings)
+			r.logInfo(redkeyCluster.NamespacedName(), "Waiting for cluster readiness before ending the fast upgrade", "errors", errors, "warnings", warnings)
 			return true, nil
 		}
 
@@ -331,7 +331,7 @@ func (r *RedKeyClusterReconciler) doSlowUpgradeUpgrading(ctx context.Context, re
 		return err
 	}
 	if !check {
-		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for Redis cluster readiness", "errors", errors, "warnings", warnings)
+		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for cluster readiness", "errors", errors, "warnings", warnings)
 		return nil // Cluster not ready --> keep waiting
 	}
 
@@ -443,7 +443,7 @@ func (r *RedKeyClusterReconciler) doSlowUpgradeEnd(ctx context.Context, redkeyCl
 		return err
 	}
 	if !check {
-		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for Redis cluster readiness", "errors", errors, "warnings", warnings)
+		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for cluster readiness", "errors", errors, "warnings", warnings)
 		return nil // Cluster not ready --> keep waiting
 	}
 
@@ -526,7 +526,7 @@ func (r *RedKeyClusterReconciler) doSlowUpgradeScalingDown(ctx context.Context, 
 		return err
 	}
 	if !check {
-		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for Redis cluster readiness before ending the fast upgrade", "errors", errors, "warnings", warnings)
+		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for cluster readiness before ending the fast upgrade", "errors", errors, "warnings", warnings)
 		return nil // Cluster not ready --> keep waiting
 	}
 
@@ -711,7 +711,7 @@ func (r *RedKeyClusterReconciler) doFastScaling(ctx context.Context, redkeyClust
 			return true, err
 		}
 		if !check {
-			r.logInfo(redkeyCluster.NamespacedName(), "Waiting for Redis cluster readiness before ending the fast scaling", "errors", errors, "warnings", warnings)
+			r.logInfo(redkeyCluster.NamespacedName(), "Waiting for cluster readiness before ending the fast scaling", "errors", errors, "warnings", warnings)
 			return true, nil
 		}
 
@@ -871,7 +871,7 @@ func (r *RedKeyClusterReconciler) scaleDownCluster(ctx context.Context, redkeyCl
 			"replicas after", redkeyCluster.Spec.Replicas, "replicas per master after", redkeyCluster.Spec.ReplicasPerMaster)
 	}
 
-	// Check redis cluster replicas meet the requirements
+	// Check cluster replicas meet the requirements
 	clusterNodes, err := robinRedis.GetClusterNodes()
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin nodes info")
@@ -964,7 +964,7 @@ func (r *RedKeyClusterReconciler) completeClusterScaleDown(ctx context.Context, 
 		}
 		if !check {
 			// Cluster scaling not completed -> requeue
-			r.logInfo(redkeyCluster.NamespacedName(), "ScaleCluster - Waiting for Redis cluster readiness before ending the cluster scaling", "errors", errors, "warnings", warnings)
+			r.logInfo(redkeyCluster.NamespacedName(), "ScaleCluster - Waiting for cluster readiness before ending the cluster scaling", "errors", errors, "warnings", warnings)
 			return true, nil
 		}
 
@@ -1116,7 +1116,7 @@ func (r *RedKeyClusterReconciler) completeClusterScaleUp(ctx context.Context, re
 		}
 		if !check {
 			// Cluster scaling not completed -> requeue
-			r.logInfo(redkeyCluster.NamespacedName(), "ScaleCluster - Waiting for Redis cluster readiness before ending the cluster scaling", "errors", errors, "warnings", warnings)
+			r.logInfo(redkeyCluster.NamespacedName(), "ScaleCluster - Waiting for cluster readiness before ending the cluster scaling", "errors", errors, "warnings", warnings)
 			return true, nil
 		}
 

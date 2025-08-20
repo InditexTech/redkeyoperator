@@ -785,7 +785,7 @@ deleteRedisCluster() {
 }
 
 #######################################
-# Allows to validate if is posible to insert data into the Redis Cluster
+# Allows to validate if is posible to insert data into the Cluster
 # Globals:
 #   namespace=$1
 #   image=$2
@@ -818,7 +818,7 @@ insertData() {
 }
 
 #######################################
-# Allows to validate if is posible to insert data while scaling up event is executing into the Redis Cluster
+# Allows to validate if is posible to insert data while scaling up event is executing into the Cluster
 # Globals:
 #   namespace=$1
 #   image=$2
@@ -900,7 +900,7 @@ insertDataWhileScaling() {
 }
 
 #######################################
-# Allows to validate if is posible to insert data while scaling down event is executing into the Redis Cluster
+# Allows to validate if is posible to insert data while scaling down event is executing into the Cluster
 # Globals:
 #   namespace=$1
 #   image=$2
@@ -1004,7 +1004,7 @@ insertDataWhileScalingDown() {
 }
 
 #######################################
-# Allows to get a specific key inserted into the Redis Cluster
+# Allows to get a specific key inserted into the Cluster
 # Globals:
 #   namespace=$1
 #   image=$2
@@ -1040,7 +1040,7 @@ getSpecificKey() {
         echo "INFO kubectl -n $namespace exec -i $REDIS_POD -- redis-cli -c"
         cat /tmp/data.txt | kubectl -n $namespace exec -i $REDIS_POD -- redis-cli -c
 
-        # loop through the redis Cluster pods looking for the key.
+        # loop through the Cluster pods looking for the key.
         for POD in $REDIS_POD; do
             getValue=$(kubectl -n $namespace exec -i $POD -- redis-cli get $key)
             if [ -n "$getValue" ]; then
@@ -1118,7 +1118,7 @@ validateRedisMasterSlave() {
     else
         REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name')
         for POD in $REDIS_POD; do
-            # get and parse the info about nodes configured in the Redis Cluster
+            # get and parse the info about nodes configured in the Cluster
             nodes=$(kubectl -n $namespace exec -i $POD -- redis-cli CLUSTER NODES | tr " " "&" | tr "\r" ";")
             break
         done
@@ -1170,7 +1170,7 @@ validateBasicRedisMasterSlave() {
     fi
     kubectl get all,rdcl -n $namespace
     echo '##########################################'
-    echo "INFO:: Validating basic configuration in Redis Cluster with master-slave configuration"
+    echo "INFO:: Validating basic configuration in Cluster with master-slave configuration"
     message=$(validateRedisMasterSlave)
     if [[ "$message" != "0" ]]; then
         resultMessage=$message
@@ -1178,7 +1178,7 @@ validateBasicRedisMasterSlave() {
     else
         REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name')
         for POD in $REDIS_POD; do
-            # get and parse the info about nodes configured in the Redis Cluster
+            # get and parse the info about nodes configured in the Cluster
             kubectl -n $namespace exec -i $POD -- redis-cli CLUSTER NODES
             echo '##########################################'
             break
@@ -1228,7 +1228,7 @@ scalingUpRedisMasterSlave() {
         else
             kubectl get all,rdcl -n $namespace
             echo '##########################################'
-            echo "INFO:: Validating configuration in Redis Cluster with master-slave configuration"
+            echo "INFO:: Validating configuration in Cluster with master-slave configuration"
             message=$(validateRedisMasterSlave)
             if [[ "$message" != "0" ]]; then
                 resultMessage=$message
@@ -1237,7 +1237,7 @@ scalingUpRedisMasterSlave() {
                 # show the configuration
                 REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name')
                 for POD in $REDIS_POD; do
-                    # get and parse the info about nodes configured in the Redis Cluster
+                    # get and parse the info about nodes configured in the Cluster
                     kubectl -n $namespace exec -i $POD -- redis-cli CLUSTER NODES
                     echo '##########################################'
                     break
@@ -1309,7 +1309,7 @@ scalingDownRedisMasterSlave() {
                 else
                     kubectl get all,rdcl -n $namespace
                     echo '##########################################'
-                    echo "INFO:: Validating configuration in Redis Cluster with master-slave configuration"
+                    echo "INFO:: Validating configuration in Cluster with master-slave configuration"
                     sleep 50
                     message=$(validateRedisMasterSlave)
                     if [[ "$message" != "0" ]]; then
@@ -1319,7 +1319,7 @@ scalingDownRedisMasterSlave() {
                         # show the configuration
                         REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name')
                         for POD in $REDIS_POD; do
-                            # get and parse the info about nodes configured in the Redis Cluster
+                            # get and parse the info about nodes configured in the Cluster
                             kubectl -n $namespace exec -i $POD -- redis-cli CLUSTER NODES
                             echo '##########################################'
                             break
@@ -1374,7 +1374,7 @@ killPodRedisMasterSlave() {
         resultMessage="Failure: Script failed"
         result=1
     else
-        echo "INFO:: Validating configuration in Redis Cluster with master-slave configuration"
+        echo "INFO:: Validating configuration in Cluster with master-slave configuration"
         sleep 40
         kubectl get all,rdcl -n $namespace
         echo '##########################################'

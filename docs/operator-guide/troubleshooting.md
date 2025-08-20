@@ -1,12 +1,12 @@
 # Troubleshooting
 
-The RedKey Operator is a complex piece of software. In some cases it can self-recover from service losses but in other cases a cluster administrator has to intervene. This document helps administrators how to solve failing redis clusters.
+The RedKey Operator is a complex piece of software. In some cases it can self-recover from service losses but in other cases a cluster administrator has to intervene. This document helps administrators how to solve failing clusters.
 
-The first section describes [redis cluster failure scenarios](#redis-cluster-failure-scenarios) and show to solve them.
+The first section describes [cluster failure scenarios](#cluster-failure-scenarios) and show to solve them.
 
-The second section lists [commands](#redis-cluster-manager-commands) used to solve the failures described in the first section.
+The second section lists [commands](#cluster-manager-commands) used to solve the failures described in the first section.
 
-## Redis cluster failure scenarios
+## Cluster failure scenarios
 
 ### Openshift 3 does not support OLM and runs on an older kube-api version
 
@@ -30,9 +30,9 @@ If a slave node is present in a master-only cluster, ix this by running the [res
 
 You can find the node IP information by running the [nodes command](#gathering-nodes-information). If the IPs are inconsistent run the [cluster meet](#cluster-meet) from a correctly configured node to the incorrect node.
 
-## Redis cluster manager commands
+## Cluster manager commands
 
-Below are a list of commands and code snippets for inspecting and repairing the cluster. Most commands use kubectl combined with the Redis cluster manager tool. This tool is invoked with
+Below are a list of commands and code snippets for inspecting and repairing the cluster. Most commands use kubectl combined with the RedKey cluster manager tool. This tool is invoked with
 
 ```
 $ redis-cli --cluster ...

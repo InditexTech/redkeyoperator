@@ -34,14 +34,14 @@ sleep 2
 
 if [[ "$LOCAL" == "false" ]]; then
     if ! patch_statefulset "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
-        log_error "Patch Redis cluster StatefulSet"
+        log_error "Patch cluster StatefulSet"
         exit 1
     fi
 fi
 
-log_info "Waiting for Redis Cluster to become ready..."
+log_info "Waiting for Cluster to become ready..."
 if ! wait_redis_ready "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
-    log_error "Error: Redis Cluster is not ready."
+    log_error "Error: Cluster is not ready."
     exit 1
 fi
 
@@ -71,7 +71,7 @@ sleep 2
 log_info "Waiting for updated resource values to take effect..."
 
 if ! wait_redis_ready "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
-    log_error "Error: Redis Cluster is not ready after resource update."
+    log_error "Error: Cluster is not ready after resource update."
     exit 1
 fi
 
