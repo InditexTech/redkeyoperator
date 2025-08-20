@@ -379,7 +379,7 @@ apply-rkcl: ##		Apply the sample RedKey Cluster manifest.
 	$(KUSTOMIZE) build config/samples | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | kubectl apply -f -
 
 delete-rkcl: ##		Delete the sample RedKey Cluster manifest.
-RedKey	$(KUSTOMIZE) build config/samples | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | kubectl delete -f -
+	$(KUSTOMIZE) build config/samples | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | kubectl delete -f -
 
 apply-all: docker-build docker-push process-manifests install deploy apply-rkcl
 
