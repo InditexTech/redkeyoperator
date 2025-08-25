@@ -41,7 +41,7 @@ const (
 	StatusUnknown      = "Unknown"
 	Port               = 8080
 
-	EndpoingProtocolPrefix = "http://"
+	EndpointProtocolPrefix = "http://"
 	EndpointStatus         = "/v1/redkeycluster/status"
 	EndpointReplicas       = "/v1/redkeycluster/replicas"
 	EndpointClusterCheck   = "/v1/cluster/check"
@@ -177,7 +177,7 @@ func NewRobin(ctx context.Context, client ctrlClient.Client, redkeyCluster *redk
 }
 
 func (r *Robin) GetStatus() (string, error) {
-	url := EndpoingProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointStatus
+	url := EndpointProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointStatus
 
 	body, err := doSimpleGet(url)
 	if err != nil {
@@ -194,7 +194,7 @@ func (r *Robin) GetStatus() (string, error) {
 }
 
 func (r *Robin) SetStatus(status string) error {
-	url := EndpoingProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointStatus
+	url := EndpointProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointStatus
 
 	var statusParam Status
 	statusParam.Status = status
@@ -213,7 +213,7 @@ func (r *Robin) SetStatus(status string) error {
 }
 
 func (r *Robin) GetReplicas() (int, int, error) {
-	url := EndpoingProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointReplicas
+	url := EndpointProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointReplicas
 
 	body, err := doSimpleGet(url)
 	if err != nil {
@@ -230,7 +230,7 @@ func (r *Robin) GetReplicas() (int, int, error) {
 }
 
 func (r *Robin) SetReplicas(clusterReplicas int, clusterReplicasPerMaster int) error {
-	url := EndpoingProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointReplicas
+	url := EndpointProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointReplicas
 
 	var replicas ClusterReplicas
 	replicas.Replicas = clusterReplicas
@@ -250,7 +250,7 @@ func (r *Robin) SetReplicas(clusterReplicas int, clusterReplicasPerMaster int) e
 }
 
 func (r *Robin) ClusterCheck() (bool, []string, []string, error) {
-	url := EndpoingProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointClusterCheck
+	url := EndpointProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointClusterCheck
 
 	body, err := doSimpleGet(url)
 	if err != nil {
@@ -271,7 +271,7 @@ func (r *Robin) ClusterCheck() (bool, []string, []string, error) {
 }
 
 func (r *Robin) GetClusterNodes() (ClusterNodes, error) {
-	url := EndpoingProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointClusterNodes
+	url := EndpointProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointClusterNodes
 	var clusterNodes ClusterNodes
 
 	body, err := doSimpleGet(url)
@@ -287,7 +287,7 @@ func (r *Robin) GetClusterNodes() (ClusterNodes, error) {
 }
 
 func (r *Robin) ClusterFix() error {
-	url := EndpoingProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointClusterFix
+	url := EndpointProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointClusterFix
 
 	var payload []byte
 	body, err := doPut(url, payload)
@@ -300,7 +300,7 @@ func (r *Robin) ClusterFix() error {
 }
 
 func (r *Robin) ClusterResetNode(nodeIndex int) error {
-	url := EndpoingProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointClusterReset + strconv.Itoa(nodeIndex)
+	url := EndpointProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointClusterReset + strconv.Itoa(nodeIndex)
 
 	var payload []byte
 	body, err := doPut(url, payload)
@@ -313,7 +313,7 @@ func (r *Robin) ClusterResetNode(nodeIndex int) error {
 }
 
 func (r *Robin) MoveSlots(nodeIndexFrom int, nodeIndexTo int, numSlots int) (bool, error) {
-	url := EndpoingProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointClusterMove
+	url := EndpointProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointClusterMove
 
 	var moveParam MoveSlots
 	moveParam.NodeIndexFrom = strconv.Itoa(nodeIndexFrom)
