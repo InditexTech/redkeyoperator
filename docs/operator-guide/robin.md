@@ -29,7 +29,7 @@ spec:
       ...
       spec:
         containers:
-          - image: 'redis-robin:0.0.1'
+          - image: 'redkey-robin:0.0.1'
             name: robin
             imagePullPolicy: Always
             ports:
@@ -132,4 +132,4 @@ spec:
 
 ## How to develop Robin
 
-Please refer to [Redis Robin](../developer-guide.md#redis-robin) section of the Developer Guide to know how to develop, build and deploy Robin for development and debugging purposes.
+Please refer to [RedKey Robin](../developer-guide.md#redkey-robin) section of the Developer Guide to know how to develop, build and deploy Robin for development and debugging purposes.

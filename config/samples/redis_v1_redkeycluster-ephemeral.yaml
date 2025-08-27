@@ -71,7 +71,7 @@ spec:
     template:
       spec:
         containers:
-          - image: k3d-redis.localhost:5005/redis-robin:0.1.0
+          - image: k3d-redis.localhost:5005/redkey-robin:0.1.0
             name: robin
             imagePullPolicy: Always
             ports:
