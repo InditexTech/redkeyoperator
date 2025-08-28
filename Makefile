@@ -5,12 +5,12 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
-name      := redis-cluster-operator
+name      := redkey-cluster-operator
 VERSION   := 1.3.0
 package   := github.com/inditextech/$(name)
 # Image URL to use for building/pushing image targets when using `pro` deployment profile.
-IMG ?= redis-operator:$(VERSION)
-IMG_WEBHOOK ?= redis-operator-webhook:$(VERSION)
+IMG ?= redkey-operator:$(VERSION)
+IMG_WEBHOOK ?= redkey-operator-webhook:$(VERSION)
 
 # CN for the webhook certificate
 CN ?= inditex.dev
@@ -77,7 +77,7 @@ BUNDLE_IMG ?= controller-bundle:$(VERSION)
 
 # Image URL to use for deploying the operator pod when using `debug` deployment profile.
 # A base golang image is used with Delve installed, in order to be able to remotely debug the manager.
-IMG_DEBUG ?= delve:1.24.5
+IMG_DEBUG ?= delve:1.24.6
 
 # Set the Operator SDK version to use. By default, what is installed on the system is used.
 # This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.
@@ -90,10 +90,10 @@ CHANNELS ?= alpha,beta
 IMAGE_REF ?= $(IMG)
 
 # Namespace in which the manager will be deployed.
-NAMESPACE ?= redis-operator
+NAMESPACE ?= redkey-operator
 
 # Namespace in which the webhook will be deployed.
-WEBHOOK_NAMESPACE := redis-operator-webhook
+WEBHOOK_NAMESPACE := redkey-operator-webhook
 
 # Allowed deploying profiles.
 PROFILES := dev debug pro
@@ -190,7 +190,7 @@ clean: ## Clean the build artifacts and Go cache
 ##@ Development
 manifests: controller-gen ##	Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(info $(M) generating config CRD base manifest files from code)
-	$(CONTROLLER_GEN) rbac:roleName=redis-operator-role crd:maxDescLen=0 webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) rbac:roleName=redkey-operator-role crd:maxDescLen=0 webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 generate: controller-gen ##	Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
@@ -252,11 +252,11 @@ docker-push-webhook: ##	Push docker image with the webhook (uses `${IMG_WEBHOOK}
 ##@ Deployment
 install: process-manifests-crd ##		Install CRD into the K8s cluster specified by kubectl default context (Kustomize is installed if not present).
 	$(info $(M) applying CRD manifest file)
-	kubectl apply -f deployment/redis.inditex.dev_redisclusters.yaml
+	kubectl apply -f deployment/redis.inditex.dev_redkeyclusters.yaml
 
 uninstall: process-manifests-crd ##		Uninstall CRD from the K8s cluster specified by kubectl default context (Kustomize is installed if not present).
 	$(info $(M) deleting CRD)
-	kubectl delete -f deployment/redis.inditex.dev_redisclusters.yaml
+	kubectl delete -f deployment/redis.inditex.dev_redkeyclusters.yaml
 
 process-manifests: kustomize process-manifests-crd ##		Generate the kustomized yamls into the `deployment` directory to deploy the manager.
 	$(info $(M) generating Manager deploying manifest files using ${PROFILE} profile)
@@ -265,12 +265,12 @@ process-manifests: kustomize process-manifests-crd ##		Generate the kustomized y
 		$(KUSTOMIZE) edit set namespace ${NAMESPACE}) && \
 	if [ ${PROFILE} == "dev" ]; then \
 		(cd config/deploy-profiles/${PROFILE} && \
-			$(KUSTOMIZE) edit set image redis-operator=${IMG}); \
+			$(KUSTOMIZE) edit set image redkey-operator=${IMG}); \
 		$(KUSTOMIZE) build config/deploy-profiles/dev > deployment/manager.yaml; \
 		$(SED) -i 's/watch-namespace/$(NAMESPACE)/' deployment/manager.yaml; \
 	elif [ ${PROFILE} == "debug" ]; then \
 		(cd config/deploy-profiles/${PROFILE} && \
-			$(KUSTOMIZE) edit set image /redis-operator=${IMG_DEBUG}); \
+			$(KUSTOMIZE) edit set image /redkey-operator=${IMG_DEBUG}); \
 		$(KUSTOMIZE) build config/deploy-profiles/debug > deployment/manager.yaml; \
 		$(SED) -i 's/watch-namespace/$(NAMESPACE)/' deployment/manager.yaml; \
 	fi
@@ -283,10 +283,10 @@ process-manifests-crd: kustomize manifests ##	Generate the kustomized yamls into
 	mkdir -p deployment
 #	 if [ ! -f certs/ca.crt ]; then make generate-ca-cert; fi
 #	$(eval CA_CERT := $(shell cat certs/ca.crt | base64 -w 0))
-#	cp ./config/crd/patches/webhook_in_redisclusters.yaml ./config/crd/patches/webhook_in_redisclusters.yaml.orig
-#	cat ./config/crd/patches/webhook_in_redisclusters.yaml.tpl | sed "s|WEBHOOK_CA_CERT|${CA_CERT}|g" > ./config/crd/patches/webhook_in_redisclusters.yaml
-	$(KUSTOMIZE) build config/crd > deployment/redis.inditex.dev_redisclusters.yaml
-#	mv ./config/crd/patches/webhook_in_redisclusters.yaml.orig ./config/crd/patches/webhook_in_redisclusters.yaml
+#	cp ./config/crd/patches/webhook_in_redkeyclusters.yaml ./config/crd/patches/webhook_in_redkeyclusters.yaml.orig
+#	cat ./config/crd/patches/webhook_in_redkeyclusters.yaml.tpl | sed "s|WEBHOOK_CA_CERT|${CA_CERT}|g" > ./config/crd/patches/webhook_in_redkeyclusters.yaml
+	$(KUSTOMIZE) build config/crd > deployment/redis.inditex.dev_redkeyclusters.yaml
+#	mv ./config/crd/patches/webhook_in_redkeyclusters.yaml.orig ./config/crd/patches/webhook_in_redkeyclusters.yaml
 	@echo "CRD manifest generated successfully"
 
 process-manifests-webhook: kustomize ##	Generate the kustomized yamls into the `deployment` directory to deploy the webhook.
@@ -299,14 +299,14 @@ process-manifests-webhook: kustomize ##	Generate the kustomized yamls into the `
   		-subj "/C=AU/CN=${WEBHOOK_NAMESPACE}.${CN}" \
   		-out certs/server.csr
 	openssl x509 -req \
-		-extfile <(printf "subjectAltName=DNS:redis-operator-webhook-service.${WEBHOOK_NAMESPACE}.svc,DNS:redis-operator-webhook-service.${WEBHOOK_NAMESPACE}.svc.cluster.local") \
+		-extfile <(printf "subjectAltName=DNS:redkey-operator-webhook-service.${WEBHOOK_NAMESPACE}.svc,DNS:redkey-operator-webhook-service.${WEBHOOK_NAMESPACE}.svc.cluster.local") \
 		-in certs/server.csr \
 		-CA certs/ca.crt -CAkey certs/ca.key -CAcreateserial \
 		-out certs/server.crt \
 		-days 365
 
 	@echo ">> Generating kube secrets..."
-	kubectl create secret tls redis-operator-webhook-service-cert \
+	kubectl create secret tls redkey-operator-webhook-service-cert \
 		--cert=certs/server.crt \
 		--key=certs/server.key \
 		--dry-run=client -o yaml \
@@ -317,10 +317,10 @@ process-manifests-webhook: kustomize ##	Generate the kustomized yamls into the `
 		$(KUSTOMIZE) edit set namespace ${WEBHOOK_NAMESPACE}) && \
 	if [ ${PROFILE} == "dev" ]; then \
 		(cd config/webhook && \
-			$(KUSTOMIZE) edit set image redis-operator-webhook=${IMG_WEBHOOK};) \
+			$(KUSTOMIZE) edit set image redkey-operator-webhook=${IMG_WEBHOOK};) \
 	elif [ ${PROFILE} == "debug" ]; then \
 		(cd config/deploy-profiles/${PROFILE} && \
-			$(KUSTOMIZE) edit set image /redis-operator-webhook=${IMG_WEBHOOK}); \
+			$(KUSTOMIZE) edit set image /redkey-operator-webhook=${IMG_WEBHOOK}); \
 	fi
 	$(KUSTOMIZE) build config/webhook > deployment/webhook.yaml
 	rm config/webhook/kustomization.yaml
@@ -355,47 +355,47 @@ undeploy-webhook: process-manifests-webhook ##		Delete the webhook from the K8s 
 	$(info $(M) deleting Webhook)
 	kubectl delete -f deployment/webhook.yaml
 
-OPERATOR=$(shell kubectl -n ${NAMESPACE} get po -l='control-plane=redis-operator' -o=jsonpath='{.items[0].metadata.name}')
+OPERATOR=$(shell kubectl -n ${NAMESPACE} get po -l='control-plane=redkey-operator' -o=jsonpath='{.items[0].metadata.name}')
 dev-deploy: ## 		Build a new manager binary, copy the file to the operator pod and run it.
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -gcflags="all=-N -l" -o bin/manager ./cmd/main.go
-	kubectl wait -n ${NAMESPACE} --for=condition=ready pod -l control-plane=redis-operator
+	kubectl wait -n ${NAMESPACE} --for=condition=ready pod -l control-plane=redkey-operator
 	kubectl cp ./bin/manager $(OPERATOR):/manager -n ${NAMESPACE}
 	kubectl exec -it po/$(OPERATOR) -n ${NAMESPACE} exec /manager
 
 debug: ##		Build a new manager binary, copy the file to the operator pod and run it in debug mode (listening on port 40000 for Delve connections).
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -gcflags="all=-N -l" -o bin/manager ./cmd/main.go
-	kubectl wait -n ${NAMESPACE} --for=condition=ready pod -l control-plane=redis-operator
+	kubectl wait -n ${NAMESPACE} --for=condition=ready pod -l control-plane=redkey-operator
 	kubectl cp ./bin/manager $(OPERATOR):/manager -n ${NAMESPACE}
 	kubectl exec -it po/$(OPERATOR) -n ${NAMESPACE} -- dlv --listen=:40000 --headless=true --api-version=2 --accept-multiclient exec /manager --continue
 
 port-forward: ##		Port forwarding of port 40000 for debugging the manager with Delve.
 	kubectl port-forward pods/$(OPERATOR) 40000:40000 -n ${NAMESPACE}
 
-delete-operator: ##		Delete the operator pod (redis-operator) in order to have a new clean pod created.
+delete-operator: ##		Delete the operator pod (redkey-operator) in order to have a new clean pod created.
 	kubectl delete pod $(OPERATOR) -n ${NAMESPACE}
 
-apply-rdcl: ##		Apply the sample Redis Cluster manifest.
-	$(info $(M) creating sample Redis cluster)
-	$(KUSTOMIZE) build config/samples | $(SED) 's/namespace: redis-operator/namespace: ${NAMESPACE}/' | kubectl apply -f -
+apply-rkcl: ##		Apply the sample RedKey Cluster manifest.
+	$(info $(M) creating sample RedKey cluster)
+	$(KUSTOMIZE) build config/samples | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | kubectl apply -f -
 
-delete-rdcl: ##		Delete the sample Redis Cluster manifest.
-	$(info $(M) deleting sample Redis cluster)
-	$(KUSTOMIZE) build config/samples | $(SED) 's/namespace: redis-operator/namespace: ${NAMESPACE}/' | kubectl delete -f -
+delete-rkcl: ##		Delete the sample RedKey Cluster manifest.
+	$(info $(M) deleting sample RedKey cluster)
+	$(KUSTOMIZE) build config/samples | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | kubectl delete -f -
 
-apply-all: docker-build docker-push process-manifests install deploy apply-rdcl
+apply-all: docker-build docker-push process-manifests install deploy apply-rkcl
 
-delete-all: delete-rdcl undeploy uninstall
+delete-all: delete-rkcl undeploy uninstall
 
-WEBHOOK=$(shell kubectl -n ${WEBHOOK_NAMESPACE} get po -l='control-plane=redis-operator-webhook' -o=jsonpath='{.items[0].metadata.name}')
+WEBHOOK=$(shell kubectl -n ${WEBHOOK_NAMESPACE} get po -l='control-plane=redkey-operator-webhook' -o=jsonpath='{.items[0].metadata.name}')
 dev-deploy-webhook: ## 		Build a new webhook binary, copy the file to the webhook pod and run it.
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -gcflags="all=-N -l" -C webhook -o ../bin/webhook  main.go
-	kubectl wait -n ${WEBHOOK_NAMESPACE} --for=condition=ready pod -l control-plane=redis-operator-webhook
+	kubectl wait -n ${WEBHOOK_NAMESPACE} --for=condition=ready pod -l control-plane=redkey-operator-webhook
 	kubectl cp ./bin/webhook $(WEBHOOK):/webhook -n ${WEBHOOK_NAMESPACE}
 	kubectl exec -it po/$(WEBHOOK) -n ${WEBHOOK_NAMESPACE} exec /webhook
 
 debug-webhook: ##		Build a new webhook binary, copy the file to the webhhok pod and run it in debug mode (listening on port 40000 for Delve connections).
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -gcflags="all=-N -l" -C webhook -o ../bin/webhook  main.go
-	kubectl wait -n ${WEBHOOK_NAMESPACE} --for=condition=ready pod -l control-plane=redis-operator-webhook
+	kubectl wait -n ${WEBHOOK_NAMESPACE} --for=condition=ready pod -l control-plane=redkey-operator-webhook
 	kubectl cp ./bin/webhook $(WEBHOOK):/webhook -n ${WEBHOOK_NAMESPACE}
 	kubectl exec -it po/$(WEBHOOK) -n ${WEBHOOK_NAMESPACE} -- dlv --listen=:40000 --headless=true --api-version=2 --accept-multiclient exec /webhook --continue
 
@@ -444,23 +444,23 @@ $(ENVTEST):
 
 ##@ Troubleshooting
 
-REDIS_PODS=$(shell kubectl get po -n ${NAMESPACE} --field-selector=status.phase=Running  -l='redis.rediscluster.operator/component=redis' -o custom-columns=':metadata.name' )
-redis-check: ## Check information in pods related to redis cluster.
+REDIS_PODS=$(shell kubectl get po -n ${NAMESPACE} --field-selector=status.phase=Running  -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name' )
+redis-check: ## Check information in pods related to RedKey cluster.
 	for POD in $(REDIS_PODS); do kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli --cluster check localhost:6379; done
 
-redis-nodes: ## Check nodes of redis cluster.
+redis-nodes: ## Check nodes of RedKey cluster.
 	for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli CLUSTER NODES | sort; done
 
-redis-slots: ## Check slots of redis cluster.
+redis-slots: ## Check slots of RedKey cluster.
 	for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli CLUSTER SLOTS | sort; done
 
-redis-info: ## Check info of redis cluster
+redis-info: ## Check info of RedKey cluster
 	for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli CLUSTER INFO | sort; done
 
-redis-forget: ## Forget nodes of redis cluster
+redis-forget: ## Forget nodes of RedKey cluster
 	for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli CLUSTER FORGET $(nodeid); done
 
-redis-benchmark: # Benckmark a redis cluster
+redis-benchmark: # Benckmark a RedKey cluster
 	if [ "$(WORKSPACE)" == "default" ]; then \
   		kubectl exec -it -n $(NSTEST) redis-cluster-0 -- redis-benchmark -c 100 -n 100000 -t set,get; \
 	else \
@@ -471,10 +471,10 @@ redis-benchmark: # Benckmark a redis cluster
 	  fi \
 	fi
 
-redis-fix: ## Fix redis cluster
+redis-fix: ## Fix RedKey cluster
 	for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli --cluster fix localhost:6379; done
 
-redis-rebalance: ## Rebalance slots of redis cluster
+redis-rebalance: ## Rebalance slots of RedKey cluster
 	for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli --cluster rebalance --cluster-use-empty-masters localhost:6379; done
 
 args = `arg="$(filter-out $@,$(MAKECMDGOALS))" && echo $${arg:-${1}}`
@@ -482,7 +482,7 @@ args = `arg="$(filter-out $@,$(MAKECMDGOALS))" && echo $${arg:-${1}}`
 redis-forget-manually:
 	for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli CLUSTER FORGET $(call args, $(nodeid)); done
 
-REDIS_POD=$(shell kubectl get po -n ${NAMESPACE} --field-selector=status.phase=Running  -l='redis.rediscluster.operator/component=redis' -o custom-columns=':metadata.name' --no-headers | head -n 1)
+REDIS_POD=$(shell kubectl get po -n ${NAMESPACE} --field-selector=status.phase=Running  -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name' --no-headers | head -n 1)
 
 .SILENT:
 redis-insert:
@@ -509,10 +509,10 @@ redis-restore:
 	for POD in $(REDIS_PODS); do echo $${POD}; kubectl cp /tmp/$${POD}-dump.rdb $${POD}:/data/dump.rdb -n ${NAMESPACE}; done
 
 redis-aof-disable:
-	kubectl patch rdcl redis-cluster -n ${NAMESPACE} --type='json' -p='[{"op": "replace", "path": "/spec/config", "value":"maxmemory 200mb\nmaxmemory-samples 5\nmaxmemory-policy allkeys-lru\nappendonly no\nprotected-mode no\nloadmodule /usr/lib/redis/modules/redisgraph.so"}]' | for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli SHUTDOWN; done | sleep 5
+	kubectl patch rkcl redis-cluster -n ${NAMESPACE} --type='json' -p='[{"op": "replace", "path": "/spec/config", "value":"maxmemory 200mb\nmaxmemory-samples 5\nmaxmemory-policy allkeys-lru\nappendonly no\nprotected-mode no\nloadmodule /usr/lib/redis/modules/redisgraph.so"}]' | for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli SHUTDOWN; done | sleep 5
 
 redis-aof-enable:
-	kubectl patch rdcl redis-cluster -n ${NAMESPACE} --type='json' -p='[{"op": "replace", "path": "/spec/config", "value":"maxmemory 200mb\nmaxmemory-samples 5\nmaxmemory-policy allkeys-lru\nappendonly yes\nprotected-mode no\nloadmodule /usr/lib/redis/modules/redisgraph.so"}]'
+	kubectl patch rkcl redis-cluster -n ${NAMESPACE} --type='json' -p='[{"op": "replace", "path": "/spec/config", "value":"maxmemory 200mb\nmaxmemory-samples 5\nmaxmemory-policy allkeys-lru\nappendonly yes\nprotected-mode no\nloadmodule /usr/lib/redis/modules/redisgraph.so"}]'
 
 
 ##@ Integration with OLM
@@ -539,7 +539,7 @@ bundle: kustomize manifests ## Generate the files for bundle.
 	rm -rf bundle/manifests/*
 	rm -rf bundle/metadata/*
 	$(OPERATOR_SDK) generate kustomize manifests -q
-	cd config/manager && $(KUSTOMIZE) edit set image redis-operator=$(IMAGE_REF)
+	cd config/manager && $(KUSTOMIZE) edit set image redkey-operator=$(IMAGE_REF)
 	$(KUSTOMIZE) build config | $(OPERATOR_SDK) generate bundle -q --overwrite --channels $(CHANNELS) --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 	$(OPERATOR_SDK) bundle validate ./bundle
 
@@ -607,7 +607,7 @@ test-cov: 	## Execute the application test with coverage
 SED = $(shell which sed)
 
 int-test-generate: ## Generate manifests and metadata files.
-	cd config/int-test; $(KUSTOMIZE) edit set image redis-operator=${IMG}; \
+	cd config/int-test; $(KUSTOMIZE) edit set image redkey-operator=${IMG}; \
 	$(KUSTOMIZE) edit set namespace $(NAMESPACE); $(KUSTOMIZE) build > tests.yaml
 
 int-test-clean:	## Clear manifests and metadata files.

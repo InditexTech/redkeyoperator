@@ -4,12 +4,12 @@
 
 #!/bin/bash
 
-# Global variable for Redis cluster name
+# Global variable for cluster name
 REDIS_CLUSTER_NAME="redis-cluster-test"
 
 # Function: Print usage information and exit
 function usage() {
-    echo "Usage: $0 <replicas> <namespace> <redis-cluster-name>" >&2
+    echo "Usage: $0 <replicas> <namespace> <redkey-cluster-name>" >&2
     exit 1
 }
 
@@ -145,14 +145,14 @@ function kill_k6 {
     rm -f k6.log
 }
 
-# Function to wait until Redis cluster is ready, with a timeout to avoid infinite waiting.
+# Function to wait until cluster is ready, with a timeout to avoid infinite waiting.
 function wait_redis_ready {
     local namespace="$1"
     local cluster="$2"
     local delay="${3:-2}"
     local timeout="${4:-6000}"  # Maximum wait time in seconds
 
-    log_info "Waiting for Redis Cluster '$cluster' in namespace '$namespace' to be ready (timeout: ${timeout}s)..."
+    log_info "Waiting for Cluster '$cluster' in namespace '$namespace' to be ready (timeout: ${timeout}s)..."
 
     local start_time current_time elapsed last_status=""
     start_time=$(date +%s)
@@ -161,14 +161,14 @@ function wait_redis_ready {
         current_time=$(date +%s)
         elapsed=$(( current_time - start_time ))
         if (( elapsed >= timeout )); then
-            log_error "Timeout reached: Redis Cluster '$cluster' in namespace '$namespace' did not become ready after ${timeout}s."
+            log_error "Timeout reached: Cluster '$cluster' in namespace '$namespace' did not become ready after ${timeout}s."
             return 1
         fi
 
-        # Fetch the Redis cluster JSON once.
+        # Fetch the cluster JSON once.
         local cluster_json
         if ! cluster_json=$(kubectl get rediscluster/"$cluster" -n "$namespace" -o json 2>/dev/null); then
-            log_error "Failed to retrieve Redis cluster JSON in namespace '$namespace'. Retrying..."
+            log_error "Failed to retrieve cluster JSON in namespace '$namespace'. Retrying..."
             sleep "$delay"
             continue
         fi
@@ -179,7 +179,7 @@ function wait_redis_ready {
         status=$(echo "$cluster_json" | jq -r '.status.status // empty')
 
         if [[ -z "$replicas" || -z "$status" ]]; then
-            log_error "Incomplete Redis cluster information in namespace '$namespace'. Retrying..."
+            log_error "Incomplete cluster information in namespace '$namespace'. Retrying..."
             sleep "$delay"
             continue
         fi
@@ -187,7 +187,7 @@ function wait_redis_ready {
         if [[ "$status" != "Ready" ]]; then
             # Log status only if it has changed.
             if [[ "$status" != "$last_status" ]]; then
-                log_info "Redis cluster status is '$status'. Waiting..."
+                log_info "cluster status is '$status'. Waiting..."
                 last_status="$status"
             fi
             sleep "$delay"
@@ -198,14 +198,14 @@ function wait_redis_ready {
         local redis_pods
         redis_pods=$(kubectl get pods -n "$namespace" -l deployment="$cluster" -o jsonpath='{.items[*].metadata.name}')
         if [[ -z "$redis_pods" ]]; then
-            log_error "No Redis pods found in namespace '$namespace'. Retrying..."
+            log_error "No pods found in namespace '$namespace'. Retrying..."
             sleep "$delay"
             continue
         fi
 
         local all_ready=true
         for pod in $redis_pods; do
-            # Check Redis cluster state inside each pod.
+            # Check cluster state inside each pod.
             if ! kubectl exec -n "$namespace" "$pod" -- redis-cli --cluster check localhost 6379 &>/dev/null; then
                 log_error "Cluster check failed for pod '$pod'. Retrying..."
                 all_ready=false
@@ -221,7 +221,7 @@ function wait_redis_ready {
         done
 
         if [[ "$all_ready" == "true" ]]; then
-            log_info "Redis Cluster is Ready!"
+            log_info "Cluster is Ready!"
             return 0
         fi
 
@@ -230,7 +230,7 @@ function wait_redis_ready {
 }
 
 
-# Function to scale Redis cluster.
+# Function to scale cluster.
 function scale_redis {
     local replicas="$1"
     local namespace="$2"
@@ -242,14 +242,14 @@ function scale_redis {
         return 1
     fi
 
-    log_info "Scaling Redis cluster '$cluster' to $replicas replicas in namespace '$namespace'."
+    log_info "Scaling cluster '$cluster' to $replicas replicas in namespace '$namespace'."
 
     if ! kubectl patch rediscluster/"$cluster" -n "$namespace" -p '{"spec":{"replicas":'"$replicas"'}}' --type merge; then
-        log_error "Failed to scale Redis cluster."
+        log_error "Failed to scale cluster."
         return 1
     fi
 
-    log_info "Successfully scaled Redis cluster '$cluster' to $replicas replicas in namespace '$namespace'."
+    log_info "Successfully scaled cluster '$cluster' to $replicas replicas in namespace '$namespace'."
 }
 
 
@@ -388,7 +388,7 @@ function operator_process_scale {
 }
 
 
-# Function to check Redis cluster status
+# Function to check cluster status
 function check_redis {
     local cluster="$1"
     local namespace="$2"
@@ -398,7 +398,7 @@ function check_redis {
     status=$(kubectl get rediscluster/"$cluster" -n "$namespace" -o json | jq -r .status.status)
 
     if [[ "$status" != "Ready" ]]; then
-        log_error "Redis cluster $cluster is not Ready in namespace $namespace (Status: $status)"
+        log_error "cluster $cluster is not Ready in namespace $namespace (Status: $status)"
         return 1
     fi
 

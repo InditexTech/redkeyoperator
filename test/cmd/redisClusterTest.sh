@@ -30,7 +30,7 @@ readonly name="redis-cluster"
 #   None
 #######################################
 initializeRedisCluster() {
-    REDIS_POD=$(kubectl get po -n $namespace -l='redis.rediscluster.operator/component=redis' -o custom-columns=':metadata.name' --no-headers | head)
+    REDIS_POD=$(kubectl get po -n $namespace -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name' --no-headers | head)
     # validate if exists an instance of redisCluster installed
     if [ -z "$REDIS_POD" ]; then
         installRedisCluster
@@ -571,8 +571,8 @@ deleteLabel() {
 #   None
 #######################################
 validateLabels() {
-    local defaultRedisClusterNameLabel="redis-cluster-name"
-    local defaultRedisClusterOperatorLabel="redis.rediscluster.operator/component"
+    local defaultRedisClusterNameLabel="redkey-cluster-name"
+    local defaultRedisClusterOperatorLabel="redis.redkeycluster.operator/component"
     # get RedisCluster labels
     local rdclLabels=$(getLabels "kubectl get rdcl redis-cluster -o custom-columns=':spec.labels' -n $namespace")
     # get ConfigMap labels
@@ -753,7 +753,7 @@ deleteRedisCluster() {
     local resultMessage="INFO:: RedisCluster was deleted correctly"
     echo '##########################################'
     echo 'INFO:: getting data and objects to delete in the current cluster'
-    pvcsToDelete=$(kubectl get pvc -l='redis-cluster-name=redis-cluster' -o custom-columns=':metadata.name' -n $namespace)
+    pvcsToDelete=$(kubectl get pvc -l='redkey-cluster-name=redis-cluster' -o custom-columns=':metadata.name' -n $namespace)
     rdclPersistent=$(kubectl get rdcl -l='app=redis' -o custom-columns=':metadata.name' -n $namespace)
     rdclEphemeral=$(kubectl get rdcl -l='tier=redis-cluster' -o custom-columns=':metadata.name' -n $namespace)
 
@@ -785,7 +785,7 @@ deleteRedisCluster() {
 }
 
 #######################################
-# Allows to validate if is posible to insert data into the Redis Cluster
+# Allows to validate if is posible to insert data into the Cluster
 # Globals:
 #   namespace=$1
 #   image=$2
@@ -802,7 +802,7 @@ insertData() {
     if [[ "$newRedisCluster" == "true" ]]; then
         initializeRedisCluster
     fi
-    REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.rediscluster.operator/component=redis' -o custom-columns=':metadata.name' --no-headers | head)
+    REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name' --no-headers | head)
     if [ -z "$REDIS_POD" ]; then
         result=0
         resultMessage="ERROR:: No pods running to insert data, starts your cluster to use this feature."
@@ -818,7 +818,7 @@ insertData() {
 }
 
 #######################################
-# Allows to validate if is posible to insert data while scaling up event is executing into the Redis Cluster
+# Allows to validate if is posible to insert data while scaling up event is executing into the Cluster
 # Globals:
 #   namespace=$1
 #   image=$2
@@ -847,7 +847,7 @@ insertDataWhileScaling() {
         echo '##########################################'
         echo $inserts
         status=$(kubectl get rediscluster -n $namespace $name --template='{{.status.status}}')
-        REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.rediscluster.operator/component=redis' -o custom-columns=':metadata.name' --no-headers | head)
+        REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name' --no-headers | head)
         if [ -z "$REDIS_POD" ]; then
             result=1
             resultMessage="ERROR:: No pods running to insert data."
@@ -870,8 +870,8 @@ insertDataWhileScaling() {
         echo '##########################################'
         totalKeys=$((inserts * keysByLoop))
         echo "INFO:: total keys inserted while the scale up process was executed $totalKeys"
-        # REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.rediscluster.operator/component=redis' -o custom-columns=':metadata.name' --no-headers | head)
-        REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.rediscluster.operator/component=redis' -o custom-columns=':metadata.name')
+        # REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name' --no-headers | head)
+        REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name')
         if [ -z "$REDIS_POD" ]; then
             result=1
             resultMessage="ERROR:: No pods running to get data."
@@ -900,7 +900,7 @@ insertDataWhileScaling() {
 }
 
 #######################################
-# Allows to validate if is posible to insert data while scaling down event is executing into the Redis Cluster
+# Allows to validate if is posible to insert data while scaling down event is executing into the Cluster
 # Globals:
 #   namespace=$1
 #   image=$2
@@ -949,7 +949,7 @@ insertDataWhileScalingDown() {
                 echo '##########################################'
                 echo $inserts
                 status=$(kubectl get rediscluster -n $namespace $name --template='{{.status.status}}')
-                REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.rediscluster.operator/component=redis' -o custom-columns=':metadata.name' --no-headers | head)
+                REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name' --no-headers | head)
                 if [ -z "$REDIS_POD" ]; then
                     result=1
                     resultMessage="ERROR:: No pods running to insert data."
@@ -975,7 +975,7 @@ insertDataWhileScalingDown() {
         echo '##########################################'
         totalKeys=$((inserts * keysByLoop))
         echo "INFO:: total keys inserted while the scale up process was executed $totalKeys"
-        REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.rediscluster.operator/component=redis' -o custom-columns=':metadata.name' --no-headers | head)
+        REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name' --no-headers | head)
         if [ -z "$REDIS_POD" ]; then
             result=1
             resultMessage="ERROR:: No pods running to get data."
@@ -1004,7 +1004,7 @@ insertDataWhileScalingDown() {
 }
 
 #######################################
-# Allows to get a specific key inserted into the Redis Cluster
+# Allows to get a specific key inserted into the Cluster
 # Globals:
 #   namespace=$1
 #   image=$2
@@ -1024,7 +1024,7 @@ getSpecificKey() {
         initializeRedisCluster
     fi
     kubectl get all,rdcl -n $namespace
-    REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.rediscluster.operator/component=redis' -o custom-columns=':metadata.name' --no-headers | head)
+    REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name' --no-headers | head)
     if [ -z "$REDIS_POD" ]; then
         result=1
         resultMessage="ERROR:: No pods running to insert data, starts your cluster to use this feature."
@@ -1040,7 +1040,7 @@ getSpecificKey() {
         echo "INFO kubectl -n $namespace exec -i $REDIS_POD -- redis-cli -c"
         cat /tmp/data.txt | kubectl -n $namespace exec -i $REDIS_POD -- redis-cli -c
 
-        # loop through the redis Cluster pods looking for the key.
+        # loop through the Cluster pods looking for the key.
         for POD in $REDIS_POD; do
             getValue=$(kubectl -n $namespace exec -i $POD -- redis-cli get $key)
             if [ -n "$getValue" ]; then
@@ -1116,9 +1116,9 @@ validateRedisMasterSlave() {
     elif [[ $minRepStatefulSet -lt $stsReplicas ]]; then
         resultMessage="ERROR:: Minimum configuration required StateFulSet minRepStatefulSet"
     else
-        REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.rediscluster.operator/component=redis' -o custom-columns=':metadata.name')
+        REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name')
         for POD in $REDIS_POD; do
-            # get and parse the info about nodes configured in the Redis Cluster
+            # get and parse the info about nodes configured in the Cluster
             nodes=$(kubectl -n $namespace exec -i $POD -- redis-cli CLUSTER NODES | tr " " "&" | tr "\r" ";")
             break
         done
@@ -1170,15 +1170,15 @@ validateBasicRedisMasterSlave() {
     fi
     kubectl get all,rdcl -n $namespace
     echo '##########################################'
-    echo "INFO:: Validating basic configuration in Redis Cluster with master-slave configuration"
+    echo "INFO:: Validating basic configuration in Cluster with master-slave configuration"
     message=$(validateRedisMasterSlave)
     if [[ "$message" != "0" ]]; then
         resultMessage=$message
         result=1
     else
-        REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.rediscluster.operator/component=redis' -o custom-columns=':metadata.name')
+        REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name')
         for POD in $REDIS_POD; do
-            # get and parse the info about nodes configured in the Redis Cluster
+            # get and parse the info about nodes configured in the Cluster
             kubectl -n $namespace exec -i $POD -- redis-cli CLUSTER NODES
             echo '##########################################'
             break
@@ -1228,16 +1228,16 @@ scalingUpRedisMasterSlave() {
         else
             kubectl get all,rdcl -n $namespace
             echo '##########################################'
-            echo "INFO:: Validating configuration in Redis Cluster with master-slave configuration"
+            echo "INFO:: Validating configuration in Cluster with master-slave configuration"
             message=$(validateRedisMasterSlave)
             if [[ "$message" != "0" ]]; then
                 resultMessage=$message
                 result=1
             else
                 # show the configuration
-                REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.rediscluster.operator/component=redis' -o custom-columns=':metadata.name')
+                REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name')
                 for POD in $REDIS_POD; do
-                    # get and parse the info about nodes configured in the Redis Cluster
+                    # get and parse the info about nodes configured in the Cluster
                     kubectl -n $namespace exec -i $POD -- redis-cli CLUSTER NODES
                     echo '##########################################'
                     break
@@ -1309,7 +1309,7 @@ scalingDownRedisMasterSlave() {
                 else
                     kubectl get all,rdcl -n $namespace
                     echo '##########################################'
-                    echo "INFO:: Validating configuration in Redis Cluster with master-slave configuration"
+                    echo "INFO:: Validating configuration in Cluster with master-slave configuration"
                     sleep 50
                     message=$(validateRedisMasterSlave)
                     if [[ "$message" != "0" ]]; then
@@ -1317,9 +1317,9 @@ scalingDownRedisMasterSlave() {
                         result=1
                     else
                         # show the configuration
-                        REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.rediscluster.operator/component=redis' -o custom-columns=':metadata.name')
+                        REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name')
                         for POD in $REDIS_POD; do
-                            # get and parse the info about nodes configured in the Redis Cluster
+                            # get and parse the info about nodes configured in the Cluster
                             kubectl -n $namespace exec -i $POD -- redis-cli CLUSTER NODES
                             echo '##########################################'
                             break
@@ -1356,7 +1356,7 @@ killPodRedisMasterSlave() {
     fi
     kubectl get all,rdcl -n $namespace
     echo '##########################################'
-    REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.rediscluster.operator/component=redis' -o custom-columns=':metadata.name')
+    REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name')
     for POD in $REDIS_POD; do
         set +e
         # kill one pod that is allocated to RedisCluster
@@ -1374,7 +1374,7 @@ killPodRedisMasterSlave() {
         resultMessage="Failure: Script failed"
         result=1
     else
-        echo "INFO:: Validating configuration in Redis Cluster with master-slave configuration"
+        echo "INFO:: Validating configuration in Cluster with master-slave configuration"
         sleep 40
         kubectl get all,rdcl -n $namespace
         echo '##########################################'
@@ -1414,7 +1414,7 @@ allTest() {
 }
 
 #######################################
-# Initialize a new redis operator in local environment.
+# Initialize a new RedKey operator in local environment.
 # Globals:
 #   namespace=$1
 #   image=$2
@@ -1524,7 +1524,7 @@ All)
 esac
 
 # ./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.8" "Initialize" "true" "storage"
-# ./test/cmd/redisClusterTest.sh test-${{ github.event.pull_request.head.sha }} ${{env.JFROG_SNAPSHOT_REGISTRY}}/redis-operator:sha-${{ github.event.pull_request.head.sha }} "Initialize" "true" "storage"
+# ./test/cmd/redisClusterTest.sh test-${{ github.event.pull_request.head.sha }} ${{env.JFROG_SNAPSHOT_REGISTRY}}/redkey-operator:sha-${{ github.event.pull_request.head.sha }} "Initialize" "true" "storage"
 # ./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:1.0.2" "ScalingUpPatch" "true" "storage"
 # ./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.8" "ScalingDownPatch" "true" "storage"
 # ./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:1.0.2" "ScalingUp" "true" "storage"

@@ -11,9 +11,9 @@ import (
 	"maps"
 	"reflect"
 
-	redisv1 "github.com/inditextech/redisoperator/api/v1"
-	redis "github.com/inditextech/redisoperator/internal/redis"
-	"github.com/inditextech/redisoperator/internal/robin"
+	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
+	redis "github.com/inditextech/redkeyoperator/internal/redis"
+	"github.com/inditextech/redkeyoperator/internal/robin"
 	"gopkg.in/yaml.v3"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -25,33 +25,33 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (r *RedisClusterReconciler) checkAndCreateRobin(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) error {
+func (r *RedKeyClusterReconciler) checkAndCreateRobin(ctx context.Context, req ctrl.Request, redkeyCluster *redkeyv1.RedKeyCluster) error {
 	// Populate robin spec if not provided. This to handle the case where the user removes the robin spec of an existing cluster. The robin objects will be deleted.
-	if redisCluster.Spec.Robin == nil {
-		redisCluster.Spec.Robin = &redisv1.RobinSpec{
+	if redkeyCluster.Spec.Robin == nil {
+		redkeyCluster.Spec.Robin = &redkeyv1.RobinSpec{
 			Config:   nil,
 			Template: nil,
 		}
 	}
 
 	// Robin configmap
-	if err := r.handleRobinConfig(ctx, req, redisCluster); err != nil {
+	if err := r.handleRobinConfig(ctx, req, redkeyCluster); err != nil {
 		return err
 	}
 
 	// Robin deployment
-	r.handleRobinDeployment(ctx, req, redisCluster)
+	r.handleRobinDeployment(ctx, req, redkeyCluster)
 
 	return nil
 }
 
-func (r *RedisClusterReconciler) handleRobinConfig(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) error {
+func (r *RedKeyClusterReconciler) handleRobinConfig(ctx context.Context, req ctrl.Request, redkeyCluster *redkeyv1.RedKeyCluster) error {
 	// Get robin configmap
-	existingConfigMap, err := r.FindExistingConfigMapFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}})
+	existingConfigMap, err := r.FindExistingConfigMapFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redkeyCluster.Name + "-robin", Namespace: redkeyCluster.Namespace}})
 
 	// Robin configmap not provided: delete configmap if exists
-	if redisCluster.Spec.Robin.Config == nil {
-		r.deleteRobinObject(ctx, existingConfigMap, redisCluster, "configmap")
+	if redkeyCluster.Spec.Robin.Config == nil {
+		r.deleteRobinObject(ctx, existingConfigMap, redkeyCluster, "configmap")
 		return nil
 	}
 
@@ -59,24 +59,24 @@ func (r *RedisClusterReconciler) handleRobinConfig(ctx context.Context, req ctrl
 	if err != nil {
 		// Return if the error is not a NotFound error
 		if !errors.IsNotFound(err) {
-			r.logError(redisCluster.NamespacedName(), err, "Getting robin configmap failed")
+			r.logError(redkeyCluster.NamespacedName(), err, "Getting robin configmap failed")
 			return nil
 		}
 
 		// Create Robin ConfigMap
-		newConfigMap := r.createRobinConfigMap(req, redisCluster.Spec, *redisCluster.Spec.Labels)
-		r.createRobinObject(ctx, newConfigMap, redisCluster, "configmap")
+		newConfigMap := r.createRobinConfigMap(req, redkeyCluster.Spec, *redkeyCluster.Spec.Labels)
+		r.createRobinObject(ctx, newConfigMap, redkeyCluster, "configmap")
 		return nil
 	}
 
 	// Robin configmap found: check if it needs to be updated
 	var existingConfig, declaredConfig robin.Configuration
 	if err := yaml.Unmarshal([]byte(existingConfigMap.Data["application-configmap.yml"]), &existingConfig); err != nil {
-		r.logError(redisCluster.NamespacedName(), err, "Error parsing existing Robin configuration")
+		r.logError(redkeyCluster.NamespacedName(), err, "Error parsing existing Robin configuration")
 		return err
 	}
-	if err := yaml.Unmarshal([]byte(*redisCluster.Spec.Robin.Config), &declaredConfig); err != nil {
-		r.logError(redisCluster.NamespacedName(), err, "Error parsing declared Robin configuration")
+	if err := yaml.Unmarshal([]byte(*redkeyCluster.Spec.Robin.Config), &declaredConfig); err != nil {
+		r.logError(redkeyCluster.NamespacedName(), err, "Error parsing declared Robin configuration")
 		return err
 	}
 
@@ -85,27 +85,27 @@ func (r *RedisClusterReconciler) handleRobinConfig(ctx context.Context, req ctrl
 	}
 
 	// Robin configmap changed: update configmap
-	existingConfigMap.Data["application-configmap.yml"] = *redisCluster.Spec.Robin.Config
-	r.updateRobinObject(ctx, existingConfigMap, redisCluster, "configmap")
+	existingConfigMap.Data["application-configmap.yml"] = *redkeyCluster.Spec.Robin.Config
+	r.updateRobinObject(ctx, existingConfigMap, redkeyCluster, "configmap")
 
 	// Add checksum to the deployment annotations to force the deployment rollout
-	if redisCluster.Spec.Robin.Template != nil {
-		if redisCluster.Spec.Robin.Template.Annotations == nil {
-			redisCluster.Spec.Robin.Template.Annotations = make(map[string]string)
+	if redkeyCluster.Spec.Robin.Template != nil {
+		if redkeyCluster.Spec.Robin.Template.Annotations == nil {
+			redkeyCluster.Spec.Robin.Template.Annotations = make(map[string]string)
 		}
-		redisCluster.Spec.Robin.Template.Annotations["checksum/config"] = fmt.Sprintf("%x", md5.Sum([]byte(*redisCluster.Spec.Robin.Config)))
+		redkeyCluster.Spec.Robin.Template.Annotations["checksum/config"] = fmt.Sprintf("%x", md5.Sum([]byte(*redkeyCluster.Spec.Robin.Config)))
 	}
 
 	return nil
 }
 
-func (r *RedisClusterReconciler) handleRobinDeployment(ctx context.Context, req ctrl.Request, redisCluster *redisv1.RedisCluster) {
+func (r *RedKeyClusterReconciler) handleRobinDeployment(ctx context.Context, req ctrl.Request, redkeyCluster *redkeyv1.RedKeyCluster) {
 	// Get robin deployment
-	deployment, err := r.FindExistingDeployment(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}})
+	deployment, err := r.FindExistingDeployment(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redkeyCluster.Name + "-robin", Namespace: redkeyCluster.Namespace}})
 
 	// Robin deployment template not provided: delete deployment if exists
-	if redisCluster.Spec.Robin.Template == nil {
-		r.deleteRobinObject(ctx, deployment, redisCluster, "deployment")
+	if redkeyCluster.Spec.Robin.Template == nil {
+		r.deleteRobinObject(ctx, deployment, redkeyCluster, "deployment")
 		return
 	}
 
@@ -113,84 +113,84 @@ func (r *RedisClusterReconciler) handleRobinDeployment(ctx context.Context, req 
 	if err != nil {
 		// Return if the error is not a NotFound error
 		if !errors.IsNotFound(err) {
-			r.logError(redisCluster.NamespacedName(), err, "Getting robin deployment failed")
+			r.logError(redkeyCluster.NamespacedName(), err, "Getting robin deployment failed")
 			return
 		}
 
 		// Create Robin Deployment
-		robinDeployment := r.createRobinDeployment(req, redisCluster, *redisCluster.Spec.Labels)
-		r.createRobinObject(ctx, robinDeployment, redisCluster, "deployment")
+		robinDeployment := r.createRobinDeployment(req, redkeyCluster, *redkeyCluster.Spec.Labels)
+		r.createRobinObject(ctx, robinDeployment, redkeyCluster, "deployment")
 		return
 	}
 
 	// Robin deployment found: check if it needs to be updated
-	patchedPodTemplateSpec, changed := r.overrideRobinDeployment(req, redisCluster, deployment.Spec.Template)
+	patchedPodTemplateSpec, changed := r.overrideRobinDeployment(req, redkeyCluster, deployment.Spec.Template)
 	if !changed {
 		return
 	}
 
 	// Robin deployment changed: update deployment
 	deployment.Spec.Template = patchedPodTemplateSpec
-	r.updateRobinObject(ctx, deployment, redisCluster, "deployment")
+	r.updateRobinObject(ctx, deployment, redkeyCluster, "deployment")
 }
 
-func (r *RedisClusterReconciler) createRobinObject(ctx context.Context, obj client.Object, redisCluster *redisv1.RedisCluster, kind string) error {
+func (r *RedKeyClusterReconciler) createRobinObject(ctx context.Context, obj client.Object, redkeyCluster *redkeyv1.RedKeyCluster, kind string) error {
 	if obj.DeepCopyObject() == nil {
 		return nil
 	}
 
-	ctrl.SetControllerReference(redisCluster, obj, r.Scheme)
+	ctrl.SetControllerReference(redkeyCluster, obj, r.Scheme)
 
-	r.logInfo(redisCluster.NamespacedName(), "Creating robin "+kind)
+	r.logInfo(redkeyCluster.NamespacedName(), "Creating robin "+kind)
 	err := r.Client.Create(ctx, obj)
 	if err != nil {
 		if !errors.IsAlreadyExists(err) {
-			r.logError(redisCluster.NamespacedName(), err, "Error creating robin "+kind)
+			r.logError(redkeyCluster.NamespacedName(), err, "Error creating robin "+kind)
 			return err
 		}
-		r.logInfo(redisCluster.NamespacedName(), "robin "+kind+" already exists")
+		r.logInfo(redkeyCluster.NamespacedName(), "robin "+kind+" already exists")
 		return nil
 	}
 
-	r.logInfo(redisCluster.NamespacedName(), "Successfully created robin "+kind, kind, redisCluster.Name+"-robin")
+	r.logInfo(redkeyCluster.NamespacedName(), "Successfully created robin "+kind, kind, redkeyCluster.Name+"-robin")
 	return nil
 }
 
-func (r *RedisClusterReconciler) updateRobinObject(ctx context.Context, obj client.Object, redisCluster *redisv1.RedisCluster, kind string) error {
+func (r *RedKeyClusterReconciler) updateRobinObject(ctx context.Context, obj client.Object, redkeyCluster *redkeyv1.RedKeyCluster, kind string) error {
 	if obj.DeepCopyObject() == nil {
 		return nil
 	}
 
-	r.logInfo(redisCluster.NamespacedName(), "Updating robin "+kind)
+	r.logInfo(redkeyCluster.NamespacedName(), "Updating robin "+kind)
 	err := r.Client.Update(ctx, obj)
 	if err != nil {
-		r.logError(redisCluster.NamespacedName(), err, "Error updating robin "+kind)
+		r.logError(redkeyCluster.NamespacedName(), err, "Error updating robin "+kind)
 		return err
 	}
 
-	r.logInfo(redisCluster.NamespacedName(), "Successfully updated robin "+kind, kind, redisCluster.Name+"-robin")
+	r.logInfo(redkeyCluster.NamespacedName(), "Successfully updated robin "+kind, kind, redkeyCluster.Name+"-robin")
 	return nil
 }
 
-func (r *RedisClusterReconciler) deleteRobinObject(ctx context.Context, obj client.Object, redisCluster *redisv1.RedisCluster, kind string) error {
+func (r *RedKeyClusterReconciler) deleteRobinObject(ctx context.Context, obj client.Object, redkeyCluster *redkeyv1.RedKeyCluster, kind string) error {
 	if obj.DeepCopyObject() == nil {
 		return nil
 	}
 
-	r.logInfo(redisCluster.NamespacedName(), "Deleting robin "+kind)
+	r.logInfo(redkeyCluster.NamespacedName(), "Deleting robin "+kind)
 	err := r.Client.Delete(ctx, obj)
 	if err != nil {
-		r.logError(redisCluster.NamespacedName(), err, "Error deleting robin "+kind)
+		r.logError(redkeyCluster.NamespacedName(), err, "Error deleting robin "+kind)
 		return err
 	}
 
-	r.logInfo(redisCluster.NamespacedName(), "Successfully deleted robin "+kind, kind, redisCluster.Name+"-robin")
+	r.logInfo(redkeyCluster.NamespacedName(), "Successfully deleted robin "+kind, kind, redkeyCluster.Name+"-robin")
 	return nil
 }
 
-func (r *RedisClusterReconciler) overrideRobinDeployment(req ctrl.Request, redisCluster *redisv1.RedisCluster, podTemplateSpec corev1.PodTemplateSpec) (corev1.PodTemplateSpec, bool) {
+func (r *RedKeyClusterReconciler) overrideRobinDeployment(req ctrl.Request, redkeyCluster *redkeyv1.RedKeyCluster, podTemplateSpec corev1.PodTemplateSpec) (corev1.PodTemplateSpec, bool) {
 	// Apply the override
-	patchedPodTemplateSpec, err := redis.ApplyPodTemplateSpecOverride(podTemplateSpec, *redisCluster.Spec.Robin.Template)
+	patchedPodTemplateSpec, err := redis.ApplyPodTemplateSpecOverride(podTemplateSpec, *redkeyCluster.Spec.Robin.Template)
 	if err != nil {
 		ctrl.Log.Error(err, "Error applying pod template spec override")
 		return podTemplateSpec, false
@@ -206,7 +206,7 @@ func (r *RedisClusterReconciler) overrideRobinDeployment(req ctrl.Request, redis
 	return *patchedPodTemplateSpec, changed
 }
 
-func (r *RedisClusterReconciler) createRobinDeployment(req ctrl.Request, rediscluster *redisv1.RedisCluster, labels map[string]string) *v1.Deployment {
+func (r *RedKeyClusterReconciler) createRobinDeployment(req ctrl.Request, redkeyCluster *redkeyv1.RedKeyCluster, labels map[string]string) *v1.Deployment {
 	var replicas = int32(1)
 	d := &v1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -215,20 +215,20 @@ func (r *RedisClusterReconciler) createRobinDeployment(req ctrl.Request, rediscl
 			Labels:    labels,
 		},
 		Spec: v1.DeploymentSpec{
-			Template: *rediscluster.Spec.Robin.Template,
+			Template: *redkeyCluster.Spec.Robin.Template,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{redis.RedisClusterLabel: req.Name, r.getStatefulSetSelectorLabel(rediscluster): "robin"},
+				MatchLabels: map[string]string{redis.RedKeyClusterLabel: req.Name, r.getStatefulSetSelectorLabel(redkeyCluster): "robin"},
 			},
 			Replicas: &replicas,
 		},
 	}
-	d.Labels[redis.RedisClusterLabel] = req.Name
-	d.Labels[redis.RedisClusterComponentLabel] = "robin"
+	d.Labels[redis.RedKeyClusterLabel] = req.Name
+	d.Labels[redis.RedKeyClusterComponentLabel] = "robin"
 	d.Spec.Template.Labels = make(map[string]string)
 	maps.Copy(d.Spec.Template.Labels, labels)
-	d.Spec.Template.Labels[redis.RedisClusterLabel] = req.Name
-	d.Spec.Template.Labels[redis.RedisClusterComponentLabel] = "robin"
-	maps.Copy(d.Spec.Template.Labels, rediscluster.Spec.Robin.Template.Labels)
+	d.Spec.Template.Labels[redis.RedKeyClusterLabel] = req.Name
+	d.Spec.Template.Labels[redis.RedKeyClusterComponentLabel] = "robin"
+	maps.Copy(d.Spec.Template.Labels, redkeyCluster.Spec.Robin.Template.Labels)
 
 	for i, container := range d.Spec.Template.Spec.Containers {
 		if container.Resources.Requests == nil {
@@ -248,7 +248,7 @@ func (r *RedisClusterReconciler) createRobinDeployment(req ctrl.Request, rediscl
 	return d
 }
 
-func (r *RedisClusterReconciler) createRobinConfigMap(req ctrl.Request, spec redisv1.RedisClusterSpec, labels map[string]string) *corev1.ConfigMap {
+func (r *RedKeyClusterReconciler) createRobinConfigMap(req ctrl.Request, spec redkeyv1.RedKeyClusterSpec, labels map[string]string) *corev1.ConfigMap {
 	cm := corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      req.Name + "-robin",
@@ -262,20 +262,20 @@ func (r *RedisClusterReconciler) createRobinConfigMap(req ctrl.Request, spec red
 	return &cm
 }
 
-func (r *RedisClusterReconciler) scaleDownRobin(ctx context.Context, redisCluster *redisv1.RedisCluster) {
-	if redisCluster.Spec.Robin != nil {
-		if redisCluster.Spec.Robin.Template != nil {
-			mdep, err := r.FindExistingDeployment(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}})
+func (r *RedKeyClusterReconciler) scaleDownRobin(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) {
+	if redkeyCluster.Spec.Robin != nil {
+		if redkeyCluster.Spec.Robin.Template != nil {
+			mdep, err := r.FindExistingDeployment(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redkeyCluster.Name + "-robin", Namespace: redkeyCluster.Namespace}})
 			if err != nil {
-				r.logError(redisCluster.NamespacedName(), err, "Cannot find existing robin deployment", "deployment", redisCluster.Name+"-robin")
+				r.logError(redkeyCluster.NamespacedName(), err, "Cannot find existing robin deployment", "deployment", redkeyCluster.Name+"-robin")
 			} else {
 				// Scaledown
 				*mdep.Spec.Replicas = 0
-				mdep, err = r.updateDeployment(ctx, mdep, redisCluster)
+				mdep, err = r.updateDeployment(ctx, mdep, redkeyCluster)
 				if err != nil {
-					r.logError(redisCluster.NamespacedName(), err, "Failed to update Deployment replicas")
+					r.logError(redkeyCluster.NamespacedName(), err, "Failed to update Deployment replicas")
 				} else {
-					r.logInfo(redisCluster.NamespacedName(), "Robin Deployment updated", "Replicas", mdep.Spec.Replicas)
+					r.logInfo(redkeyCluster.NamespacedName(), "Robin Deployment updated", "Replicas", mdep.Spec.Replicas)
 				}
 			}
 		}

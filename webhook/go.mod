@@ -1,11 +1,11 @@
-module github.com/inditextech/redisoperator/webhook
+module github.com/inditextech/redkeyoperator/webhook
 
-go 1.24.5
+go 1.24.6
 
-replace github.com/inditextech/redisoperator => ../
+replace github.com/inditextech/redkeyoperator => ../
 
 require (
-	github.com/inditextech/redisoperator v1.3.0
+	github.com/inditextech/redkeyoperator v1.3.0
 	github.com/joho/godotenv v1.5.1
 	k8s.io/api v0.33.0
 	k8s.io/apimachinery v0.33.0

@@ -6,7 +6,7 @@ patches:
   target:
     group: apps
     kind: Deployment
-    name: redis-operator
+    name: redkey-operator
     version: v1
 - path: ./operator-deployment-patch.yaml
 
@@ -14,5 +14,5 @@ resources:
 - ../../rbac
 - ../../manager
 
-namespace: redis-operator
+namespace: redkey-operator
 

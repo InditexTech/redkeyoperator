@@ -118,7 +118,7 @@ func newOperatorDeployment(ns string) *appsv1.Deployment {
 						"control-plane": "redis-operator",
 						"domain":        "DOMAIN",
 						"environment":   "ENVIRONMENT",
-						"layer":         "middleware-redisoperator",
+						"layer":         "middleware-redkeyoperator",
 						"slot":          "default",
 						"tenant":        "TENANT",
 						"type":          "middleware",
@@ -210,17 +210,17 @@ func operatorPolicyRules() []rbacv1.PolicyRule {
 		},
 		{
 			APIGroups: []string{"redis.inditex.com"},
-			Resources: []string{"redisclusters"},
+			Resources: []string{"redkeyclusters"},
 			Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
 		},
 		{
 			APIGroups: []string{"redis.inditex.com"},
-			Resources: []string{"redisclusters/finalizers"},
+			Resources: []string{"redkeyclusters/finalizers"},
 			Verbs:     []string{"update"},
 		},
 		{
 			APIGroups: []string{"redis.inditex.com"},
-			Resources: []string{"redisclusters/status"},
+			Resources: []string{"redkeyclusters/status"},
 			Verbs:     []string{"get", "patch", "update"},
 		},
 	}

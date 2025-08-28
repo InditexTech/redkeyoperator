@@ -17,12 +17,12 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/inditextech/redisoperator/internal/common"
-	"github.com/inditextech/redisoperator/internal/kubernetes"
-	"github.com/inditextech/redisoperator/internal/redis"
+	"github.com/inditextech/redkeyoperator/internal/common"
+	"github.com/inditextech/redkeyoperator/internal/kubernetes"
+	"github.com/inditextech/redkeyoperator/internal/redis"
 	"gopkg.in/yaml.v3"
 
-	redisv1 "github.com/inditextech/redisoperator/api/v1"
+	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -40,6 +40,15 @@ const (
 	StatusMaintenance  = "Maintenance"
 	StatusUnknown      = "Unknown"
 	Port               = 8080
+
+	EndpointProtocolPrefix = "http://"
+	EndpointStatus         = "/v1/redkeycluster/status"
+	EndpointReplicas       = "/v1/redkeycluster/replicas"
+	EndpointClusterCheck   = "/v1/cluster/check"
+	EndpointClusterNodes   = "/v1/cluster/nodes"
+	EndpointClusterFix     = "/v1/cluster/fix"
+	EndpointClusterMove    = "/v1/cluster/move"
+	EndpointClusterReset   = "/v1/cluster/reset/"
 )
 
 // Configuration is the top-level configuration struct.
@@ -52,18 +61,18 @@ type Configuration struct {
 type RedisConfig struct {
 	Standalone bool                  `yaml:"standalone"`
 	Reconciler RedisReconcilerConfig `yaml:"reconciler"`
-	Cluster    RedisClusterConfig    `yaml:"cluster"`
+	Cluster    RedKeyClusterConfig   `yaml:"cluster"`
 	Metrics    RedisMetricsConfig    `yaml:"metrics"`
 }
 
-// RedisOperatorConfig holds operator-level Redis configuration.
+// RedKeyOperatorConfig holds operator-level Redis configuration.
 type RedisReconcilerConfig struct {
 	IntervalSeconds                 int `yaml:"interval_seconds"`
 	OperationCleanupIntervalSeconds int `yaml:"operation_cleanup_interval_seconds"`
 }
 
-// RedisClusterConfig holds cluster-level Redis configuration.
-type RedisClusterConfig struct {
+// RedKeyClusterConfig holds cluster-level Redis configuration.
+type RedKeyClusterConfig struct {
 	Namespace                string        `yaml:"namespace"`
 	Name                     string        `yaml:"name"`
 	Replicas                 int           `yaml:"replicas"`
@@ -133,13 +142,13 @@ type Robin struct {
 	Logger logr.Logger
 }
 
-// Gets Robin initialized from a RedisCluster.
-func NewRobin(ctx context.Context, client ctrlClient.Client, redisCluster *redisv1.RedisCluster, logger logr.Logger) (Robin, error) {
-	componentLabel := kubernetes.GetStatefulSetSelectorLabel(ctx, client, redisCluster)
+// Gets Robin initialized from a RedKeyCluster.
+func NewRobin(ctx context.Context, client ctrlClient.Client, redkeyCluster *redkeyv1.RedKeyCluster, logger logr.Logger) (Robin, error) {
+	componentLabel := kubernetes.GetStatefulSetSelectorLabel(ctx, client, redkeyCluster)
 	labelSelector := labels.SelectorFromSet(
 		map[string]string{
-			redis.RedisClusterLabel: redisCluster.Name,
-			componentLabel:          common.ComponentLabelRobin,
+			redis.RedKeyClusterLabel: redkeyCluster.Name,
+			componentLabel:           common.ComponentLabelRobin,
 		},
 	)
 
@@ -148,7 +157,7 @@ func NewRobin(ctx context.Context, client ctrlClient.Client, redisCluster *redis
 
 	pods := &corev1.PodList{}
 	err := client.List(ctx, pods, &ctrlClient.ListOptions{
-		Namespace:     redisCluster.Namespace,
+		Namespace:     redkeyCluster.Namespace,
 		LabelSelector: labelSelector,
 	})
 	if err != nil {
@@ -168,7 +177,7 @@ func NewRobin(ctx context.Context, client ctrlClient.Client, redisCluster *redis
 }
 
 func (r *Robin) GetStatus() (string, error) {
-	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/rediscluster/status"
+	url := EndpointProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointStatus
 
 	body, err := doSimpleGet(url)
 	if err != nil {
@@ -185,7 +194,7 @@ func (r *Robin) GetStatus() (string, error) {
 }
 
 func (r *Robin) SetStatus(status string) error {
-	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/rediscluster/status"
+	url := EndpointProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointStatus
 
 	var statusParam Status
 	statusParam.Status = status
@@ -204,7 +213,7 @@ func (r *Robin) SetStatus(status string) error {
 }
 
 func (r *Robin) GetReplicas() (int, int, error) {
-	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/rediscluster/replicas"
+	url := EndpointProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointReplicas
 
 	body, err := doSimpleGet(url)
 	if err != nil {
@@ -221,7 +230,7 @@ func (r *Robin) GetReplicas() (int, int, error) {
 }
 
 func (r *Robin) SetReplicas(clusterReplicas int, clusterReplicasPerMaster int) error {
-	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/rediscluster/replicas"
+	url := EndpointProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointReplicas
 
 	var replicas ClusterReplicas
 	replicas.Replicas = clusterReplicas
@@ -241,7 +250,7 @@ func (r *Robin) SetReplicas(clusterReplicas int, clusterReplicasPerMaster int) e
 }
 
 func (r *Robin) ClusterCheck() (bool, []string, []string, error) {
-	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/cluster/check"
+	url := EndpointProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointClusterCheck
 
 	body, err := doSimpleGet(url)
 	if err != nil {
@@ -262,7 +271,7 @@ func (r *Robin) ClusterCheck() (bool, []string, []string, error) {
 }
 
 func (r *Robin) GetClusterNodes() (ClusterNodes, error) {
-	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/cluster/nodes"
+	url := EndpointProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointClusterNodes
 	var clusterNodes ClusterNodes
 
 	body, err := doSimpleGet(url)
@@ -278,7 +287,7 @@ func (r *Robin) GetClusterNodes() (ClusterNodes, error) {
 }
 
 func (r *Robin) ClusterFix() error {
-	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/cluster/fix"
+	url := EndpointProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointClusterFix
 
 	var payload []byte
 	body, err := doPut(url, payload)
@@ -291,7 +300,7 @@ func (r *Robin) ClusterFix() error {
 }
 
 func (r *Robin) ClusterResetNode(nodeIndex int) error {
-	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/cluster/reset/" + strconv.Itoa(nodeIndex)
+	url := EndpointProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointClusterReset + strconv.Itoa(nodeIndex)
 
 	var payload []byte
 	body, err := doPut(url, payload)
@@ -304,7 +313,7 @@ func (r *Robin) ClusterResetNode(nodeIndex int) error {
 }
 
 func (r *Robin) MoveSlots(nodeIndexFrom int, nodeIndexTo int, numSlots int) (bool, error) {
-	url := "http://" + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + "/v1/cluster/move"
+	url := EndpointProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointClusterMove
 
 	var moveParam MoveSlots
 	moveParam.NodeIndexFrom = strconv.Itoa(nodeIndexFrom)
@@ -402,9 +411,9 @@ func (cn *ClusterNodes) GetReplicaNodes() []*Node {
 }
 
 // Updates configuration in Robin ConfigMap with the new status.
-func PersistRobinStatut(ctx context.Context, client ctrlClient.Client, redisCluster *redisv1.RedisCluster, newStatus string) error {
+func PersistRobinStatut(ctx context.Context, client ctrlClient.Client, redkeyCluster *redkeyv1.RedKeyCluster, newStatus string) error {
 	cmap := &corev1.ConfigMap{}
-	err := client.Get(ctx, types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}, cmap)
+	err := client.Get(ctx, types.NamespacedName{Name: redkeyCluster.Name + "-robin", Namespace: redkeyCluster.Namespace}, cmap)
 	if err != nil {
 		return err
 	}
@@ -426,9 +435,9 @@ func PersistRobinStatut(ctx context.Context, client ctrlClient.Client, redisClus
 }
 
 // Updates configuration in Robin ConfigMap with the new replicas.
-func PersistRobinReplicas(ctx context.Context, client ctrlClient.Client, redisCluster *redisv1.RedisCluster, replicas int, replicasPerMaster int) error {
+func PersistRobinReplicas(ctx context.Context, client ctrlClient.Client, redkeyCluster *redkeyv1.RedKeyCluster, replicas int, replicasPerMaster int) error {
 	cmap := &corev1.ConfigMap{}
-	err := client.Get(ctx, types.NamespacedName{Name: redisCluster.Name + "-robin", Namespace: redisCluster.Namespace}, cmap)
+	err := client.Get(ctx, types.NamespacedName{Name: redkeyCluster.Name + "-robin", Namespace: redkeyCluster.Namespace}, cmap)
 	if err != nil {
 		return err
 	}

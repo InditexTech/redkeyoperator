@@ -1,14 +1,14 @@
 # Master-Replica Clusters
 
-Starting with the release 0.2.34, Redis Operator supports master-replica architecture of Redis Cluster. This architecture increases resiliency of Redis clusters as each master has one or more replicas and in case of a master goes down, its replica (or one of its replicas) can take over the role of its master and continue to serve without a downtime and data loss in practice. Theoretically, there will be a small downtime and a possibility of a data loss if a data on a master gets updated and master go down before the data change propagate to its replicas but these are negligible.
+Starting with the release 0.2.34, RedKey Operator supports master-replica architecture of RedKey Cluster. This architecture increases resiliency of RedKey clusters as each master has one or more replicas and in case of a master goes down, its replica (or one of its replicas) can take over the role of its master and continue to serve without a downtime and data loss in practice. Theoretically, there will be a small downtime and a possibility of a data loss if a data on a master gets updated and master go down before the data change propagate to its replicas but these are negligible.
 
-Clusters with master-replica architecture can be created by adding `replicas_per_master` specification and setting to an integer value inside the `spec` definition of a Redis Cluster object. Redis Operator will create replica nodes matching the count of `replicas_per_master` definition for each master nodes.
+Clusters with master-replica architecture can be created by adding `replicas_per_master` specification and setting to an integer value inside the `spec` definition of a RedKey Cluster object. RedKey Operator will create replica nodes matching the count of `replicas_per_master` definition for each master nodes.
 
 The minimum configuration for the correct operation of this function is:
 
 ```yaml
 apiVersion: redis.inditex.dev/v1
-kind: RedisCluster
+kind: RedKeyCluster
 ...
 spec:
   ...
@@ -22,7 +22,7 @@ If this feature is enabled, this additional configuration should be added to `re
 
 ```yaml
 apiVersion: redis.inditex.dev/v1
-kind: RedisCluster
+kind: RedKeyCluster
 ...
 spec:
   ...
@@ -43,7 +43,7 @@ spec:
 
 ```yaml
 apiVersion: redis.inditex.dev/v1
-kind: RedisCluster
+kind: RedKeyCluster
 ...
 spec:
   ...
@@ -52,11 +52,11 @@ spec:
 
 ```
 
-Redis Operator will create 6 pods, 3 masters and 3 replicas (one for each master).
+RedKey Operator will create 6 pods, 3 masters and 3 replicas (one for each master).
 
 ```yaml
 apiVersion: redis.inditex.dev/v1
-kind: RedisCluster
+kind: RedKeyCluster
 ...
 spec:
   ...
@@ -64,11 +64,11 @@ spec:
   replicas_per_master: 2
 ```
 
-Redis Operator will create 15 pods, 5 masters and 10 replicas (two for each master).
+RedKey Operator will create 15 pods, 5 masters and 10 replicas (two for each master).
 
 ```yaml
 apiVersion: redis.inditex.dev/v1
-kind: RedisCluster
+kind: RedKeyCluster
 ...
 spec:
   ...
@@ -76,15 +76,15 @@ spec:
   replicas_per_master: 0
 ```
 
-Redis Operator will create 5 pods, 5 masters and no replicas.
+RedKey Operator will create 5 pods, 5 masters and no replicas.
 
 ```yaml
 apiVersion: redis.inditex.dev/v1
-kind: RedisCluster
+kind: RedKeyCluster
 ...
 spec:
   ...
   replicas: 5
 ```
 
-Redis Operator will create 5 pods, 5 masters and no replicas.
+RedKey Operator will create 5 pods, 5 masters and no replicas.

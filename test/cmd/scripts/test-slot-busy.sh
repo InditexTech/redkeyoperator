@@ -27,7 +27,7 @@ if ! ensure_namespace "$NAMESPACE"; then
     exit 1
 fi
 
-log_info "Starting Redis cluster scale test for cluster '$REDIS_CLUSTER_NAME' in namespace '$NAMESPACE' with $REPLICAS replicas."
+log_info "Starting cluster scale test for cluster '$REDIS_CLUSTER_NAME' in namespace '$NAMESPACE' with $REPLICAS replicas."
 
 # # Start manager process and create a clean RedisCluster
 # if ! ensure_manager "$NAMESPACE" "$TEST_NAME" ; then
@@ -44,7 +44,7 @@ sleep 2
 
 if [[ "$LOCAL" == "false" ]]; then
     if ! patch_statefulset "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
-        log_error "Patch Redis cluster StatefulSet"
+        log_error "Patch cluster StatefulSet"
         exit 1
     fi
     log_info "Patched StatefulSet/$REDIS_CLUSTER_NAME security context."
@@ -55,18 +55,18 @@ if ! wait_redis_ready "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
     exit 1
 fi
 
-# Scale the Redis cluster
-log_info "Scaling Redis cluster '$REDIS_CLUSTER_NAME' to $REPLICAS replicas..."
+# Scale the cluster
+log_info "Scaling cluster '$REDIS_CLUSTER_NAME' to $REPLICAS replicas..."
 
-# Scale Redis cluster
+# Scale cluster
 if ! scale_redis "$REPLICAS" "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
-    echo "Error: Scaling Redis failed"
+    echo "Error: Cluster scaling failed"
     exit 1
 fi
 
 sleep 2
 
-log_info "Redis cluster scaled to $REPLICAS replicas."
+log_info "Cluster scaled to $REPLICAS replicas."
 
 log_info "Waiting for $REPLICAS replicas to become ready..."
 
@@ -116,4 +116,4 @@ if ! wait_redis_ready "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
     exit 1
 fi
 
-log_info "Redis cluster scaling and slot reassignment test completed successfully."
+log_info "Cluster scaling and slot reassignment test completed successfully."

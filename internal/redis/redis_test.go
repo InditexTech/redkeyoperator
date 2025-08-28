@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/inditextech/redisoperator/internal/common"
+	"github.com/inditextech/redkeyoperator/internal/common"
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -21,8 +21,8 @@ import (
 
 var replicas = int32(3)
 var defaultLabels = map[string]string{
-	RedisClusterLabel:          "rediscluster",
-	RedisClusterComponentLabel: common.ComponentLabelRedis,
+	RedKeyClusterLabel:          "rediscluster",
+	RedKeyClusterComponentLabel: common.ComponentLabelRedis,
 }
 
 var redisStatefulSet = &appsv1.StatefulSet{
@@ -115,7 +115,7 @@ var redisService = &corev1.Service{
 				},
 			},
 		},
-		Selector:  map[string]string{RedisClusterLabel: "rediscluster", RedisClusterComponentLabel: common.ComponentLabelRedis},
+		Selector:  map[string]string{RedKeyClusterLabel: "rediscluster", RedKeyClusterComponentLabel: common.ComponentLabelRedis},
 		ClusterIP: "None",
 	},
 }
@@ -1080,7 +1080,7 @@ func Test_ApplyServiceOverride(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "rediscluster",
 					Namespace:   "default",
-					Labels:      map[string]string{RedisClusterLabel: "rediscluster", RedisClusterComponentLabel: common.ComponentLabelRedis, "new-label": "new-value"},
+					Labels:      map[string]string{RedKeyClusterLabel: "rediscluster", RedKeyClusterComponentLabel: common.ComponentLabelRedis, "new-label": "new-value"},
 					Annotations: map[string]string{"new-annotation": "new-value"},
 				},
 				Spec: corev1.ServiceSpec{
@@ -1094,7 +1094,7 @@ func Test_ApplyServiceOverride(t *testing.T) {
 							},
 						},
 					},
-					Selector:  map[string]string{RedisClusterLabel: "rediscluster", RedisClusterComponentLabel: common.ComponentLabelRedis},
+					Selector:  map[string]string{RedKeyClusterLabel: "rediscluster", RedKeyClusterComponentLabel: common.ComponentLabelRedis},
 					ClusterIP: "None",
 				},
 			},
@@ -1128,7 +1128,7 @@ func Test_ApplyServiceOverride(t *testing.T) {
 							},
 						},
 					},
-					Selector:  map[string]string{RedisClusterLabel: "rediscluster", RedisClusterComponentLabel: common.ComponentLabelRedis, "new-selector": "new-value"},
+					Selector:  map[string]string{RedKeyClusterLabel: "rediscluster", RedKeyClusterComponentLabel: common.ComponentLabelRedis, "new-selector": "new-value"},
 					ClusterIP: "None",
 				},
 			},
@@ -1156,7 +1156,7 @@ func Test_ApplyServiceOverride(t *testing.T) {
 							},
 						},
 					},
-					Selector:  map[string]string{RedisClusterLabel: "rediscluster", RedisClusterComponentLabel: common.ComponentLabelRedis, "new-selector": "new-value"},
+					Selector:  map[string]string{RedKeyClusterLabel: "rediscluster", RedKeyClusterComponentLabel: common.ComponentLabelRedis, "new-selector": "new-value"},
 					ClusterIP: "None",
 				},
 			},
@@ -1381,7 +1381,7 @@ func Test_ApplyPodTemplateSpecOverride(t *testing.T) {
 			},
 			expected: &corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:      map[string]string{"new-label": "new-value", RedisClusterLabel: "rediscluster", RedisClusterComponentLabel: common.ComponentLabelRedis},
+					Labels:      map[string]string{"new-label": "new-value", RedKeyClusterLabel: "rediscluster", RedKeyClusterComponentLabel: common.ComponentLabelRedis},
 					Annotations: map[string]string{"new-annotation": "new-value"},
 				},
 				Spec: corev1.PodSpec{},

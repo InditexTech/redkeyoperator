@@ -13,7 +13,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 
-	redisv1 "github.com/inditextech/redisoperator/api/v1"
+	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -58,7 +58,7 @@ func NewCachingClientFunc() client.NewClientFunc {
 
 func TestE2E(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Redis Operator E2E Suite", Label("e2e"))
+	RunSpecs(t, "RedKey Operator E2E Suite", Label("e2e"))
 }
 
 var _ = BeforeSuite(func() {
@@ -86,7 +86,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	// register all schemes in one shot
-	utilruntime.Must(redisv1.AddToScheme(scheme.Scheme))
+	utilruntime.Must(redkeyv1.AddToScheme(scheme.Scheme))
 	utilruntime.Must(corev1.AddToScheme(scheme.Scheme))
 	utilruntime.Must(apiextensions.AddToScheme(scheme.Scheme))
 	utilruntime.Must(metav1.AddMetaToScheme(scheme.Scheme))

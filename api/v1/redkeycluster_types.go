@@ -12,19 +12,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-// StatusUpgrading: A RedisCluster enters this status when when:
+// StatusUpgrading: A RedKeyCluster enters this status when when:
 //   - there are differences between the existing configuration in the configmap
-//     and the configuration of the RedisCluster object merged with the default configuration set in the code.
-//   - there is a mismatch between the StatefulSet object labels and the RedisCluster Spec labels.
-//   - a mismatch exists between RedisCluster resources defined under spec and effective resources defined in the StatefulSet.
-//   - the images set in RedisCluster under spec and the image set in the StatefulSet object are not the same.
+//     and the configuration of the RedKeyCluster object merged with the default configuration set in the code.
+//   - there is a mismatch between the StatefulSet object labels and the RedKeyCluster Spec labels.
+//   - a mismatch exists between RedKeyCluster resources defined under spec and effective resources defined in the StatefulSet.
+//   - the images set in RedKeyCluster under spec and the image set in the StatefulSet object are not the same.
 //     The cluster is upgraded, reconfiguring the objects to solve these mismatches.
 //
-// StatusScalingDown: RedisCluster replicas > StatefulSet replicas
+// StatusScalingDown: RedKeyCluster replicas > StatefulSet replicas
 //
 //	The cluster enters in this status to remove excess nodes.
 //
-// StatusScalingUp: RedisCluster replicas < StatefulSet replicas
+// StatusScalingUp: RedKeyCluster replicas < StatefulSet replicas
 //
 //	The cluster enters in this status to create the needed nodes to equal the desired replicas with the current replicas.
 //
@@ -72,32 +72,32 @@ const (
 var ConditionUpgrading = metav1.Condition{
 	Type:               "Upgrading",
 	LastTransitionTime: metav1.Now(),
-	Message:            "Redis cluster is upgrading",
-	Reason:             "RedisClusterUpgrading",
+	Message:            "RedKey cluster is upgrading",
+	Reason:             "RedKeyClusterUpgrading",
 	Status:             metav1.ConditionTrue,
 }
 
 var ConditionScalingUp = metav1.Condition{
 	Type:               "ScalingUp",
 	LastTransitionTime: metav1.Now(),
-	Message:            "Redis cluster is scaling up",
-	Reason:             "RedisClusterScalingUp",
+	Message:            "RedKey cluster is scaling up",
+	Reason:             "RedKeyClusterScalingUp",
 	Status:             metav1.ConditionTrue,
 }
 var ConditionScalingDown = metav1.Condition{
 	Type:               "ScalingDown",
 	LastTransitionTime: metav1.Now(),
-	Message:            "Redis cluster is scaling down",
-	Reason:             "RedisClusterScalingDown",
+	Message:            "RedKey cluster is scaling down",
+	Reason:             "RedKeyClusterScalingDown",
 	Status:             metav1.ConditionTrue,
 }
 
 var AllConditions = []metav1.Condition{ConditionUpgrading, ConditionScalingUp, ConditionScalingDown}
 
-// RedisClusterSpec defines the desired state of RedisCluster
+// RedKeyClusterSpec defines the desired state of RedKeyCluster
 // +kubebuilder:validation:XValidation:rule="self.ephemeral || has(self.storage)", message="Ephemeral or storage must be set"
 // +kubebuilder:validation:XValidation:rule="!(self.ephemeral && has(self.storage))", message="Ephemeral and storage cannot be combined"
-type RedisClusterSpec struct {
+type RedKeyClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	// RedisAuth
 	Auth RedisAuth `json:"auth,omitempty"`
@@ -111,6 +111,7 @@ type RedisClusterSpec struct {
 	Replicas int32 `json:"replicas"`
 
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=0
 	// ReplicasPerMaster specifies how many replicas should be attached to each Redis Master
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Number of replicas per Master Node"
 	ReplicasPerMaster int32 `json:"replicasPerMaster,omitempty"`
@@ -120,15 +121,15 @@ type RedisClusterSpec struct {
 	Image string `json:"image,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// DeletePVC specifies if the PVC should be deleted when the RedisCluster is deleted.
+	// DeletePVC specifies if the PVC should be deleted when the RedKeyCluster is deleted.
 	DeletePVC bool `json:"deletePVC,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// Backup specifies if the RedisCluster should be backed up.
+	// Backup specifies if the RedKeyCluster should be backed up.
 	Backup bool `json:"backup,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// Robin specifies the robin configuration for the RedisCluster.
+	// Robin specifies the robin configuration for the RedKeyCluster.
 	Robin *RobinSpec `json:"robin,omitempty"`
 
 	// +kubebuilder:validation:Optional
@@ -140,19 +141,19 @@ type RedisClusterSpec struct {
 	Config string `json:"config,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// Resources is the resource requirements for the RedisCluster.
+	// Resources is the resource requirements for the RedKeyCluster.
 	Resources *v1.ResourceRequirements `json:"resources,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// Labels is the labels to add to the RedisCluster.
+	// Labels is the labels to add to the RedKeyCluster.
 	Labels *map[string]string `json:"labels,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// Pdb is the PodDisruptionBudget configuration for the RedisCluster.
+	// Pdb is the PodDisruptionBudget configuration for the RedKeyCluster.
 	Pdb Pdb `json:"pdb,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	Override *RedisClusterOverrideSpec `json:"override,omitempty"`
+	Override *RedKeyClusterOverrideSpec `json:"override,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=true
@@ -179,18 +180,18 @@ type RedisClusterSpec struct {
 	AccessModes []v1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
 }
 
-func (redisClusterSpec RedisClusterSpec) NodesNeeded() int {
-	return int(redisClusterSpec.Replicas + (redisClusterSpec.Replicas * redisClusterSpec.ReplicasPerMaster))
+func (redkeyClusterSpec RedKeyClusterSpec) NodesNeeded() int {
+	return int(redkeyClusterSpec.Replicas + (redkeyClusterSpec.Replicas * redkeyClusterSpec.ReplicasPerMaster))
 }
 
 // Provides the ability to override the generated manifest of several child resources.
-type RedisClusterOverrideSpec struct {
+type RedKeyClusterOverrideSpec struct {
 	// +kubebuilder:validation:Optional
-	// Override configuration for the RedisCluster StatefulSet.
+	// Override configuration for the RedKeyCluster StatefulSet.
 	StatefulSet *appsv1.StatefulSet `json:"statefulSet,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// Override configuration for the RedisCluster Service.
+	// Override configuration for the RedKeyCluster Service.
 	Service *v1.Service `json:"service,omitempty"`
 }
 
@@ -199,17 +200,17 @@ type RobinSpec struct {
 	Config   *string             `json:"config,omitempty"`
 }
 
-// RedisClusterStatus defines the observed state of RedisCluster
-type RedisClusterStatus struct {
+// RedKeyClusterStatus defines the observed state of RedKeyCluster
+type RedKeyClusterStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make manifests" to regenerate code after modifying this file
-	Nodes      map[string]*RedisNode `json:"nodes"`
-	Status     string                `json:"status"`
-	Conditions []metav1.Condition    `json:"conditions,omitempty"`
-	Substatus  RedisClusterSubstatus `json:"substatus"`
+	Nodes      map[string]*RedisNode  `json:"nodes"`
+	Status     string                 `json:"status"`
+	Conditions []metav1.Condition     `json:"conditions,omitempty"`
+	Substatus  RedKeyClusterSubstatus `json:"substatus"`
 }
 
-type RedisClusterSubstatus struct {
+type RedKeyClusterSubstatus struct {
 	Status             string `json:"status,omitempty"`
 	UpgradingPartition string `json:"upgradingPartition,omitempty"`
 }
@@ -237,48 +238,53 @@ type Pdb struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:shortName=rdcl
+// +kubebuilder:resource:shortName=rkcl
 // +kubebuilder:storageversion
-// +kubebuilder:printcolumn:name="Replicas",type="integer",JSONPath=".spec.replicas",description="Amount of Redis nodes"
-// +kubebuilder:printcolumn:name="Image",type="string",JSONPath=".spec.image",description="Source image for Redis instance"
-// +kubebuilder:printcolumn:name="Storage",type="string",JSONPath=".spec.storage",description="Amount of storage for Redis"
-// +kubebuilder:printcolumn:name="StorageClassName",type="string",JSONPath=".spec.storageClassName",description="Storage Class to be used by the PVC"
-// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.status",description="The status of Redis cluster"
-// +kubebuilder:printcolumn:name="Substatus",type="string",JSONPath=".status.substatus.status",description="The substatus of Redis cluster"
+// +kubebuilder:printcolumn:name="Masters",type="integer",priority=0,JSONPath=".spec.replicas",description="Amount of Redis master nodes"
+// +kubebuilder:printcolumn:name="Replicas",type="integer",priority=0,JSONPath=".spec.replicasPerMaster",description="Amount of replicas per master node"
+// +kubebuilder:printcolumn:name="Ephemeral",type="boolean",priority=0,JSONPath=".spec.ephemeral",description="Cluster ephemeral"
+// +kubebuilder:printcolumn:name="PurgeKeys",type="boolean",priority=0,JSONPath=".spec.purgeKeysOnRebalance",description="Purge keys on rebalance"
+// +kubebuilder:printcolumn:name="Image",type="string",priority=0,JSONPath=".spec.image",description="Source image for Redis instance"
+// +kubebuilder:printcolumn:name="Storage",type="string",priority=0,JSONPath=".spec.storage",description="Amount of storage for Redis"
+// +kubebuilder:printcolumn:name="StorageClassName",type="string",priority=10,JSONPath=".spec.storageClassName",description="Storage Class to be used by the PVC"
+// +kubebuilder:printcolumn:name="DeletePVC",type="boolean",priority=5,JSONPath=".spec.deletePVC",description="Deleve PVC"
+// +kubebuilder:printcolumn:name="Status",type="string",priority=0,JSONPath=".status.status",description="The cluster status"
+// +kubebuilder:printcolumn:name="Substatus",type="string",priority=0,JSONPath=".status.substatus.status",description="The cluster substatus"
+// +kubebuilder:printcolumn:name="Partition",type="string",priority=5,JSONPath=".status.substatus.upgradingPartition",description="Upgrading partition"
 // +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas,selectorpath=.status.selector
-// RedisCluster is the Schema for the redisclusters API
-type RedisCluster struct {
+// RedKeyCluster is the Schema for the redkeyclusters API
+type RedKeyCluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              RedisClusterSpec   `json:"spec,omitempty"`
-	Status            RedisClusterStatus `json:"status,omitempty"`
+	Spec              RedKeyClusterSpec   `json:"spec,omitempty"`
+	Status            RedKeyClusterStatus `json:"status,omitempty"`
 }
 
-func (redisCluster RedisCluster) NodesNeeded() int {
-	return redisCluster.Spec.NodesNeeded()
+func (redkeyCluster RedKeyCluster) NodesNeeded() int {
+	return redkeyCluster.Spec.NodesNeeded()
 }
 
 //+kubebuilder:object:root=true
 
-// RedisClusterList contains a list of RedisCluster
-type RedisClusterList struct {
+// RedKeyClusterList contains a list of RedKeyCluster
+type RedKeyClusterList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []RedisCluster `json:"items"`
+	Items           []RedKeyCluster `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&RedisCluster{}, &RedisClusterList{})
+	SchemeBuilder.Register(&RedKeyCluster{}, &RedKeyClusterList{})
 }
 
-func (r RedisCluster) NamespacedName() types.NamespacedName {
+func (redkeyCluster RedKeyCluster) NamespacedName() types.NamespacedName {
 	return types.NamespacedName{
-		Namespace: r.GetNamespace(),
-		Name:      r.GetName(),
+		Namespace: redkeyCluster.GetNamespace(),
+		Name:      redkeyCluster.GetName(),
 	}
 }
 
-func CompareStatuses(a, b *RedisClusterStatus) bool {
+func CompareStatuses(a, b *RedKeyClusterStatus) bool {
 	if a.Status != b.Status {
 		return false
 	}
@@ -301,7 +307,7 @@ func CompareStatuses(a, b *RedisClusterStatus) bool {
 	return true
 }
 
-func IsFastOperationStatus(status RedisClusterSubstatus) bool {
+func IsFastOperationStatus(status RedKeyClusterSubstatus) bool {
 	return status.Status == SubstatusFastScaling || status.Status == SubstatusEndingFastScaling ||
 		status.Status == SubstatusFastUpgrading || status.Status == SubstatusEndingFastUpgrading
 }

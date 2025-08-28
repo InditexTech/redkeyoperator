@@ -2,7 +2,7 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: redisclusters.redis.inditex.dev
+  name: redkeyclusters.redis.inditex.dev
 spec:
   conversion:
     strategy: Webhook
@@ -10,8 +10,8 @@ spec:
       clientConfig:
         caBundle: WEBHOOK_CA_CERT
         service:
-          namespace: redis-operator-webhook
-          name: redis-operator-webhook-service
+          namespace: redkey-operator-webhook
+          name: redkey-operator-webhook-service
           path: /convert
       conversionReviewVersions:
       - v1

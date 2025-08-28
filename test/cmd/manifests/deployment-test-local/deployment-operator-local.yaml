@@ -317,7 +317,7 @@ spec:
         control-plane: redis-operator
         domain: DOMAIN
         environment: ENVIRONMENT
-        layer: middleware-redisoperator
+        layer: middleware-redkeyoperator
         prometheus.io/scrape: "true"
         slot: default
         tenant: TENANT

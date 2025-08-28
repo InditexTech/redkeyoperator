@@ -23,13 +23,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	redisv1 "github.com/inditextech/redisoperator/api/v1"
-	webhookredisv1 "github.com/inditextech/redisoperator/webhook/v1"
+	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
+	webhookredisv1 "github.com/inditextech/redkeyoperator/webhook/v1"
 	//+kubebuilder:scaffold:imports
 )
 
 const (
-	USER_AGENT_NAME    = "redis-cluster-operator-webhook"
+	USER_AGENT_NAME    = "redkey-cluster-operator-webhook"
 	USER_AGENT_VERSION = "1.3.0"
 )
 
@@ -41,7 +41,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(redisv1.AddToScheme(scheme))
+	utilruntime.Must(redkeyv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -101,8 +101,8 @@ func main() {
 	}
 
 	// nolint:goconst
-	if err = webhookredisv1.SetupRedisClusterWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "RedisCluster")
+	if err = webhookredisv1.SetupRedKeyClusterWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "RedKeyCluster")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

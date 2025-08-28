@@ -12,7 +12,7 @@ set -o nounset
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib-test.sh"  # Expects functions: ensure_namespace, kill_k6, create_clean_rdcl, wait_redis_ready, log_info, log_error
 
-# Read and assign arguments: $2 for namespace and $3 for redis cluster name; ignore $1 (replicas)
+# Read and assign arguments: $2 for namespace and $3 for cluster name; ignore $1 (replicas)
 NAMESPACE="$2"
 REDIS_CLUSTER_NAME="$3"
 LOCAL="${4:-false}"
@@ -22,7 +22,7 @@ check_pod_properties() {
     local expected_log_format="$1"
     local expected_log_scrape="$2"
 
-    # Retrieve the pod JSON for the first pod in the Redis cluster
+    # Retrieve the pod JSON for the first pod in the cluster
     local pod_json
     if ! pod_json=$(kubectl get pod/"$REDIS_CLUSTER_NAME"-0 -n "$NAMESPACE" -o json); then
         log_error "Failed to retrieve pod information for $REDIS_CLUSTER_NAME-0 in namespace $NAMESPACE"
@@ -69,14 +69,14 @@ main() {
 
     if [[ "$LOCAL" == "false" ]]; then
         if ! patch_statefulset "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
-            log_error "Patch Redis cluster StatefulSet"
+            log_error "Patch cluster StatefulSet"
             exit 1
         fi
         log_info "Patched StatefulSet/$REDIS_CLUSTER_NAME security context."
     fi
 
-    # Wait for the Redis Cluster to be ready (expected version: 4.0.0)
-    log_info "Waiting for Redis Cluster to become ready (expected version: 4.0.0)..."
+    # Wait for the Cluster to be ready (expected version: 4.0.0)
+    log_info "Waiting for Cluster to become ready (expected version: 4.0.0)..."
     if ! wait_redis_ready "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
         log_error "Error: Redis not ready after patch"
         exit 1
@@ -100,11 +100,11 @@ main() {
 
     sleep 5
 
-    log_info "Applied logging configuration, waiting for Redis Cluster to become ready (expected version: 4.0.1)..."
+    log_info "Applied logging configuration, waiting for Cluster to become ready (expected version: 4.0.1)..."
 
     # Wait for readiness after applying logging configuration
     if ! wait_redis_ready "$NAMESPACE" "$REDIS_CLUSTER_NAME"; then
-        log_error "Error: Redis cluster is not ready after applying Loki configuration"
+        log_error "Error: Cluster is not ready after applying Loki configuration"
         exit 1
     fi
 

@@ -1,16 +1,16 @@
 # Troubleshooting
 
-The Redis Operator is a complex piece of software. In some cases it can self-recover from service losses but in other cases a cluster administrator has to intervene. This document helps administrators how to solve failing redis clusters.
+The RedKey Operator is a complex piece of software. In some cases it can self-recover from service losses but in other cases a cluster administrator has to intervene. This document helps administrators how to solve failing clusters.
 
-The first section describes [redis cluster failure scenarios](#redis-cluster-failure-scenarios) and show to solve them.
+The first section describes [cluster failure scenarios](#cluster-failure-scenarios) and show to solve them.
 
-The second section lists [commands](#redis-cluster-manager-commands) used to solve the failures described in the first section.
+The second section lists [commands](#cluster-manager-commands) used to solve the failures described in the first section.
 
-## Redis cluster failure scenarios
+## Cluster failure scenarios
 
 ### Openshift 3 does not support OLM and runs on an older kube-api version
 
-Redis Operator is deployed in a production intranet cluster, which runs on Openshift 3. Openshift 3 uses an old `kube-api` version which comes with `CRD apiextension v1beta1`. The solution is to [generate Openshift 3 CRDs](#generate-openshift-3-crds).
+RedKey Operator is deployed in a production intranet cluster, which runs on Openshift 3. Openshift 3 uses an old `kube-api` version which comes with `CRD apiextension v1beta1`. The solution is to [generate Openshift 3 CRDs](#generate-openshift-3-crds).
 
 ### Downgrade a failing operator
 
@@ -30,9 +30,9 @@ If a slave node is present in a master-only cluster, ix this by running the [res
 
 You can find the node IP information by running the [nodes command](#gathering-nodes-information). If the IPs are inconsistent run the [cluster meet](#cluster-meet) from a correctly configured node to the incorrect node.
 
-## Redis cluster manager commands
+## Cluster manager commands
 
-Below are a list of commands and code snippets for inspecting and repairing the cluster. Most commands use kubectl combined with the Redis cluster manager tool. This tool is invoked with
+Below are a list of commands and code snippets for inspecting and repairing the cluster. Most commands use kubectl combined with the RedKey cluster manager tool. This tool is invoked with
 
 ```
 $ redis-cli --cluster ...
@@ -123,7 +123,7 @@ M: 11d23d3c2cbac49201825415b38015c862313ec9 10.244.0.57:6379
 For each pod list the status of each node: its role, master or slave, whether it is failing, and which slots are allocated to it.
 
 ```
-for pod in $(kubectl get pods -l redis-cluster-name=[redis-cluster-name] -o json | jq -r '.items[] | .metadata.name'); do echo "POD ${pod} NODES"; kubectl exec -it ${pod} -- redis-cli CLUSTER NODES  | sort; done
+for pod in $(kubectl get pods -l redkey-cluster-name=[redkey-cluster-name] -o json | jq -r '.items[] | .metadata.name'); do echo "POD ${pod} NODES"; kubectl exec -it ${pod} -- redis-cli CLUSTER NODES  | sort; done
 ```
 
 ### Cluster meet
@@ -146,8 +146,8 @@ fi
 cluster_redis=$1
 echo "Meeting all with all nodes: " $cluster_redis
 
-for pod in $(oc get pod -l redis-cluster-name=$cluster_redis,redis.rediscluster.operator/component=redis -o json | jq -r '.items[].metadata.name'); do
-    for ip in $(oc get pod -l redis-cluster-name=$cluster_redis,redis.rediscluster.operator/component=redis -o json | jq -r '.items[].status.podIP'); do
+for pod in $(oc get pod -l redkey-cluster-name=$cluster_redis,redis.redkeycluster.operator/component=redis -o json | jq -r '.items[].metadata.name'); do
+    for ip in $(oc get pod -l redkey-cluster-name=$cluster_redis,redis.redkeycluster.operator/component=redis -o json | jq -r '.items[].status.podIP'); do
         oc exec $pod -- redis-cli cluster meet $ip 3689
     done
 done
@@ -198,7 +198,7 @@ kubectl exec -it [redis-pod-name] -- redis-cli cluster reset
 Have all nodes in the cluster forget a failing node. First get the node id via the [cluster nodes command](#gathering-nodes-information).
 
 ```
-for pod in $(kubectl get pods -l redis-cluster-name=[redis-cluster-name] -o json | jq -r '.items[] | .metadata.name'); do echo "POD ${pod} NODES"; kubectl exec -it ${pod} -- redis-cli CLUSTER FORGET [node-id] | sort; done
+for pod in $(kubectl get pods -l redkey-cluster-name=[redkey-cluster-name] -o json | jq -r '.items[] | .metadata.name'); do echo "POD ${pod} NODES"; kubectl exec -it ${pod} -- redis-cli CLUSTER FORGET [node-id] | sort; done
 ```
 
 If there is a set of disconnected or failing nodes they can forget all at once with the following script:
@@ -212,7 +212,7 @@ if [ -z "$1" ]; then
 fi
 cluster_redis=$1
 echo "Forgetting disconnect in: " $cluster_redis
-for pod in $(oc get pod -l redis-cluster-name=$cluster_redis,redis.rediscluster.operator/component=redis -o json | jq -r '.items[].metadata.name'); do
+for pod in $(oc get pod -l redkey-cluster-name=$cluster_redis,redis.redkeycluster.operator/component=redis -o json | jq -r '.items[].metadata.name'); do
     for node in $(oc exec $pod -- cat /tmp/nodes.conf | egrep '(fail|disconnected)' | cut -f1 -d" "); do
         oc exec  $pod -- redis-cli cluster forget $node
     done

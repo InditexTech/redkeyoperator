@@ -1,6 +1,6 @@
-module github.com/inditextech/redisoperator
+module github.com/inditextech/redkeyoperator
 
-go 1.24.5
+go 1.24.6
 
 require (
 	github.com/go-logr/logr v1.4.2

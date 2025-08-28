@@ -1,8 +1,8 @@
 apiVersion: redis.inditex.dev/v1
-kind: RedisCluster
+kind: RedKeyCluster
 metadata:
   labels:
-    app.kubernetes.io/name: redis-cluster-operator
+    app.kubernetes.io/name: redkey-cluster-operator
     app.kubernetes.io/managed-by: kustomize
   name: redis-cluster-ephemeral
 spec:
@@ -30,14 +30,14 @@ spec:
   robin:
     config: |
       metadata:
-        namespace: redis-operator
+        namespace: redkey-operator
       redis:
         standalone: false
         reconciler:
           interval_seconds: 30
           operation_cleanup_interval_seconds: 30
         cluster:
-          namespace: redis-operator
+          namespace: redkey-operator
           name: redis-cluster-ephemeral
           replicas: 3
           replicas_per_master: 0
@@ -71,7 +71,7 @@ spec:
     template:
       spec:
         containers:
-          - image: k3d-redis.localhost:5005/redis-robin:0.1.0
+          - image: k3d-redis.localhost:5005/redkey-robin:0.1.0
             name: robin
             imagePullPolicy: Always
             ports:

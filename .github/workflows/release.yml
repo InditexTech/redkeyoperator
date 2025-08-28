@@ -8,8 +8,8 @@ on:
 env:
   REGISTRY: ghcr.io
   OWNER: InditexTech
-  OPERATOR_NAME: redis-operator
-  WEBHOOK_NAME: redis-operator-webhook
+  OPERATOR_NAME: redkey-operator
+  WEBHOOK_NAME: redkey-operator-webhook
 
 jobs:
   create-release:
@@ -37,7 +37,7 @@ jobs:
           body: |
             Check out the [changelog](CHANGELOG.md) for version v${{ steps.makefile_version.outputs.version }}
   publish-operator-image:
-    name: Publish Redis Operator image to the registry
+    name: Publish RedKey Operator image to the registry
     needs: create-release
     runs-on: ubuntu-latest
     steps:
@@ -63,7 +63,7 @@ jobs:
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.OPERATOR_NAME }}:${{ steps.makefile_version.outputs.version }}
   publish-operator-webhook-image:
-    name: Publish Redis Operator Webhook image to the registry
+    name: Publish RedKey Operator Webhook image to the registry
     needs: create-release
     runs-on: ubuntu-latest
     steps:
@@ -90,7 +90,7 @@ jobs:
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.WEBHOOK_NAME }}:${{ steps.makefile_version.outputs.version }}
 #   publish-operator:
-#     name: Publish Redis Operator to OperatorHub.io
+#     name: Publish RedKey Operator to OperatorHub.io
 #     needs: [create-release, publish-operator-image, publish-operator-webhook-image]
 #     runs-on: ubuntu-latest
 #     steps:

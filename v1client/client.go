@@ -7,7 +7,7 @@ package redisv1client
 import (
 	"context"
 
-	redisv1 "github.com/inditextech/redisoperator/api/v1"
+	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
@@ -17,8 +17,8 @@ import (
 
 // RdclInterface defines the methods to be implemented by Redis Clients
 type RdclInterface interface {
-	List(ctx context.Context, opts metav1.ListOptions) (*redisv1.RedisClusterList, error)
-	Get(ctx context.Context, name string, options metav1.GetOptions) (*redisv1.RedisCluster, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*redkeyv1.RedKeyClusterList, error)
+	Get(ctx context.Context, name string, options metav1.GetOptions) (*redkeyv1.RedKeyCluster, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 }
 
@@ -27,13 +27,13 @@ type rdclClient struct {
 	ns         string
 }
 
-func (c *rdclClient) List(ctx context.Context, opts metav1.ListOptions) (*redisv1.RedisClusterList, error) {
-	result := redisv1.RedisClusterList{}
+func (c *rdclClient) List(ctx context.Context, opts metav1.ListOptions) (*redkeyv1.RedKeyClusterList, error) {
+	result := redkeyv1.RedKeyClusterList{}
 	err := c.restClient.
 		Get().
 		AbsPath("/apis/redis.inditex.dev/redisv1").
 		Namespace(c.ns).
-		Resource("redisclusters").
+		Resource("redkeyclusters").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Do(ctx).
 		Into(&result)
@@ -41,13 +41,13 @@ func (c *rdclClient) List(ctx context.Context, opts metav1.ListOptions) (*redisv
 	return &result, err
 }
 
-func (c *rdclClient) Get(ctx context.Context, name string, opts metav1.GetOptions) (*redisv1.RedisCluster, error) {
-	result := redisv1.RedisCluster{}
+func (c *rdclClient) Get(ctx context.Context, name string, opts metav1.GetOptions) (*redkeyv1.RedKeyCluster, error) {
+	result := redkeyv1.RedKeyCluster{}
 	err := c.restClient.
 		Get().
 		AbsPath("/apis/redis.inditex.dev/v1").
 		Namespace(c.ns).
-		Resource("redisclusters").
+		Resource("redkeyclusters").
 		Name(name).
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Do(ctx).
@@ -60,17 +60,17 @@ func (c *rdclClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.
 	return c.restClient.Get().
 		AbsPath("/apis/redis.inditex.dev/v1").
 		Namespace(c.ns).
-		Resource("redisclusters").
+		Resource("redkeyclusters").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch(ctx)
 }
 
-// V1Interface defines the interface to communicate with all GroupVersion. It now just bears a client fdr Redis Clusters
+// V1Interface defines the interface to communicate with all GroupVersion. It now just bears a client for RedKey Clusters
 type V1Interface interface {
-	RedisClusters(namespace string) RdclInterface
+	RedKeyClusters(namespace string) RdclInterface
 }
 
-// V1Client is the struct that bears the rest Interface. It implements RedisClusters method, which satisfies the redisv1Interface
+// V1Client is the struct that bears the rest Interface. It implements RedKeyClusters method, which satisfies the redisv1Interface
 type V1Client struct {
 	restClient rest.Interface
 }
@@ -78,7 +78,7 @@ type V1Client struct {
 // NewForConfig creates V1Client by using the given rest.Config. Returns error if something is amiss in the config.
 func NewForConfig(c *rest.Config) (*V1Client, error) {
 	config := *c
-	config.ContentConfig.GroupVersion = &schema.GroupVersion{Group: redisv1.GroupVersion.Group, Version: redisv1.GroupVersion.Version}
+	config.ContentConfig.GroupVersion = &schema.GroupVersion{Group: redkeyv1.GroupVersion.Group, Version: redkeyv1.GroupVersion.Version}
 	config.APIPath = "/apis"
 	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 	config.UserAgent = rest.DefaultKubernetesUserAgent()
@@ -91,8 +91,8 @@ func NewForConfig(c *rest.Config) (*V1Client, error) {
 	return &V1Client{restClient: client}, nil
 }
 
-// RedisClusters returns the interface which will allow the caller to access the implemented methods of the interface
-func (c *V1Client) RedisClusters(namespace string) RdclInterface {
+// RedKeyClusters returns the interface which will allow the caller to access the implemented methods of the interface
+func (c *V1Client) RedKeyClusters(namespace string) RdclInterface {
 	return &rdclClient{
 		restClient: c.restClient,
 		ns:         namespace,

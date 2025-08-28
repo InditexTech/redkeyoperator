@@ -4,23 +4,35 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.2
-  name: redisclusters.redis.inditex.dev
+  name: redkeyclusters.redis.inditex.dev
 spec:
   group: redis.inditex.dev
   names:
-    kind: RedisCluster
-    listKind: RedisClusterList
-    plural: redisclusters
+    kind: RedKeyCluster
+    listKind: RedKeyClusterList
+    plural: redkeyclusters
     shortNames:
-    - rdcl
-    singular: rediscluster
+    - rkcl
+    singular: redkeycluster
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - description: Amount of Redis nodes
+    - description: Amount of Redis master nodes
       jsonPath: .spec.replicas
+      name: Masters
+      type: integer
+    - description: Amount of replicas per master node
+      jsonPath: .spec.replicasPerMaster
       name: Replicas
       type: integer
+    - description: Cluster ephemeral
+      jsonPath: .spec.ephemeral
+      name: Ephemeral
+      type: boolean
+    - description: Purge keys on rebalance
+      jsonPath: .spec.purgeKeysOnRebalance
+      name: PurgeKeys
+      type: boolean
     - description: Source image for Redis instance
       jsonPath: .spec.image
       name: Image
@@ -32,14 +44,25 @@ spec:
     - description: Storage Class to be used by the PVC
       jsonPath: .spec.storageClassName
       name: StorageClassName
+      priority: 10
       type: string
-    - description: The status of Redis cluster
+    - description: Deleve PVC
+      jsonPath: .spec.deletePVC
+      name: DeletePVC
+      priority: 5
+      type: boolean
+    - description: The cluster status
       jsonPath: .status.status
       name: Status
       type: string
-    - description: The substatus of Redis cluster
+    - description: The cluster substatus
       jsonPath: .status.substatus.status
       name: Substatus
+      type: string
+    - description: Upgrading partition
+      jsonPath: .status.substatus.upgradingPartition
+      name: Partition
+      priority: 5
       type: string
     name: v1
     schema:
@@ -4227,6 +4250,7 @@ spec:
                 format: int32
                 type: integer
               replicasPerMaster:
+                default: 0
                 format: int32
                 type: integer
               resources:

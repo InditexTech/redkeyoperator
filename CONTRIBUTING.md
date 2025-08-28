@@ -1,6 +1,6 @@
-# Contributing to Redis Operator
+# Contributing to RedKey Operator
 
-Thank you for considering contributing to Redis Operator. We appreciate your interest in helping improve this project.
+Thank you for considering contributing to RedKey Operator. We appreciate your interest in helping improve this project.
 
 Whether you are fixing bugs, adding features, or improving documentation, your contributions are welcome. By following this guide, you'll help ensure that your contributions are accepted and make the process easier for everyone.
 
@@ -85,6 +85,6 @@ We’ll review your PR and provide feedback. If everything looks good, we will m
 
 ## Running tests
 
-Redis Operator has both unit and behavioral (End To End) tests. Please refer to the [operator guide](./docs/operator-guide/toc.md), [developer guide](./docs/developer-guide.md) 
+RedKey Operator has both unit and behavioral (End To End) tests. Please refer to the [operator guide](./docs/operator-guide/toc.md), [developer guide](./docs/developer-guide.md) 
 and [test guide](./test/README.md) for more information
 

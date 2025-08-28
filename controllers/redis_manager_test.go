@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"testing"
 
-	redisv1 "github.com/inditextech/redisoperator/api/v1"
-	"github.com/inditextech/redisoperator/internal/redis"
+	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
+	"github.com/inditextech/redkeyoperator/internal/redis"
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -19,7 +19,7 @@ import (
 	"k8s.io/client-go/tools/record"
 )
 
-var rc = newRedisCluster()
+var rc = newRedKeyCluster()
 var recorder = newRecorder()
 var reconciler = newReconciler(rc, recorder)
 var configMap = newConfigMap()
@@ -31,9 +31,9 @@ func TestUpdateScalingStatus_ScalingDown(t *testing.T) {
 
 	_ = reconciler.updateScalingStatus(newContext(), rc)
 
-	assertStatusEqual(t, rc, redisv1.StatusScalingDown)
-	assertConditionTrue(t, rc, redisv1.ConditionScalingDown)
-	assertConditionFalse(t, rc, redisv1.ConditionScalingUp)
+	assertStatusEqual(t, rc, redkeyv1.StatusScalingDown)
+	assertConditionTrue(t, rc, redkeyv1.ConditionScalingDown)
+	assertConditionFalse(t, rc, redkeyv1.ConditionScalingUp)
 }
 
 func TestUpdateScalingStatus_ScalingUp(t *testing.T) {
@@ -43,14 +43,14 @@ func TestUpdateScalingStatus_ScalingUp(t *testing.T) {
 
 	_ = reconciler.updateScalingStatus(newContext(), rc)
 
-	assertStatusEqual(t, rc, redisv1.StatusScalingUp)
-	assertConditionFalse(t, rc, redisv1.ConditionScalingDown)
-	assertConditionTrue(t, rc, redisv1.ConditionScalingUp)
+	assertStatusEqual(t, rc, redkeyv1.StatusScalingUp)
+	assertConditionFalse(t, rc, redkeyv1.ConditionScalingDown)
+	assertConditionTrue(t, rc, redkeyv1.ConditionScalingUp)
 }
 
 func TestUpdateScalingStatus_ScalingDown_Completed(t *testing.T) {
-	rc.Status.Status = redisv1.StatusScalingDown
-	rc.Status.Conditions = []metav1.Condition{redisv1.ConditionScalingDown}
+	rc.Status.Status = redkeyv1.StatusScalingDown
+	rc.Status.Conditions = []metav1.Condition{redkeyv1.ConditionScalingDown}
 
 	numStatefulSetReplicas := rc.Spec.Replicas
 
@@ -58,14 +58,14 @@ func TestUpdateScalingStatus_ScalingDown_Completed(t *testing.T) {
 
 	_ = reconciler.updateScalingStatus(newContext(), rc)
 
-	assertStatusEqual(t, rc, redisv1.StatusReady)
-	assertConditionFalse(t, rc, redisv1.ConditionScalingDown)
-	assertConditionFalse(t, rc, redisv1.ConditionScalingUp)
+	assertStatusEqual(t, rc, redkeyv1.StatusReady)
+	assertConditionFalse(t, rc, redkeyv1.ConditionScalingDown)
+	assertConditionFalse(t, rc, redkeyv1.ConditionScalingUp)
 }
 
 func TestUpdateScalingStatus_ScalingUp_Completed(t *testing.T) {
-	rc.Status.Status = redisv1.StatusScalingUp
-	rc.Status.Conditions = []metav1.Condition{redisv1.ConditionScalingUp}
+	rc.Status.Status = redkeyv1.StatusScalingUp
+	rc.Status.Conditions = []metav1.Condition{redkeyv1.ConditionScalingUp}
 
 	numStatefulSetReplicas := rc.Spec.Replicas
 
@@ -78,9 +78,9 @@ func TestUpdateScalingStatus_ScalingUp_Completed(t *testing.T) {
 
 	_ = reconciler.updateScalingStatus(newContext(), rc)
 
-	assertStatusEqual(t, rc, redisv1.StatusReady)
-	assertConditionFalse(t, rc, redisv1.ConditionScalingDown)
-	assertConditionFalse(t, rc, redisv1.ConditionScalingUp)
+	assertStatusEqual(t, rc, redkeyv1.StatusReady)
+	assertConditionFalse(t, rc, redkeyv1.ConditionScalingDown)
+	assertConditionFalse(t, rc, redkeyv1.ConditionScalingUp)
 }
 
 func TestUpdateScalingStatus_ScalingUp_In_Progress(t *testing.T) {
@@ -88,7 +88,7 @@ func TestUpdateScalingStatus_ScalingUp_In_Progress(t *testing.T) {
 
 	readyNodes := newReadyNodes(int(numStatefulSetReplicas))
 
-	rc.Status.Status = redisv1.StatusScalingUp
+	rc.Status.Status = redkeyv1.StatusScalingUp
 	rc.Status.Nodes = readyNodes
 
 	reconciler.FindExistingStatefulSetFunc = mockStatefulSet(newStatefulSet(rc, numStatefulSetReplicas))
@@ -96,13 +96,13 @@ func TestUpdateScalingStatus_ScalingUp_In_Progress(t *testing.T) {
 
 	_ = reconciler.updateScalingStatus(newContext(), rc)
 
-	assertStatusEqual(t, rc, redisv1.StatusScalingUp)
-	assertConditionFalse(t, rc, redisv1.ConditionScalingDown)
-	assertConditionTrue(t, rc, redisv1.ConditionScalingUp)
+	assertStatusEqual(t, rc, redkeyv1.StatusScalingUp)
+	assertConditionFalse(t, rc, redkeyv1.ConditionScalingDown)
+	assertConditionTrue(t, rc, redkeyv1.ConditionScalingUp)
 }
 
 func TestUpdateUpgradingStatus_Upgrading_Config_Not_Changed(t *testing.T) {
-	rc.Status.Status = redisv1.StatusReady
+	rc.Status.Status = redkeyv1.StatusReady
 	rc.Status.Conditions = []metav1.Condition{}
 
 	// TODO: pass redis to configmap so it has same config
@@ -118,13 +118,13 @@ func TestUpdateUpgradingStatus_Upgrading_Config_Not_Changed(t *testing.T) {
 
 	_ = reconciler.updateUpgradingStatus(newContext(), rc)
 
-	assertStatusEqual(t, rc, redisv1.StatusReady)
-	assertConditionFalse(t, rc, redisv1.ConditionUpgrading)
+	assertStatusEqual(t, rc, redkeyv1.StatusReady)
+	assertConditionFalse(t, rc, redkeyv1.ConditionUpgrading)
 }
 
 func TestUpdateUpgradingStatus_Upgrading_Completed(t *testing.T) {
-	rc.Status.Status = redisv1.StatusUpgrading
-	rc.Status.Conditions = []metav1.Condition{redisv1.ConditionUpgrading}
+	rc.Status.Status = redkeyv1.StatusUpgrading
+	rc.Status.Conditions = []metav1.Condition{redkeyv1.ConditionUpgrading}
 
 	// TODO: pass redis to configmap so it has same config
 	configMap.Data = make(map[string]string)
@@ -135,8 +135,8 @@ func TestUpdateUpgradingStatus_Upgrading_Completed(t *testing.T) {
 
 	_ = reconciler.updateUpgradingStatus(newContext(), rc)
 
-	assertStatusEqual(t, rc, redisv1.StatusReady)
-	assertConditionFalse(t, rc, redisv1.ConditionUpgrading)
+	assertStatusEqual(t, rc, redkeyv1.StatusReady)
+	assertConditionFalse(t, rc, redkeyv1.ConditionUpgrading)
 }
 
 func TestUpdateUpgradingStatus_Upgrading_Config_Changed(t *testing.T) {
@@ -156,8 +156,8 @@ func TestUpdateUpgradingStatus_Upgrading_Config_Changed(t *testing.T) {
 
 	_ = reconciler.updateUpgradingStatus(newContext(), rc)
 
-	assertStatusEqual(t, rc, redisv1.StatusUpgrading)
-	assertConditionTrue(t, rc, redisv1.ConditionUpgrading)
+	assertStatusEqual(t, rc, redkeyv1.StatusUpgrading)
+	assertConditionTrue(t, rc, redkeyv1.ConditionUpgrading)
 }
 
 func TestUpdateUpgradingStatus_Upgrading_Limits_Cpu_Changed(t *testing.T) {
@@ -177,8 +177,8 @@ func TestUpdateUpgradingStatus_Upgrading_Limits_Cpu_Changed(t *testing.T) {
 
 	_ = reconciler.updateUpgradingStatus(newContext(), rc)
 
-	assertStatusEqual(t, rc, redisv1.StatusUpgrading)
-	assertConditionTrue(t, rc, redisv1.ConditionUpgrading)
+	assertStatusEqual(t, rc, redkeyv1.StatusUpgrading)
+	assertConditionTrue(t, rc, redkeyv1.ConditionUpgrading)
 }
 
 func TestUpdateUpgradingStatus_Upgrading_Requests_Cpu_Changed(t *testing.T) {
@@ -198,8 +198,8 @@ func TestUpdateUpgradingStatus_Upgrading_Requests_Cpu_Changed(t *testing.T) {
 
 	_ = reconciler.updateUpgradingStatus(newContext(), rc)
 
-	assertStatusEqual(t, rc, redisv1.StatusUpgrading)
-	assertConditionTrue(t, rc, redisv1.ConditionUpgrading)
+	assertStatusEqual(t, rc, redkeyv1.StatusUpgrading)
+	assertConditionTrue(t, rc, redkeyv1.ConditionUpgrading)
 }
 
 func TestUpdateUpgradingStatus_Upgrading_Limits_Memory_Changed(t *testing.T) {
@@ -219,8 +219,8 @@ func TestUpdateUpgradingStatus_Upgrading_Limits_Memory_Changed(t *testing.T) {
 
 	_ = reconciler.updateUpgradingStatus(newContext(), rc)
 
-	assertStatusEqual(t, rc, redisv1.StatusUpgrading)
-	assertConditionTrue(t, rc, redisv1.ConditionUpgrading)
+	assertStatusEqual(t, rc, redkeyv1.StatusUpgrading)
+	assertConditionTrue(t, rc, redkeyv1.ConditionUpgrading)
 }
 
 func TestUpdateUpgradingStatus_Upgrading_Requests_Memory_Changed(t *testing.T) {
@@ -240,8 +240,8 @@ func TestUpdateUpgradingStatus_Upgrading_Requests_Memory_Changed(t *testing.T) {
 
 	_ = reconciler.updateUpgradingStatus(newContext(), rc)
 
-	assertStatusEqual(t, rc, redisv1.StatusUpgrading)
-	assertConditionTrue(t, rc, redisv1.ConditionUpgrading)
+	assertStatusEqual(t, rc, redkeyv1.StatusUpgrading)
+	assertConditionTrue(t, rc, redkeyv1.ConditionUpgrading)
 }
 
 func TestUpdateUpgradingStatus_Upgrading_Image_Changed(t *testing.T) {
@@ -253,22 +253,22 @@ func TestUpdateUpgradingStatus_Upgrading_Image_Changed(t *testing.T) {
 	rc.Spec.Config = redis.GenerateRedisConfig(rc)
 
 	sset := newStatefulSet(rc, numStatefulSetReplicas)
-	sset.Spec.Template.Spec.Containers[0].Image = "redis-operator:9.9.9"
+	sset.Spec.Template.Spec.Containers[0].Image = "redkey-operator:9.9.9"
 
 	reconciler.FindExistingStatefulSetFunc = mockStatefulSet(sset)
 	reconciler.FindExistingConfigMapFunc = mockConfigMap(configMap)
 
 	_ = reconciler.updateUpgradingStatus(newContext(), rc)
 
-	assertStatusEqual(t, rc, redisv1.StatusUpgrading)
-	assertConditionTrue(t, rc, redisv1.ConditionUpgrading)
+	assertStatusEqual(t, rc, redkeyv1.StatusUpgrading)
+	assertConditionTrue(t, rc, redkeyv1.ConditionUpgrading)
 }
 
 func TestSetConditionTrue(t *testing.T) {
 	clearConditions()
 	initEventRecorder()
 
-	condition := redisv1.ConditionUpgrading
+	condition := redkeyv1.ConditionUpgrading
 
 	reconciler.setConditionTrue(rc, condition, "upgrading")
 
@@ -281,11 +281,11 @@ func TestSetConditionTrue_recordEvent(t *testing.T) {
 
 	message := "Updating resource requests"
 
-	reconciler.setConditionTrue(rc, redisv1.ConditionUpgrading, message)
+	reconciler.setConditionTrue(rc, redkeyv1.ConditionUpgrading, message)
 
 	select {
 	case event := <-recorder.Events:
-		assert.Equal(t, "Normal RedisClusterUpgrading "+message, event)
+		assert.Equal(t, "Normal RedKeyClusterUpgrading "+message, event)
 	default:
 		t.Fail()
 		fmt.Println("expected event to be recorded because condition was changed")
@@ -299,7 +299,7 @@ func clearConditions() {
 func TestSetConditionTrue_dontRecordEvent(t *testing.T) {
 	initEventRecorder()
 
-	condition := redisv1.ConditionUpgrading
+	condition := redkeyv1.ConditionUpgrading
 
 	rc.Status.Conditions = []metav1.Condition{condition}
 
