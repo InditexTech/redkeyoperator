@@ -979,12 +979,12 @@ func (r *RedKeyClusterReconciler) completeClusterScaleDown(ctx context.Context, 
 
 func (r *RedKeyClusterReconciler) getCulledNodes(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) ([]robin.Node, error) {
 	logger := r.getHelperLogger((redkeyCluster.NamespacedName()))
-	redisRobin, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
+	redkeyRobin, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin to get cluster nodes")
 		return nil, err
 	}
-	clusterNodes, err := redisRobin.GetClusterNodes()
+	clusterNodes, err := redkeyRobin.GetClusterNodes()
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error getting cluster nodes info from Robin")
 		return nil, err
