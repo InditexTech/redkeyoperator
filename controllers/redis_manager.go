@@ -678,10 +678,15 @@ func (r *RedKeyClusterReconciler) doFastScaling(ctx context.Context, redkeyClust
 			return true, nil
 		}
 
-		// Rebuild the cluster
+		// Reset the cluster
 		robin, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
 		if err != nil {
 			r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin to check its readiness")
+			return true, err
+		}
+		err = robin.ClusterRecreate()
+		if err != nil {
+			r.logError(redkeyCluster.NamespacedName(), err, "Error performing a cluster recreate through Robin")
 			return true, err
 		}
 		err = robin.ClusterFix()
@@ -731,20 +736,20 @@ func (r *RedKeyClusterReconciler) doFastScaling(ctx context.Context, redkeyClust
 				return true, err
 			}
 
-			// At this point Robin status has been updated from Ready status. Ge go back to Ready status.
+			// Set Robin status to NotReconciling.
 			redkeyRobin, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
 			if err != nil {
 				r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin to check its readiness")
 				return true, err
 			}
-			err = redkeyRobin.SetStatus(redkeyv1.StatusReady)
+			err = redkeyRobin.SetStatus(redkeyv1.RobinStatusNoReconciling)
 			if err != nil {
-				r.logError(redkeyCluster.NamespacedName(), err, "Error updating Robin status", "status", redkeyv1.StatusReady)
+				r.logError(redkeyCluster.NamespacedName(), err, "Error updating Robin status", "status", redkeyv1.RobinStatusNoReconciling)
 				return true, err
 			}
-			err = robin.PersistRobinStatut(ctx, r.Client, redkeyCluster, redkeyv1.StatusReady)
+			err = robin.PersistRobinStatut(ctx, r.Client, redkeyCluster, redkeyv1.RobinStatusNoReconciling)
 			if err != nil {
-				r.logError(redkeyCluster.NamespacedName(), err, "Error persisting Robin status", "status", redkeyv1.StatusReady)
+				r.logError(redkeyCluster.NamespacedName(), err, "Error persisting Robin status", "status", redkeyv1.RobinStatusNoReconciling)
 				return true, err
 			}
 
