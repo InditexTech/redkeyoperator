@@ -689,11 +689,6 @@ func (r *RedKeyClusterReconciler) doFastScaling(ctx context.Context, redkeyClust
 			r.logError(redkeyCluster.NamespacedName(), err, "Error performing a cluster recreate through Robin")
 			return true, err
 		}
-		err = robin.ClusterFix()
-		if err != nil {
-			r.logError(redkeyCluster.NamespacedName(), err, "Error performing a cluster fix through Robin")
-			return true, err
-		}
 
 		err = r.updateClusterSubStatus(ctx, redkeyCluster, redkeyv1.SubstatusEndingFastScaling, "")
 		if err != nil {
