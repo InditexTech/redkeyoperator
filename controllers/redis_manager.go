@@ -257,14 +257,14 @@ func (r *RedKeyClusterReconciler) doSlowUpgradeScalingUp(ctx context.Context, re
 	r.logInfo(redkeyCluster.NamespacedName(), "Redis node pods are ready", "pods", existingStatefulSet.Spec.Replicas)
 
 	logger := r.getHelperLogger(redkeyCluster.NamespacedName())
-	robinRedis, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
+	redkeyRobin, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin to check its readiness")
 		return err
 	}
 
 	// Set the number of replicas to Robin to have the new node met to the existing nodes.
-	replicas, replicasPerMaster, err := robinRedis.GetReplicas()
+	replicas, replicasPerMaster, err := redkeyRobin.GetReplicas()
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error getting replicas from Robin")
 		return err
@@ -274,7 +274,7 @@ func (r *RedKeyClusterReconciler) doSlowUpgradeScalingUp(ctx context.Context, re
 		if err != nil {
 			r.logError(redkeyCluster.NamespacedName(), err, "Error persisting Robin replicas")
 		}
-		err = robinRedis.SetReplicas(int(redkeyCluster.Spec.Replicas), int(redkeyCluster.Spec.ReplicasPerMaster))
+		err = redkeyRobin.SetReplicas(int(redkeyCluster.Spec.Replicas), int(redkeyCluster.Spec.ReplicasPerMaster))
 		if err != nil {
 			r.logError(redkeyCluster.NamespacedName(), err, "Error updating Robin replicas")
 			return err
@@ -282,7 +282,7 @@ func (r *RedKeyClusterReconciler) doSlowUpgradeScalingUp(ctx context.Context, re
 	}
 
 	// Check all cluster nodes are ready from Robin.
-	clusterNodes, err := robinRedis.GetClusterNodes()
+	clusterNodes, err := redkeyRobin.GetClusterNodes()
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error getting cluster nodes from Robin")
 		return err
@@ -318,14 +318,14 @@ func (r *RedKeyClusterReconciler) doSlowUpgradeUpgrading(ctx context.Context, re
 
 	// Get Robin.
 	logger := r.getHelperLogger(redkeyCluster.NamespacedName())
-	robinRedis, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
+	redkeyRobin, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin to check its readiness")
 		return err
 	}
 
 	// Check cluster health.
-	check, errors, warnings, err := robinRedis.ClusterCheck()
+	check, errors, warnings, err := redkeyRobin.ClusterCheck()
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error checking the cluster readiness over Robin")
 		return err
@@ -363,7 +363,7 @@ func (r *RedKeyClusterReconciler) doSlowUpgradeUpgrading(ctx context.Context, re
 		}
 	} else {
 		// Move slots from partition before rolling update.
-		completed, err := robinRedis.MoveSlots(currentPartition, currentPartition+1, 0)
+		completed, err := redkeyRobin.MoveSlots(currentPartition, currentPartition+1, 0)
 		if err != nil {
 			r.logError(redkeyCluster.NamespacedName(), err, "Error moving slots", "From node", currentPartition, "To node", currentPartition+1)
 			return err
@@ -374,7 +374,7 @@ func (r *RedKeyClusterReconciler) doSlowUpgradeUpgrading(ctx context.Context, re
 		}
 
 		// Forget node
-		err = robinRedis.ClusterResetNode(currentPartition)
+		err = redkeyRobin.ClusterResetNode(currentPartition)
 		if err != nil {
 			r.logError(redkeyCluster.NamespacedName(), err, "Error from Robin resetting the node", "node index", currentPartition)
 			return err
@@ -430,14 +430,14 @@ func (r *RedKeyClusterReconciler) doSlowUpgradeEnd(ctx context.Context, redkeyCl
 
 	// Get Robin.
 	logger := r.getHelperLogger(redkeyCluster.NamespacedName())
-	robinRedis, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
+	redkeyRobin, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin to check its readiness")
 		return err
 	}
 
 	// Check cluster health.
-	check, errors, warnings, err := robinRedis.ClusterCheck()
+	check, errors, warnings, err := redkeyRobin.ClusterCheck()
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error checking the cluster readiness over Robin")
 		return err
@@ -449,7 +449,7 @@ func (r *RedKeyClusterReconciler) doSlowUpgradeEnd(ctx context.Context, redkeyCl
 
 	// Move slots from extra node to node 0.
 	extraNodeIndex := int(*(existingStatefulSet.Spec.Replicas)) - 1
-	completed, err := robinRedis.MoveSlots(extraNodeIndex, 0, 0)
+	completed, err := redkeyRobin.MoveSlots(extraNodeIndex, 0, 0)
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error moving slots", "From node", extraNodeIndex, "To node", 0)
 		return err
@@ -495,14 +495,14 @@ func (r *RedKeyClusterReconciler) doSlowUpgradeScalingDown(ctx context.Context, 
 	r.logInfo(redkeyCluster.NamespacedName(), "Redis node pods are ready", "pods", existingStatefulSet.Spec.Replicas)
 
 	logger := r.getHelperLogger(redkeyCluster.NamespacedName())
-	robinRedis, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
+	redkeyRobin, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin")
 		return err
 	}
 
 	// Set the number of replicas to Robin to have the new node met to the existing nodes.
-	replicas, replicasPerMaster, err := robinRedis.GetReplicas()
+	replicas, replicasPerMaster, err := redkeyRobin.GetReplicas()
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error getting replicas from Robin")
 		return err
@@ -512,7 +512,7 @@ func (r *RedKeyClusterReconciler) doSlowUpgradeScalingDown(ctx context.Context, 
 		if err != nil {
 			r.logError(redkeyCluster.NamespacedName(), err, "Error persisting Robin replicas")
 		}
-		err = robinRedis.SetReplicas(int(redkeyCluster.Spec.Replicas), int(redkeyCluster.Spec.ReplicasPerMaster))
+		err = redkeyRobin.SetReplicas(int(redkeyCluster.Spec.Replicas), int(redkeyCluster.Spec.ReplicasPerMaster))
 		if err != nil {
 			r.logError(redkeyCluster.NamespacedName(), err, "Error updating Robin replicas")
 			return err
@@ -520,7 +520,7 @@ func (r *RedKeyClusterReconciler) doSlowUpgradeScalingDown(ctx context.Context, 
 	}
 
 	// Check all cluster nodes are ready from Robin.
-	check, errors, warnings, err := robinRedis.ClusterCheck()
+	check, errors, warnings, err := redkeyRobin.ClusterCheck()
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error checking the cluster readiness over Robin")
 		return err
@@ -732,12 +732,12 @@ func (r *RedKeyClusterReconciler) doFastScaling(ctx context.Context, redkeyClust
 			}
 
 			// At this point Robin status has been updated from Ready status. Ge go back to Ready status.
-			robinRedis, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
+			redkeyRobin, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
 			if err != nil {
 				r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin to check its readiness")
 				return true, err
 			}
-			err = robinRedis.SetStatus(redkeyv1.StatusReady)
+			err = redkeyRobin.SetStatus(redkeyv1.StatusReady)
 			if err != nil {
 				r.logError(redkeyCluster.NamespacedName(), err, "Error updating Robin status", "status", redkeyv1.StatusReady)
 				return true, err
@@ -752,7 +752,7 @@ func (r *RedKeyClusterReconciler) doFastScaling(ctx context.Context, redkeyClust
 			r.Client.Delete(ctx, existingStatefulSet)
 
 			// Update Robin replicas.
-			err = robinRedis.SetReplicas(int(redkeyCluster.Spec.Replicas), int(redkeyCluster.Spec.ReplicasPerMaster))
+			err = redkeyRobin.SetReplicas(int(redkeyCluster.Spec.Replicas), int(redkeyCluster.Spec.ReplicasPerMaster))
 			if err != nil {
 				r.logError(redkeyCluster.NamespacedName(), err, "Error setting Robin replicas", "replicas", redkeyCluster.Spec.Replicas,
 					"replicas per master", redkeyCluster.Spec.ReplicasPerMaster)
@@ -843,20 +843,20 @@ func (r *RedKeyClusterReconciler) doSlowScaling(ctx context.Context, redkeyClust
 func (r *RedKeyClusterReconciler) scaleDownCluster(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) (bool, error) {
 
 	logger := r.getHelperLogger((redkeyCluster.NamespacedName()))
-	robinRedis, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
+	redkeyRobin, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin to get cluster nodes")
 		return true, err
 	}
 
 	// Update replicas
-	replicas, replicasPerMaster, err := robinRedis.GetReplicas()
+	replicas, replicasPerMaster, err := redkeyRobin.GetReplicas()
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin replicas")
 		return true, err
 	}
 	if replicas != int(redkeyCluster.Spec.Replicas) || replicasPerMaster != int(redkeyCluster.Spec.ReplicasPerMaster) {
-		err = robinRedis.SetReplicas(int(redkeyCluster.Spec.Replicas), int(redkeyCluster.Spec.ReplicasPerMaster))
+		err = redkeyRobin.SetReplicas(int(redkeyCluster.Spec.Replicas), int(redkeyCluster.Spec.ReplicasPerMaster))
 		if err != nil {
 			r.logError(redkeyCluster.NamespacedName(), err, "Error updating Robin replicas", "replicas", redkeyCluster.Spec.Replicas,
 				"replicas per master", redkeyCluster.Spec.ReplicasPerMaster)
@@ -872,7 +872,7 @@ func (r *RedKeyClusterReconciler) scaleDownCluster(ctx context.Context, redkeyCl
 	}
 
 	// Check cluster replicas meet the requirements
-	clusterNodes, err := robinRedis.GetClusterNodes()
+	clusterNodes, err := redkeyRobin.GetClusterNodes()
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin nodes info")
 		return true, err
@@ -1035,7 +1035,7 @@ func (r *RedKeyClusterReconciler) scaleUpCluster(ctx context.Context, redkeyClus
 
 func (r *RedKeyClusterReconciler) completeClusterScaleUp(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) (bool, error) {
 	logger := r.getHelperLogger((redkeyCluster.NamespacedName()))
-	robinRedis, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
+	redkeyRobin, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin to get cluster nodes")
 		return true, err
@@ -1058,7 +1058,7 @@ func (r *RedKeyClusterReconciler) completeClusterScaleUp(ctx context.Context, re
 		}
 
 		// Update Robin with new replicas/replicasPerMaster
-		err = robinRedis.SetReplicas(int(redkeyCluster.Spec.Replicas), int(redkeyCluster.Spec.ReplicasPerMaster))
+		err = redkeyRobin.SetReplicas(int(redkeyCluster.Spec.Replicas), int(redkeyCluster.Spec.ReplicasPerMaster))
 		if err != nil {
 			r.logError(redkeyCluster.NamespacedName(), err, "Error updating replicas in Robin", "replicas", redkeyCluster.Spec.Replicas, "replicasPerMaster", redkeyCluster.Spec.ReplicasPerMaster)
 			return true, err
@@ -1083,7 +1083,7 @@ func (r *RedKeyClusterReconciler) completeClusterScaleUp(ctx context.Context, re
 		// We will ensure that all cluster nodes are initialized before asking Robin to meet all new nodes,
 		// forget outdated nodes, ensure slots coverage and rebalance.
 
-		clusterNodes, err := robinRedis.GetClusterNodes()
+		clusterNodes, err := redkeyRobin.GetClusterNodes()
 		if err != nil {
 			r.logError(redkeyCluster.NamespacedName(), err, "Error getting cluster nodes from Robin")
 			return true, err
@@ -1093,7 +1093,7 @@ func (r *RedKeyClusterReconciler) completeClusterScaleUp(ctx context.Context, re
 			r.logInfo(redkeyCluster.NamespacedName(), "ScaleCluster - Inconsistency. Statefulset replicas equals to RedKeyCluster replicas but we have a different number of cluster nodes. Trying to fix it...",
 				"RedKeyCluster replicas", redkeyCluster.Spec.Replicas, "Cluster nodes", masterNodes)
 		}
-		err = robinRedis.ClusterFix()
+		err = redkeyRobin.ClusterFix()
 		if err != nil {
 			r.logError(redkeyCluster.NamespacedName(), err, "Error asking to Robin to ensure the cluster is ok")
 			return true, err
@@ -1109,7 +1109,7 @@ func (r *RedKeyClusterReconciler) completeClusterScaleUp(ctx context.Context, re
 	case redkeyv1.SubstatusEndingScaling:
 		// Final step: ensure the cluster is Ok.
 
-		check, errors, warnings, err := robinRedis.ClusterCheck()
+		check, errors, warnings, err := redkeyRobin.ClusterCheck()
 		if err != nil {
 			r.logError(redkeyCluster.NamespacedName(), err, "Error checking the cluster readiness over Robin")
 			return true, err
