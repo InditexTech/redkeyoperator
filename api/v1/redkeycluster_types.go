@@ -55,6 +55,15 @@ const (
 	StatusInitializing = "Initializing"
 	StatusError        = "Error"
 
+	RobinStatusNoReconciling = "NoReconciling"
+	RobinStatusUpgrading     = "Upgrading"
+	RobinStatusScalingDown   = "ScalingDown"
+	RobinStatusScalingUp     = "ScalingUp"
+	RobinStatusReady         = "Ready"
+	RobinStatusConfiguring   = "Configuring"
+	RobinStatusInitializing  = "Initializing"
+	RobinStatusError         = "Error"
+
 	SubstatusFastUpgrading        = "FastUpgrading"
 	SubstatusEndingFastUpgrading  = "EndingFastUpgrading"
 	SubstatusSlowUpgrading        = "SlowUpgrading"
@@ -310,4 +319,25 @@ func CompareStatuses(a, b *RedKeyClusterStatus) bool {
 func IsFastOperationStatus(status RedKeyClusterSubstatus) bool {
 	return status.Status == SubstatusFastScaling || status.Status == SubstatusEndingFastScaling ||
 		status.Status == SubstatusFastUpgrading || status.Status == SubstatusEndingFastUpgrading
+}
+
+func GetRobinStatusCodeEquivalence(redkeyClusterStatus string) string {
+	switch redkeyClusterStatus {
+	case StatusUpgrading:
+		return RobinStatusUpgrading
+	case StatusScalingDown:
+		return RobinStatusScalingDown
+	case StatusScalingUp:
+		return RobinStatusScalingUp
+	case StatusReady:
+		return RobinStatusReady
+	case StatusConfiguring:
+		return RobinStatusConfiguring
+	case StatusInitializing:
+		return RobinStatusInitializing
+	case StatusError:
+		return RobinStatusError
+	default:
+		return RobinStatusError
+	}
 }

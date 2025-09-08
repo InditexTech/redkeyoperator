@@ -30,25 +30,27 @@ import (
 )
 
 const (
-	StatusInitializing = "Initializing"
-	StatutsConfiguring = "Configuring"
-	StatusReady        = "Ready"
-	StatusError        = "Error"
-	StatutsUpgrading   = "Upgrading"
-	StatusScalingDown  = "ScalingDown"
-	StatusScalingUp    = "ScalingUp"
-	StatusMaintenance  = "Maintenance"
-	StatusUnknown      = "Unknown"
-	Port               = 8080
+	StatusInitializing  = "Initializing"
+	StatutsConfiguring  = "Configuring"
+	StatusReady         = "Ready"
+	StatusError         = "Error"
+	StatutsUpgrading    = "Upgrading"
+	StatusScalingDown   = "ScalingDown"
+	StatusScalingUp     = "ScalingUp"
+	StatusMaintenance   = "Maintenance"
+	StatusNoReconciling = "NoReconciling"
+	StatusUnknown       = "Unknown"
+	Port                = 8080
 
-	EndpointProtocolPrefix = "http://"
-	EndpointStatus         = "/v1/redkeycluster/status"
-	EndpointReplicas       = "/v1/redkeycluster/replicas"
-	EndpointClusterCheck   = "/v1/cluster/check"
-	EndpointClusterNodes   = "/v1/cluster/nodes"
-	EndpointClusterFix     = "/v1/cluster/fix"
-	EndpointClusterMove    = "/v1/cluster/move"
-	EndpointClusterReset   = "/v1/cluster/reset/"
+	EndpointProtocolPrefix  = "http://"
+	EndpointStatus          = "/v1/redkeycluster/status"
+	EndpointReplicas        = "/v1/redkeycluster/replicas"
+	EndpointClusterCheck    = "/v1/cluster/check"
+	EndpointClusterNodes    = "/v1/cluster/nodes"
+	EndpointClusterFix      = "/v1/cluster/fix"
+	EndpointClusterMove     = "/v1/cluster/move"
+	EndpointClusterReset    = "/v1/cluster/reset/"
+	EndpointClusterRecreate = "/v1/cluster/recreate"
 )
 
 // Configuration is the top-level configuration struct.
@@ -343,6 +345,19 @@ func (r *Robin) MoveSlots(nodeIndexFrom int, nodeIndexTo int, numSlots int) (boo
 		r.Logger.Info("Moving slots still in progress", "from", nodeIndexFrom, "to", nodeIndexTo, "slots", numSlots)
 		return false, nil
 	}
+}
+
+func (r *Robin) ClusterRecreate() error {
+	url := EndpointProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointClusterRecreate
+
+	var payload []byte
+	body, err := doPut(url, payload)
+	if err != nil {
+		return fmt.Errorf("cluster recreate: %w", err)
+	}
+	r.Logger.Info("Asked to Robin to recreate the cluster", "response body", string(body))
+
+	return nil
 }
 
 func doSimpleGet(url string) ([]byte, error) {
