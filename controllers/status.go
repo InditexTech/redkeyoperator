@@ -75,7 +75,7 @@ func (r *RedKeyClusterReconciler) updateClusterStatus(ctx context.Context, redke
 		}
 
 		// Update Robin ConfigMap status
-		err = robin.PersistRobinStatut(ctx, r.Client, redkeyCluster, redkeyv1.GetRobinStatusCodeEquivalence(redkeyCluster.Status.Status))
+		err = robin.PersistRobinStatus(ctx, r.Client, redkeyCluster, redkeyv1.GetRobinStatusCodeEquivalence(redkeyCluster.Status.Status))
 		if err != nil {
 			r.logError(redkeyCluster.NamespacedName(), err, "Error updating the new status in Robin ConfigMap", "status", redkeyCluster.Status.Status)
 			return err

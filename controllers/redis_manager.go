@@ -404,7 +404,7 @@ func (r *RedKeyClusterReconciler) doSlowUpgradeUpgrading(ctx context.Context, re
 		r.logError(redkeyCluster.NamespacedName(), err, "Error updating Robin status", "status", redkeyv1.RobinStatusNoReconciling)
 		return err
 	}
-	err = robin.PersistRobinStatut(ctx, r.Client, redkeyCluster, redkeyv1.RobinStatusNoReconciling)
+	err = robin.PersistRobinStatus(ctx, r.Client, redkeyCluster, redkeyv1.RobinStatusNoReconciling)
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error persisting Robin status", "status", redkeyv1.RobinStatusNoReconciling)
 		return err
@@ -525,7 +525,7 @@ func (r *RedKeyClusterReconciler) doSlowUpgradeRollingUpdate(ctx context.Context
 		r.logError(redkeyCluster.NamespacedName(), err, "Error updating Robin status", "status", redkeyv1.RobinStatusUpgrading)
 		return err
 	}
-	err = robin.PersistRobinStatut(ctx, r.Client, redkeyCluster, redkeyv1.RobinStatusUpgrading)
+	err = robin.PersistRobinStatus(ctx, r.Client, redkeyCluster, redkeyv1.RobinStatusUpgrading)
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error persisting Robin status", "status", redkeyv1.RobinStatusUpgrading)
 		return err
@@ -888,7 +888,7 @@ func (r *RedKeyClusterReconciler) doFastScaling(ctx context.Context, redkeyClust
 				r.logError(redkeyCluster.NamespacedName(), err, "Error updating Robin status", "status", redkeyv1.RobinStatusNoReconciling)
 				return true, err
 			}
-			err = robin.PersistRobinStatut(ctx, r.Client, redkeyCluster, redkeyv1.RobinStatusNoReconciling)
+			err = robin.PersistRobinStatus(ctx, r.Client, redkeyCluster, redkeyv1.RobinStatusNoReconciling)
 			if err != nil {
 				r.logError(redkeyCluster.NamespacedName(), err, "Error persisting Robin status", "status", redkeyv1.RobinStatusNoReconciling)
 				return true, err
