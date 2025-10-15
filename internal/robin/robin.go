@@ -214,6 +214,14 @@ func (r *Robin) SetStatus(status string) error {
 	return nil
 }
 
+func (r *Robin) SetAndPersistRobinStatus(ctx context.Context, client ctrlClient.Client, redkeyCluster *redkeyv1.RedKeyCluster, newStatus string) error {
+	err := r.SetStatus(newStatus)
+	if err != nil {
+		return err
+	}
+	return PersistRobinStatus(ctx, client, redkeyCluster, newStatus)
+}
+
 func (r *Robin) GetReplicas() (int, int, error) {
 	url := EndpointProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointReplicas
 
