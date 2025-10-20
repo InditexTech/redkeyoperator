@@ -30,10 +30,11 @@ import (
 )
 
 const (
-	DefaultRequeueTimeout time.Duration = 5
-	ScalingDefaultTimeout time.Duration = 30
-	ReadyRequeueTimeout   time.Duration = 30
-	ErrorRequeueTimeout   time.Duration = 30
+	DefaultRequeueTimeout   time.Duration = 5
+	UpgradingDefaultTimeout time.Duration = 30
+	ScalingDefaultTimeout   time.Duration = 30
+	ReadyRequeueTimeout     time.Duration = 30
+	ErrorRequeueTimeout     time.Duration = 30
 )
 
 func NewRedKeyClusterReconciler(mgr ctrl.Manager, maxConcurrentReconciles int, concurrentMigrates int) *RedKeyClusterReconciler {
@@ -284,7 +285,7 @@ func (r *RedKeyClusterReconciler) reconcileStatusUpgrading(ctx context.Context, 
 		r.Recorder.Event(redkeyCluster, "Warning", "ClusterError", err.Error())
 	}
 
-	return requeue, DefaultRequeueTimeout
+	return requeue, UpgradingDefaultTimeout
 }
 
 func (r *RedKeyClusterReconciler) reconcileStatusScalingDown(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) (bool, time.Duration) {
