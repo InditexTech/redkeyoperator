@@ -214,6 +214,14 @@ func (r *Robin) SetStatus(status string) error {
 	return nil
 }
 
+func (r *Robin) SetAndPersistRobinStatus(ctx context.Context, client ctrlClient.Client, redkeyCluster *redkeyv1.RedKeyCluster, newStatus string) error {
+	err := r.SetStatus(newStatus)
+	if err != nil {
+		return err
+	}
+	return PersistRobinStatus(ctx, client, redkeyCluster, newStatus)
+}
+
 func (r *Robin) GetReplicas() (int, int, error) {
 	url := EndpointProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointReplicas
 
@@ -426,7 +434,7 @@ func (cn *ClusterNodes) GetReplicaNodes() []*Node {
 }
 
 // Updates configuration in Robin ConfigMap with the new status.
-func PersistRobinStatut(ctx context.Context, client ctrlClient.Client, redkeyCluster *redkeyv1.RedKeyCluster, newStatus string) error {
+func PersistRobinStatus(ctx context.Context, client ctrlClient.Client, redkeyCluster *redkeyv1.RedKeyCluster, newStatus string) error {
 	cmap := &corev1.ConfigMap{}
 	err := client.Get(ctx, types.NamespacedName{Name: redkeyCluster.Name + "-robin", Namespace: redkeyCluster.Namespace}, cmap)
 	if err != nil {

@@ -270,7 +270,7 @@ process-manifests: kustomize process-manifests-crd ##		Generate the kustomized y
 		$(SED) -i 's/watch-namespace/$(NAMESPACE)/' deployment/manager.yaml; \
 	elif [ ${PROFILE} == "debug" ]; then \
 		(cd config/deploy-profiles/${PROFILE} && \
-			$(KUSTOMIZE) edit set image /redkey-operator=${IMG_DEBUG}); \
+			$(KUSTOMIZE) edit set image redkey-operator=${IMG_DEBUG}); \
 		$(KUSTOMIZE) build config/deploy-profiles/debug > deployment/manager.yaml; \
 		$(SED) -i 's/watch-namespace/$(NAMESPACE)/' deployment/manager.yaml; \
 	fi

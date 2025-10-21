@@ -70,6 +70,7 @@ const (
 	SubstatusUpgradingScalingUp   = "ScalingUp"
 	SubstatusUpgradingScalingDown = "ScalingDown"
 	SubstatusEndingSlowUpgrading  = "EndingSlowUpgrading"
+	SubstatusRollingConfig        = "RollingConfig"
 
 	SubstatusFastScaling       = "FastScaling"
 	SubstatusEndingFastScaling = "EndingFastScaling"

@@ -64,7 +64,7 @@ func (r *RedKeyClusterReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return r.ReconcileClusterObject(ctx, req, redkeyCluster)
 	} else {
 		// cluster deleted
-		r.Log.Info("Can't find RedisCRedKeyClusterluster, probably deleted", "redis-cluster", req.NamespacedName)
+		r.Log.Info("Can't find RedKeyCluster, probably deleted", "redis-cluster", req.NamespacedName)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 }
