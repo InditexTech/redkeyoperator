@@ -1,0 +1,142 @@
+apiVersion: redis.inditex.dev/v1
+kind: RedKeyCluster
+metadata:
+  labels:
+    app.kubernetes.io/name: redkey-cluster-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: redis-cluster-ephemeral
+spec:
+  replicas: 3
+  ephemeral: true
+  accessModes: 
+  - ReadWriteOnce
+  deletePVC: false
+  image: redis:8-bookworm
+  purgeKeysOnRebalance: true
+  labels:
+    team: team-a
+    custom: labels
+  config: |
+    maxmemory 90mb
+    maxmemory-samples 5
+    maxmemory-policy allkeys-lru
+    protected-mode no
+    appendonly no
+    save ""
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  robin:
+    config: |
+      metadata:
+        namespace: redkey-operator
+      redis:
+        standalone: false
+        reconciler:
+          interval_seconds: 30
+          operation_cleanup_interval_seconds: 30
+        cluster:
+          namespace: redkey-operator
+          name: redis-cluster-ephemeral
+          replicas: 3
+          replicas_per_master: 0
+          status: 'Unknown'
+          ephemeral: true
+          health_probe_interval_seconds: 60
+          healing_time_seconds: 60
+          max_retries: 10
+          back_off: 10s
+        metrics:
+          interval_seconds: 60
+          redis_info_keys:
+            - keyspace_hits
+            - evicted_keys
+            - connected_clients
+            - total_commands_processed
+            - keyspace_misses
+            - expired_keys
+            - redis_version
+            - used_memory_rss
+            - maxmemory
+            - used_cpu_sys
+            - used_cpu_sys_children
+            - used_cpu_user
+            - used_cpu_user_children
+            - total_net_input_bytes
+            - total_net_output_bytes
+            - aof_base_size
+            - aof_current_size
+            - mem_aof_buffer
+    template:
+      spec:
+        containers:
+          - image: redkey-robin:0.1.0
+            name: robin
+            imagePullPolicy: Always
+            ports:
+              - containerPort: 8080
+                name: prometheus
+                protocol: TCP
+            volumeMounts:
+              - mountPath: /opt/conf/configmap
+                name: redis-cluster-ephemeral-robin-config
+            resources:
+              requests:
+                cpu: 500m
+                memory: 100Mi
+              limits:
+                cpu: 1
+                memory: 200Mi
+        volumes:
+          - configMap:
+              defaultMode: 420
+              name: redis-cluster-ephemeral-robin
+            name: redis-cluster-ephemeral-robin-config
+  # override:
+  #   service:
+  #     metadata:
+  #       annotations:
+  #         traffic.inditex.dev/weight: "101"
+  #       labels:
+  #         inditex.dev/test: "test"
+  #     spec:
+  #       ports:
+  #       - name: prometheus
+  #         port: 9090
+  #         targetPort: 9090
+  #         protocol: TCP
+  #       selector:
+  #         inditex.dev/test: "test"
+  #   statefulSet:
+  #     metadata:
+  #       annotations:
+  #         traffic.inditex.dev/weight: "10"
+  #     spec:
+  #       template:
+  #         metadata:
+  #           labels:
+  #             inditex.dev/test: "test"
+  #         spec:
+  #           tolerations:
+  #             - key: "test"
+  #               operator: "Equal"
+  #               value: "test"
+  #               effect: "NoSchedule"
+  #           topologySpreadConstraints:
+  #           - maxSkew: 1
+  #             topologyKey: kubernetes.io/hostname
+  #             whenUnsatisfiable: DoNotSchedule
+  #             labelSelector:
+  #               matchLabels:
+  #                 app: foo
+  #             matchLabelKeys:
+  #               - pod-template-hash
+  #           containers: 
+  #           - name: nginx
+  #             image: nginx
+  #           - name: redis
+  #             env:
+  #              - name: test
+  #                value: test
+  #           terminationGracePeriodSeconds: 10

@@ -11,6 +11,7 @@ package   := github.com/inditextech/$(name)
 # Image URL to use for building/pushing image targets when using `pro` deployment profile.
 IMG ?= redkey-operator:$(VERSION)
 IMG_WEBHOOK ?= redkey-operator-webhook:$(VERSION)
+IMG_ROBIN ?= redkey-robin:$(VERSION)
 
 # CN for the webhook certificate
 CN ?= inditex.dev
@@ -376,11 +377,19 @@ delete-operator: ##		Delete the operator pod (redkey-operator) in order to have 
 
 apply-rkcl: ##		Apply the sample RedKey Cluster manifest.
 	$(info $(M) creating sample RedKey cluster)
-	$(KUSTOMIZE) build config/samples | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | kubectl apply -f -
+	$(KUSTOMIZE) build config/samples/ephemeral | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | $(SED) 's,image: redkey-robin:0.1.0,image: ${IMG_ROBIN},' | kubectl apply -f -
 
 delete-rkcl: ##		Delete the sample RedKey Cluster manifest.
 	$(info $(M) deleting sample RedKey cluster)
-	$(KUSTOMIZE) build config/samples | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | kubectl delete -f -
+	$(KUSTOMIZE) build config/samples/ephemeral | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | $(SED) 's,image: redkey-robin:0.1.0,image: ${IMG_ROBIN},' | kubectl delete -f -
+
+apply-debug-rkcl: ##		Apply the sample RedKey Cluster manifest for Robin debugging.
+	$(info $(M) creating sample RedKey cluster)
+	$(KUSTOMIZE) build config/samples/robin-debug | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | $(SED) 's,image: redkey-robin:0.1.0,image: ${IMG_DEBUG},' | kubectl apply -f -
+
+delete-debug-rkcl: ##		Delete the sample RedKey Cluster manifest for Robin debugging.
+	$(info $(M) deleting sample RedKey cluster)
+	$(KUSTOMIZE) build config/samples/robin-debug | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | $(SED) 's,image: redkey-robin:0.1.0,image: ${IMG_DEBUG},' | kubectl delete -f -
 
 apply-all: docker-build docker-push process-manifests install deploy apply-rkcl
 
