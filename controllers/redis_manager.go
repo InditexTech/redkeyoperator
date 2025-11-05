@@ -1211,8 +1211,7 @@ func (r *RedKeyClusterReconciler) completeClusterScaleUp(ctx context.Context, re
 
 	case redkeyv1.SubstatusScalingRobin:
 		// Robin was already updated with new replicas/replicasPerMaster.
-		// We will ensure that all cluster nodes are initialized before asking Robin to meet all new nodes,
-		// forget outdated nodes, ensure slots coverage and rebalance.
+		// We will ensure that all cluster nodes are initialized.
 
 		clusterNodes, err := redkeyRobin.GetClusterNodes()
 		if err != nil {
@@ -1221,13 +1220,8 @@ func (r *RedKeyClusterReconciler) completeClusterScaleUp(ctx context.Context, re
 		}
 		masterNodes := clusterNodes.GetMasterNodes()
 		if len(masterNodes) != int(redkeyCluster.Spec.Replicas) {
-			r.logInfo(redkeyCluster.NamespacedName(), "ScaleCluster - Inconsistency. Statefulset replicas equals to RedKeyCluster replicas but we have a different number of cluster nodes. Trying to fix it...",
+			r.logInfo(redkeyCluster.NamespacedName(), "ScaleCluster - Inconsistency. Statefulset replicas equals to RedKeyCluster replicas but we have a different number of cluster nodes. Waiting for Robin to complete scaling up...",
 				"RedKeyCluster replicas", redkeyCluster.Spec.Replicas, "Cluster nodes", masterNodes)
-		}
-		err = redkeyRobin.ClusterFix()
-		if err != nil {
-			r.logError(redkeyCluster.NamespacedName(), err, "Error asking to Robin to ensure the cluster is ok")
-			return true, err
 		}
 		err = r.updateClusterSubStatus(ctx, redkeyCluster, redkeyv1.SubstatusEndingScaling, "")
 		if err != nil {
