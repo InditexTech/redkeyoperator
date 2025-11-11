@@ -229,16 +229,16 @@ func (r *RedKeyClusterReconciler) reconcileStatusConfiguring(ctx context.Context
 	}
 
 	// Check cluster readiness.
-	check, errors, warnings, err := robinRedis.ClusterCheck()
+	status, err := robinRedis.GetClusterStatus()
 	if err != nil {
-		r.logError(redkeyCluster.NamespacedName(), err, "Error checking the cluster readiness over Robin")
+		r.logError(redkeyCluster.NamespacedName(), err, "Error getting cluster status")
 		return true, DefaultRequeueTimeout
 	}
-
-	if !check {
-		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for cluster readiness", "errors", errors, "warnings", warnings)
+	if status != redkeyv1.RobinStatusReady {
+		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for cluster readiness", "status", status)
 		return true, DefaultRequeueTimeout
 	}
+	r.logInfo(redkeyCluster.NamespacedName(), "Robin reports cluster is ready")
 
 	// RedKey cluster is ok, moving to Ready status
 	redkeyCluster.Status.Status = redkeyv1.StatusReady
