@@ -1085,26 +1085,26 @@ func (r *RedKeyClusterReconciler) completeClusterScaleDown(ctx context.Context, 
 		logger := r.getHelperLogger((redkeyCluster.NamespacedName()))
 		robin, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
 		if err != nil {
-			r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin to get cluster nodes")
+			r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin")
 			return true, err
 		}
-		check, errors, warnings, err := robin.ClusterCheck()
+		status, err := robin.GetClusterStatus()
 		if err != nil {
-			r.logError(redkeyCluster.NamespacedName(), err, "Error checking the cluster readiness over Robin")
+			r.logError(redkeyCluster.NamespacedName(), err, "Error getting cluster status from Robin")
 			return true, err
 		}
-		if !check {
-			// Cluster scaling not completed -> requeue
-			r.logInfo(redkeyCluster.NamespacedName(), "ScaleCluster - Waiting for cluster readiness before ending the cluster scaling", "errors", errors, "warnings", warnings)
-			return true, nil
+		if status != redkeyv1.RobinStatusReady {
+			r.logInfo(redkeyCluster.NamespacedName(), "Waiting for Robin to end scaling down...")
+			return true, nil // Cluster scaling not completed -> requeue
 		}
+		r.logInfo(redkeyCluster.NamespacedName(), "Robin reports cluster is ready after scaling down")
 
 	default:
 		r.logError(redkeyCluster.NamespacedName(), nil, "Substatus not coherent", "substatus", redkeyCluster.Status.Substatus.Status)
 		return true, nil
 	}
 
-	// Cluster scaling completed!
+	// The cluster is now scaled.
 	return false, nil
 }
 
@@ -1232,25 +1232,25 @@ func (r *RedKeyClusterReconciler) completeClusterScaleUp(ctx context.Context, re
 		return true, nil // Cluster scaling not completed -> requeue
 
 	case redkeyv1.SubstatusEndingScaling:
-		// Final step: ensure the cluster is Ok.
+		// Final step: wait for Robin to end scaling up.
 
-		check, errors, warnings, err := redkeyRobin.ClusterCheck()
+		status, err := redkeyRobin.GetClusterStatus()
 		if err != nil {
-			r.logError(redkeyCluster.NamespacedName(), err, "Error checking the cluster readiness over Robin")
+			r.logError(redkeyCluster.NamespacedName(), err, "Error getting cluster status from Robin")
 			return true, err
 		}
-		if !check {
-			// Cluster scaling not completed -> requeue
-			r.logInfo(redkeyCluster.NamespacedName(), "ScaleCluster - Waiting for cluster readiness before ending the cluster scaling", "errors", errors, "warnings", warnings)
-			return true, nil
+		if status != redkeyv1.RobinStatusReady {
+			r.logInfo(redkeyCluster.NamespacedName(), "Waiting for Robin to end scaling up...")
+			return true, nil // Cluster scaling not completed -> requeue
 		}
+		r.logInfo(redkeyCluster.NamespacedName(), "Robin reports cluster is ready after scaling up")
 
 	default:
 		r.logError(redkeyCluster.NamespacedName(), nil, "Substatus not coherent", "substatus", redkeyCluster.Status.Substatus.Status)
 		return true, nil
 	}
 
-	// Cluster scaling completed!
+	// The cluster is now scaled.
 	return false, nil
 }
 
