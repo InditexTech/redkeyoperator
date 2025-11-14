@@ -105,7 +105,12 @@ func (r *RedKeyClusterReconciler) doFastUpgrade(ctx context.Context, redkeyClust
 		if err != nil {
 			return false, err
 		}
-		logger := r.getHelperLogger(redkeyCluster.NamespacedName())
+		// We need to ensure that the StatefulSet is updated before proceeding.
+		// Events can happen due to the deletion of the pods and the recreation of them by the StatefulSet controller.
+		if existingStatefulSet.Status.Replicas != *existingStatefulSet.Spec.Replicas {
+			r.logInfo(redkeyCluster.NamespacedName(), "Waiting for the StatefulSet to update")
+			return true, nil
+		}
 
 		podsReady, err := r.allPodsReady(ctx, redkeyCluster)
 		if err != nil {
@@ -115,18 +120,6 @@ func (r *RedKeyClusterReconciler) doFastUpgrade(ctx context.Context, redkeyClust
 		if !podsReady {
 			r.logInfo(redkeyCluster.NamespacedName(), "Waiting for pods to become ready to end Fast Upgrade", "expectedReplicas", int(*(existingStatefulSet.Spec.Replicas)))
 			return true, nil
-		}
-
-		// Rebuild the cluster
-		robin, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
-		if err != nil {
-			r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin to check its readiness")
-			return true, err
-		}
-		err = robin.ClusterFix()
-		if err != nil {
-			r.logError(redkeyCluster.NamespacedName(), err, "Error performing a cluster fix through Robin")
-			return true, err
 		}
 
 		err = r.updateClusterSubStatus(ctx, redkeyCluster, redkeyv1.SubstatusEndingFastUpgrading, "")
@@ -145,13 +138,22 @@ func (r *RedKeyClusterReconciler) doFastUpgrade(ctx context.Context, redkeyClust
 			r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin to check its readiness")
 			return true, err
 		}
-		check, errors, warnings, err := robin.ClusterCheck()
+		nodes, err := robin.GetClusterNodes()
 		if err != nil {
-			r.logError(redkeyCluster.NamespacedName(), err, "Error checking the cluster readiness over Robin")
+			r.logError(redkeyCluster.NamespacedName(), err, "Error getting cluster nodes from Robin")
 			return true, err
 		}
-		if !check {
-			r.logInfo(redkeyCluster.NamespacedName(), "Waiting for cluster readiness before ending the fast upgrade", "errors", errors, "warnings", warnings)
+		if len(nodes.Nodes) != redkeyCluster.NodesNeeded() {
+			r.logInfo(redkeyCluster.NamespacedName(), "Waiting for all cluster nodes to be updated from Robin", "robinNodes", len(nodes.Nodes), "expectedNodes", redkeyCluster.NodesNeeded())
+			return true, nil
+		}
+		status, err := robin.GetClusterStatus()
+		if err != nil {
+			r.logError(redkeyCluster.NamespacedName(), err, "Error getting cluster status from Robin")
+			return true, err
+		}
+		if status != redkeyv1.StatusReady {
+			r.logInfo(redkeyCluster.NamespacedName(), "Waiting for cluster status to be Ready", "currentStatus", status)
 			return true, nil
 		}
 
