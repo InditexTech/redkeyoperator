@@ -1,5 +1,5 @@
 # Robin base URL. Update the IP before launching any of the requests.
-@robinBaseUrl = http://10.244.0.48:8080
+@robinBaseUrl = http://10.244.0.150:8080
 
 # Metrics
 
@@ -39,6 +39,10 @@ PUT {{robinBaseUrl}}/v1/redkeycluster/replicas
 }
 
 ## Cluster
+
+### Status
+
+GET {{robinBaseUrl}}/v1/cluster/status
 
 ### Check
 

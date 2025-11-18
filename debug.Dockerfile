@@ -2,11 +2,19 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-FROM golang:1.24.6
+# Define the desired Golang version
+ARG GOLANG_VERSION=1.24.6
 
-RUN go install github.com/go-delve/delve/cmd/dlv@v1.25
+# Use an official Golang image with a specific version based on Debian
+FROM golang:${GOLANG_VERSION}-trixie
 
-# Install redis-cli by adding the redis package (required to debug Redkey Robin)
+# Define the desired Delve version
+ARG DELVE_VERSION=1.25
+
+# Install Delve debugger
+RUN go install "github.com/go-delve/delve/cmd/dlv@v${DELVE_VERSION}"
+
+# Install redis-cli by adding the redis package (required to debug) and other useful tools
 RUN apt update -y && apt install -y redis-tools curl procps
 
 WORKDIR /

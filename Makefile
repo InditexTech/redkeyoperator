@@ -5,13 +5,16 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
-name      := redkey-cluster-operator
-VERSION   := 1.3.0
-package   := github.com/inditextech/$(name)
+name           := redkey-cluster-operator
+version        := 1.3.0
+golang_version := 1.24.6
+delve_version  := 1.25
+package        := github.com/inditextech/$(name)
+
 # Image URL to use for building/pushing image targets when using `pro` deployment profile.
-IMG ?= redkey-operator:$(VERSION)
-IMG_WEBHOOK ?= redkey-operator-webhook:$(VERSION)
-IMG_ROBIN ?= redkey-robin:$(VERSION)
+IMG ?= redkey-operator:$(version)
+IMG_WEBHOOK ?= redkey-operator-webhook:$(version)
+IMG_ROBIN ?= redkey-robin:$(version)
 
 # CN for the webhook certificate
 CN ?= inditex.dev
@@ -33,7 +36,7 @@ SRC = $(shell find . -path ./vendor -prune -o -name '*.go' -print)
 M = $(shell printf "\033[34;1m▶\033[0m")
 
 MODULE=$(shell go list -m)
-GO_COMPILE_FLAGS='-X $(MODULE)/cmd/server.GitCommit=$(COMMIT) -X $(MODULE)/cmd/server.BuildDate=$(DATE) -X $(MODULE)/cmd/server.VersionBuild=$(VERSION)'
+GO_COMPILE_FLAGS='-X $(MODULE)/cmd/server.GitCommit=$(COMMIT) -X $(MODULE)/cmd/server.BuildDate=$(DATE) -X $(MODULE)/cmd/server.VersionBuild=$(version)'
 
 # Test coverage files
 TEST_COVERAGE_PROFILE_OUTPUT = "coverage.out"
@@ -74,7 +77,7 @@ endif
 
 # BUNDLE_IMG defines the image:tag used for the bundle. 
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
-BUNDLE_IMG ?= controller-bundle:$(VERSION)
+BUNDLE_IMG ?= controller-bundle:$(version)
 
 # Image URL to use for deploying the operator pod when using `debug` deployment profile.
 # A base golang image is used with Delve installed, in order to be able to remotely debug the manager.
@@ -140,7 +143,7 @@ deps: ## Installs dependencies
 
 .PHONY: version 
 version:: ## Print the current version of the project.
-	@echo "$(VERSION)"
+	@echo "$(version)"
 
 .PHONY: version-next
 version-next:: ## Bump to next development version
@@ -224,7 +227,7 @@ run: ##	Execute the program locally
 
 docker-build: test ##	Build docker image with the manager (uses `${IMG}` image name).
 	$(info $(M) building Manager docker image)
-	docker build -t ${IMG} .
+	docker build -t ${IMG} --build-arg GOLANG_VERSION=${golang_version} .
 
 docker-push: ##	Push docker image with the manager (uses `${IMG}` image name).
 	$(info $(M) pushing Manager docker image)
@@ -232,7 +235,7 @@ docker-push: ##	Push docker image with the manager (uses `${IMG}` image name).
 
 debug-docker-build: ##	Build docker image for debugging from debug.Dockerfile (uses `${IMG_DEBUG}` image name).
 	$(info $(M) building debug docker image)
-	docker build -t ${IMG_DEBUG} -f debug.Dockerfile .
+	docker build -t ${IMG_DEBUG} -f debug.Dockerfile --build-arg GOLANG_VERSION=${golang_version} --build-arg DELVE_VERSION=${delve_version} .
 
 debug-docker-push: ##	Push docker image for debugging from debug.Dockerfile (uses `${IMG_DEBUG}` image name).
 	$(info $(M) building debug docker image)
@@ -549,7 +552,7 @@ bundle: kustomize manifests ## Generate the files for bundle.
 	rm -rf bundle/metadata/*
 	$(OPERATOR_SDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image redkey-operator=$(IMAGE_REF)
-	$(KUSTOMIZE) build config | $(OPERATOR_SDK) generate bundle -q --overwrite --channels $(CHANNELS) --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	$(KUSTOMIZE) build config | $(OPERATOR_SDK) generate bundle -q --overwrite --channels $(CHANNELS) --version $(version) $(BUNDLE_METADATA_OPTS)
 	$(OPERATOR_SDK) bundle validate ./bundle
 
 .PHONY: bundle-build 

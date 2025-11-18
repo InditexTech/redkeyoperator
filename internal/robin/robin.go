@@ -51,6 +51,7 @@ const (
 	EndpointClusterMove     = "/v1/cluster/move"
 	EndpointClusterReset    = "/v1/cluster/reset/"
 	EndpointClusterRecreate = "/v1/cluster/recreate"
+	EndpointClusterStatus   = "/v1/cluster/status"
 )
 
 // Configuration is the top-level configuration struct.
@@ -366,6 +367,23 @@ func (r *Robin) ClusterRecreate() error {
 	r.Logger.Info("Asked to Robin to recreate the cluster", "response body", string(body))
 
 	return nil
+}
+
+func (r *Robin) GetClusterStatus() (string, error) {
+	url := EndpointProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointClusterStatus
+
+	body, err := doSimpleGet(url)
+	if err != nil {
+		return "", fmt.Errorf("getting Robin cluster status: %w", err)
+	}
+
+	var status Status
+	err = json.Unmarshal(body, &status)
+	if err != nil {
+		return "", fmt.Errorf("parsing Robin cluster status response: %w", err)
+	}
+
+	return status.Status, nil
 }
 
 func doSimpleGet(url string) ([]byte, error) {

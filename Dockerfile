@@ -2,8 +2,13 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# Build the manager binary
-FROM golang:1.24.6 AS builder
+### Build stage
+
+# Define the desired Golang version
+ARG GOLANG_VERSION=1.24.6
+
+# Use an official Golang image with a specific version based on Debian
+FROM golang:${GOLANG_VERSION}-trixie AS builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -22,6 +27,9 @@ COPY internal/ internal/
 
 # Build
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -o manager ./cmd/
+
+
+### Final stage
 
 # Use Red Hat Universal Base Image 9 Minimal to package the manager binary.
 # Refer to https://www.redhat.com/en/blog/introducing-red-hat-universal-base-image for more details.

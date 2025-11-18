@@ -105,7 +105,12 @@ func (r *RedKeyClusterReconciler) doFastUpgrade(ctx context.Context, redkeyClust
 		if err != nil {
 			return false, err
 		}
-		logger := r.getHelperLogger(redkeyCluster.NamespacedName())
+		// We need to ensure that the StatefulSet is updated before proceeding.
+		// Events can happen due to the deletion of the pods and the recreation of them by the StatefulSet controller.
+		if existingStatefulSet.Status.Replicas != *existingStatefulSet.Spec.Replicas {
+			r.logInfo(redkeyCluster.NamespacedName(), "Waiting for the StatefulSet to update")
+			return true, nil
+		}
 
 		podsReady, err := r.allPodsReady(ctx, redkeyCluster)
 		if err != nil {
@@ -115,18 +120,6 @@ func (r *RedKeyClusterReconciler) doFastUpgrade(ctx context.Context, redkeyClust
 		if !podsReady {
 			r.logInfo(redkeyCluster.NamespacedName(), "Waiting for pods to become ready to end Fast Upgrade", "expectedReplicas", int(*(existingStatefulSet.Spec.Replicas)))
 			return true, nil
-		}
-
-		// Rebuild the cluster
-		robin, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
-		if err != nil {
-			r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin to check its readiness")
-			return true, err
-		}
-		err = robin.ClusterFix()
-		if err != nil {
-			r.logError(redkeyCluster.NamespacedName(), err, "Error performing a cluster fix through Robin")
-			return true, err
 		}
 
 		err = r.updateClusterSubStatus(ctx, redkeyCluster, redkeyv1.SubstatusEndingFastUpgrading, "")
@@ -145,13 +138,22 @@ func (r *RedKeyClusterReconciler) doFastUpgrade(ctx context.Context, redkeyClust
 			r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin to check its readiness")
 			return true, err
 		}
-		check, errors, warnings, err := robin.ClusterCheck()
+		nodes, err := robin.GetClusterNodes()
 		if err != nil {
-			r.logError(redkeyCluster.NamespacedName(), err, "Error checking the cluster readiness over Robin")
+			r.logError(redkeyCluster.NamespacedName(), err, "Error getting cluster nodes from Robin")
 			return true, err
 		}
-		if !check {
-			r.logInfo(redkeyCluster.NamespacedName(), "Waiting for cluster readiness before ending the fast upgrade", "errors", errors, "warnings", warnings)
+		if len(nodes.Nodes) != redkeyCluster.NodesNeeded() {
+			r.logInfo(redkeyCluster.NamespacedName(), "Waiting for all cluster nodes to be updated from Robin", "robinNodes", len(nodes.Nodes), "expectedNodes", redkeyCluster.NodesNeeded())
+			return true, nil
+		}
+		status, err := robin.GetClusterStatus()
+		if err != nil {
+			r.logError(redkeyCluster.NamespacedName(), err, "Error getting cluster status from Robin")
+			return true, err
+		}
+		if status != redkeyv1.StatusReady {
+			r.logInfo(redkeyCluster.NamespacedName(), "Waiting for cluster status to be Ready", "currentStatus", status)
 			return true, nil
 		}
 
@@ -1085,26 +1087,26 @@ func (r *RedKeyClusterReconciler) completeClusterScaleDown(ctx context.Context, 
 		logger := r.getHelperLogger((redkeyCluster.NamespacedName()))
 		robin, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
 		if err != nil {
-			r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin to get cluster nodes")
+			r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin")
 			return true, err
 		}
-		check, errors, warnings, err := robin.ClusterCheck()
+		status, err := robin.GetClusterStatus()
 		if err != nil {
-			r.logError(redkeyCluster.NamespacedName(), err, "Error checking the cluster readiness over Robin")
+			r.logError(redkeyCluster.NamespacedName(), err, "Error getting cluster status from Robin")
 			return true, err
 		}
-		if !check {
-			// Cluster scaling not completed -> requeue
-			r.logInfo(redkeyCluster.NamespacedName(), "ScaleCluster - Waiting for cluster readiness before ending the cluster scaling", "errors", errors, "warnings", warnings)
-			return true, nil
+		if status != redkeyv1.RobinStatusReady {
+			r.logInfo(redkeyCluster.NamespacedName(), "Waiting for Robin to end scaling down...")
+			return true, nil // Cluster scaling not completed -> requeue
 		}
+		r.logInfo(redkeyCluster.NamespacedName(), "Robin reports cluster is ready after scaling down")
 
 	default:
 		r.logError(redkeyCluster.NamespacedName(), nil, "Substatus not coherent", "substatus", redkeyCluster.Status.Substatus.Status)
 		return true, nil
 	}
 
-	// Cluster scaling completed!
+	// The cluster is now scaled.
 	return false, nil
 }
 
@@ -1211,8 +1213,7 @@ func (r *RedKeyClusterReconciler) completeClusterScaleUp(ctx context.Context, re
 
 	case redkeyv1.SubstatusScalingRobin:
 		// Robin was already updated with new replicas/replicasPerMaster.
-		// We will ensure that all cluster nodes are initialized before asking Robin to meet all new nodes,
-		// forget outdated nodes, ensure slots coverage and rebalance.
+		// We will ensure that all cluster nodes are initialized.
 
 		clusterNodes, err := redkeyRobin.GetClusterNodes()
 		if err != nil {
@@ -1221,13 +1222,8 @@ func (r *RedKeyClusterReconciler) completeClusterScaleUp(ctx context.Context, re
 		}
 		masterNodes := clusterNodes.GetMasterNodes()
 		if len(masterNodes) != int(redkeyCluster.Spec.Replicas) {
-			r.logInfo(redkeyCluster.NamespacedName(), "ScaleCluster - Inconsistency. Statefulset replicas equals to RedKeyCluster replicas but we have a different number of cluster nodes. Trying to fix it...",
+			r.logInfo(redkeyCluster.NamespacedName(), "ScaleCluster - Inconsistency. Statefulset replicas equals to RedKeyCluster replicas but we have a different number of cluster nodes. Waiting for Robin to complete scaling up...",
 				"RedKeyCluster replicas", redkeyCluster.Spec.Replicas, "Cluster nodes", masterNodes)
-		}
-		err = redkeyRobin.ClusterFix()
-		if err != nil {
-			r.logError(redkeyCluster.NamespacedName(), err, "Error asking to Robin to ensure the cluster is ok")
-			return true, err
 		}
 		err = r.updateClusterSubStatus(ctx, redkeyCluster, redkeyv1.SubstatusEndingScaling, "")
 		if err != nil {
@@ -1238,25 +1234,25 @@ func (r *RedKeyClusterReconciler) completeClusterScaleUp(ctx context.Context, re
 		return true, nil // Cluster scaling not completed -> requeue
 
 	case redkeyv1.SubstatusEndingScaling:
-		// Final step: ensure the cluster is Ok.
+		// Final step: wait for Robin to end scaling up.
 
-		check, errors, warnings, err := redkeyRobin.ClusterCheck()
+		status, err := redkeyRobin.GetClusterStatus()
 		if err != nil {
-			r.logError(redkeyCluster.NamespacedName(), err, "Error checking the cluster readiness over Robin")
+			r.logError(redkeyCluster.NamespacedName(), err, "Error getting cluster status from Robin")
 			return true, err
 		}
-		if !check {
-			// Cluster scaling not completed -> requeue
-			r.logInfo(redkeyCluster.NamespacedName(), "ScaleCluster - Waiting for cluster readiness before ending the cluster scaling", "errors", errors, "warnings", warnings)
-			return true, nil
+		if status != redkeyv1.RobinStatusReady {
+			r.logInfo(redkeyCluster.NamespacedName(), "Waiting for Robin to end scaling up...")
+			return true, nil // Cluster scaling not completed -> requeue
 		}
+		r.logInfo(redkeyCluster.NamespacedName(), "Robin reports cluster is ready after scaling up")
 
 	default:
 		r.logError(redkeyCluster.NamespacedName(), nil, "Substatus not coherent", "substatus", redkeyCluster.Status.Substatus.Status)
 		return true, nil
 	}
 
-	// Cluster scaling completed!
+	// The cluster is now scaled.
 	return false, nil
 }
 
