@@ -157,7 +157,7 @@ func (r *RedKeyClusterReconciler) reconcileStatusInitializing(ctx context.Contex
 		r.logError(redkeyCluster.NamespacedName(), err, "Could not find the StatefulSet to check Redis node pods readiness")
 		return true, DefaultRequeueTimeout
 	}
-	
+
 	// Check Redis node pods rediness
 	nodePodsReady, err := r.allPodsReady(ctx, redkeyCluster, sset)
 	if err != nil {
