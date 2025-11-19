@@ -152,8 +152,14 @@ func (r *RedKeyClusterReconciler) reconcileStatusNew(redkeyCluster *redkeyv1.Red
 
 func (r *RedKeyClusterReconciler) reconcileStatusInitializing(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) (bool, time.Duration) {
 
+	sset, err := r.FindExistingStatefulSet(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redkeyCluster.Name, Namespace: redkeyCluster.Namespace}})
+	if err != nil {
+		r.logError(redkeyCluster.NamespacedName(), err, "Could not find the StatefulSet to check Redis node pods readiness")
+		return true, DefaultRequeueTimeout
+	}
+	
 	// Check Redis node pods rediness
-	nodePodsReady, err := r.allPodsReady(ctx, redkeyCluster)
+	nodePodsReady, err := r.allPodsReady(ctx, redkeyCluster, sset)
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Could not check for Redis node pods being ready")
 		return true, DefaultRequeueTimeout

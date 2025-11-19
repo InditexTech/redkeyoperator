@@ -443,7 +443,7 @@ func (r *RedKeyClusterReconciler) overrideService(req ctrl.Request, redkeyCluste
 	return patchedService, changed
 }
 
-func (r *RedKeyClusterReconciler) allPodsReady(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) (bool, error) {
+func (r *RedKeyClusterReconciler) allPodsReady(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster, existingStatefulSet *v1.StatefulSet) (bool, error) {
 	listOptions := client.ListOptions{
 		Namespace: redkeyCluster.Namespace,
 		LabelSelector: labels.SelectorFromSet(
@@ -453,7 +453,7 @@ func (r *RedKeyClusterReconciler) allPodsReady(ctx context.Context, redkeyCluste
 			},
 		),
 	}
-	podsReady, err := kubernetes.AllPodsReady(ctx, r.Client, &listOptions, redkeyCluster.NodesNeeded())
+	podsReady, err := kubernetes.AllPodsReady(ctx, r.Client, &listOptions, int(*existingStatefulSet.Spec.Replicas))
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Could not check for pods being ready")
 		return false, err
