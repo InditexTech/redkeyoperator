@@ -262,6 +262,7 @@ type Pdb struct {
 // +kubebuilder:printcolumn:name="Substatus",type="string",priority=0,JSONPath=".status.substatus.status",description="The cluster substatus"
 // +kubebuilder:printcolumn:name="Partition",type="string",priority=5,JSONPath=".status.substatus.upgradingPartition",description="Upgrading partition"
 // +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas,selectorpath=.status.selector
+// +kubebuilder:validation:XValidation:rule="self.spec.replicas == oldSelf.spec.replicas || !has(self.status) || self.status.status == 'Ready'", message="Changing the number of replicas is not allowed unless the cluster is in 'Ready' status"
 // RedKeyCluster is the Schema for the redkeyclusters API
 type RedKeyCluster struct {
 	metav1.TypeMeta   `json:",inline"`
