@@ -525,22 +525,3 @@ func (r *RedKeyClusterReconciler) updateDeployment(ctx context.Context, deployme
 	}
 	return refreshedDeployment, nil
 }
-
-func (r *RedKeyClusterReconciler) updateRdclReplicas(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster, replicas int32) (*redkeyv1.RedKeyCluster, error) {
-	refreshedRdcl := &redkeyv1.RedKeyCluster{}
-	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		// get a fresh redkeycluster to minimize conflicts
-		err := r.Client.Get(ctx, types.NamespacedName{Namespace: redkeyCluster.Namespace, Name: redkeyCluster.Name}, refreshedRdcl)
-		if err != nil {
-			r.logError(redkeyCluster.NamespacedName(), err, "Error getting a refreshed RedKeyCluster before updating it. It may have been deleted?")
-			return err
-		}
-		refreshedRdcl.Spec.Replicas = replicas
-		var updateErr = r.Client.Update(ctx, refreshedRdcl)
-		return updateErr
-	})
-	if err != nil {
-		return nil, err
-	}
-	return refreshedRdcl, nil
-}
