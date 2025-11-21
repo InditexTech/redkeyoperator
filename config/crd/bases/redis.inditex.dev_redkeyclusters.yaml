@@ -8017,6 +8017,11 @@ spec:
             - substatus
             type: object
         type: object
+        x-kubernetes-validations:
+        - message: Changing the number of replicas is not allowed unless the cluster
+            is in 'Ready' status
+          rule: self.spec.replicas == oldSelf.spec.replicas || !has(self.status) ||
+            self.status.status == 'Ready'
     served: true
     storage: true
     subresources:

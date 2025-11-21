@@ -443,7 +443,7 @@ func (r *RedKeyClusterReconciler) overrideService(req ctrl.Request, redkeyCluste
 	return patchedService, changed
 }
 
-func (r *RedKeyClusterReconciler) allPodsReady(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) (bool, error) {
+func (r *RedKeyClusterReconciler) allPodsReady(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster, existingStatefulSet *v1.StatefulSet) (bool, error) {
 	listOptions := client.ListOptions{
 		Namespace: redkeyCluster.Namespace,
 		LabelSelector: labels.SelectorFromSet(
@@ -453,7 +453,7 @@ func (r *RedKeyClusterReconciler) allPodsReady(ctx context.Context, redkeyCluste
 			},
 		),
 	}
-	podsReady, err := kubernetes.AllPodsReady(ctx, r.Client, &listOptions, redkeyCluster.NodesNeeded())
+	podsReady, err := kubernetes.AllPodsReady(ctx, r.Client, &listOptions, int(*existingStatefulSet.Spec.Replicas))
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Could not check for pods being ready")
 		return false, err
@@ -524,23 +524,4 @@ func (r *RedKeyClusterReconciler) updateDeployment(ctx context.Context, deployme
 		return nil, err
 	}
 	return refreshedDeployment, nil
-}
-
-func (r *RedKeyClusterReconciler) updateRdclReplicas(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster, replicas int32) (*redkeyv1.RedKeyCluster, error) {
-	refreshedRdcl := &redkeyv1.RedKeyCluster{}
-	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		// get a fresh redkeycluster to minimize conflicts
-		err := r.Client.Get(ctx, types.NamespacedName{Namespace: redkeyCluster.Namespace, Name: redkeyCluster.Name}, refreshedRdcl)
-		if err != nil {
-			r.logError(redkeyCluster.NamespacedName(), err, "Error getting a refreshed RedKeyCluster before updating it. It may have been deleted?")
-			return err
-		}
-		refreshedRdcl.Spec.Replicas = replicas
-		var updateErr = r.Client.Update(ctx, refreshedRdcl)
-		return updateErr
-	})
-	if err != nil {
-		return nil, err
-	}
-	return refreshedRdcl, nil
 }
