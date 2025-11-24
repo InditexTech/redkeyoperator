@@ -32,7 +32,7 @@ Learn about [RedKey Cluster Status and Substatus](./docs/redkey-cluster-status.m
 
 Discover [RedKey Robin](./docs/redkey-robin.md).
 
-Importance of the [purgeKeysOnRebalance](./docs/purge-keys-on-rebalance.md) parameter.
+The importance of the [purgeKeysOnRebalance](./docs/purge-keys-on-rebalance.md) parameter.
 
 ## Versions
 
