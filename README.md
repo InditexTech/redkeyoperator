@@ -1,4 +1,5 @@
-# ![RedKey Operator icon](docs/images/badge.png) RedKey Operator for Kubernetes
+![RedKey Operator icon](docs/images/redkey-logo-50.png)
+# RedKey Operator for Kubernetes
 
 A **RedKey Cluster** is a key/value cluster using either [Redis Official Image](https://hub.docker.com/_/redis) or [Valkey Official Image](https://hub.docker.com/r/valkey/valkey/) images to create its nodes (note that all cluster nodes must use the same image).
 
@@ -12,13 +13,13 @@ RedKey operator is built using [kubebuilder](https://github.com/kubernetes-sigs/
 
 - RedKey Cluster creation
 - Cluster scaling up and down
-- CLuster upgrading
+- Cluster upgrading
   - Update node pods image
   - Update Redis configuration
   - Update node pods resources
 - Ensure cluster health
 - Slots allocation
-- Persistence
+- Ephemeral cluster (pure cache-like behavior) or using persistence
 - RedisGraph support
 
 ## Documentation
@@ -27,7 +28,11 @@ Refer to [operator guide](./docs/operator-guide/toc.md) to have an overview of t
 
 If you are a developer, you'll find interesting information in the [developer guide](./docs/developer-guide.md).
 
-Learn about [RedKey cluster status](./docs/redkey-cluster-status.md).
+Learn about [RedKey Cluster Status and Substatus](./docs/redkey-cluster-status.md).
+
+Discover [RedKey Robin](./docs/redkey-robin.md).
+
+Importance of the [purgeKeysOnRebalance](./docs/purge-keys-on-rebalance.md) parameter.
 
 ## Versions
 
