@@ -349,7 +349,7 @@ Before redeploying the webhook code using `make debug-webhook` you can delete th
 Delete the operator and all associated resources with:
 
 ```shell
-make delete-rdcl
+make delete-rkcl
 make undeploy
 make uninstall
 kubectl delete ns redkey-operator
@@ -360,10 +360,14 @@ kubectl delete ns redkey-operator
 You can deploy a sample RedKey Cluster from `config/samples` folder running:
 
 ```shell
-make apply-rdcl
+make apply-rkcl
 ```
 
-This will apply the manifest file to create an single node ephemeral RedKeyCluster object with `purgeKeysOnRebalance` set to **true**.
+This will apply the manifest file to create a three nodes ephemeral RedKeyCluster object with `purgeKeysOnRebalance` set to **true**.
+
+As [Redkey Robin](https://github.com/InditexTech/redkeyrobin) image is required to being able to deploy the RedKey cluster, you should ensure the image is available in your K8s cluster. You'll find how to build the image from the GitHub repository.
+
+In order to set the image name to be used when creating your local RedKey cluster you can sen the environment variable `IMG_ROBIN`. The value set to this variable will be used to kustomize the manifests that will be applied to create the sample RedKeyCluster.
 
 ## Tests
 
