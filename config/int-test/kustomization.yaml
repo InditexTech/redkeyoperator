@@ -6,7 +6,7 @@ patchesStrategicMerge:
 
 resources:
 - resources/namespace.yaml
-- ../samples
+- ../examples
 - ../rbac
 - ../manager
 

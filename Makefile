@@ -380,19 +380,19 @@ delete-operator: ##		Delete the operator pod (redkey-operator) in order to have 
 
 apply-rkcl: ##		Apply the sample RedKey Cluster manifest.
 	$(info $(M) creating sample RedKey cluster)
-	$(KUSTOMIZE) build config/samples/ephemeral | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | $(SED) 's,image: redkey-robin:0.1.0,image: ${IMG_ROBIN},' | kubectl apply -f -
+	$(KUSTOMIZE) build config/examples/ephemeral | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | $(SED) 's,image: redkey-robin:0.1.0,image: ${IMG_ROBIN},' | kubectl apply -f -
 
 delete-rkcl: ##		Delete the sample RedKey Cluster manifest.
 	$(info $(M) deleting sample RedKey cluster)
-	$(KUSTOMIZE) build config/samples/ephemeral | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | $(SED) 's,image: redkey-robin:0.1.0,image: ${IMG_ROBIN},' | kubectl delete -f -
+	$(KUSTOMIZE) build config/examples/ephemeral | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | $(SED) 's,image: redkey-robin:0.1.0,image: ${IMG_ROBIN},' | kubectl delete -f -
 
 apply-debug-rkcl: ##		Apply the sample RedKey Cluster manifest for Robin debugging.
 	$(info $(M) creating sample RedKey cluster)
-	$(KUSTOMIZE) build config/samples/robin-debug | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | $(SED) 's,image: redkey-robin:0.1.0,image: ${IMG_DEBUG},' | kubectl apply -f -
+	$(KUSTOMIZE) build config/examples/robin-debug | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | $(SED) 's,image: redkey-robin:0.1.0,image: ${IMG_DEBUG},' | kubectl apply -f -
 
 delete-debug-rkcl: ##		Delete the sample RedKey Cluster manifest for Robin debugging.
 	$(info $(M) deleting sample RedKey cluster)
-	$(KUSTOMIZE) build config/samples/robin-debug | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | $(SED) 's,image: redkey-robin:0.1.0,image: ${IMG_DEBUG},' | kubectl delete -f -
+	$(KUSTOMIZE) build config/examples/robin-debug | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | $(SED) 's,image: redkey-robin:0.1.0,image: ${IMG_DEBUG},' | kubectl delete -f -
 
 apply-all: docker-build docker-push process-manifests install deploy apply-rkcl
 
@@ -521,10 +521,10 @@ redis-restore:
 	for POD in $(REDIS_PODS); do echo $${POD}; kubectl cp /tmp/$${POD}-dump.rdb $${POD}:/data/dump.rdb -n ${NAMESPACE}; done
 
 redis-aof-disable:
-	kubectl patch rkcl redis-cluster -n ${NAMESPACE} --type='json' -p='[{"op": "replace", "path": "/spec/config", "value":"maxmemory 200mb\nmaxmemory-samples 5\nmaxmemory-policy allkeys-lru\nappendonly no\nprotected-mode no\nloadmodule /usr/lib/redis/modules/redisgraph.so"}]' | for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli SHUTDOWN; done | sleep 5
+	kubectl patch rkcl redis-cluster -n ${NAMESPACE} --type='json' -p='[{"op": "replace", "path": "/spec/config", "value":"maxmemory 200mb\nmaxmemory-examples 5\nmaxmemory-policy allkeys-lru\nappendonly no\nprotected-mode no\nloadmodule /usr/lib/redis/modules/redisgraph.so"}]' | for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli SHUTDOWN; done | sleep 5
 
 redis-aof-enable:
-	kubectl patch rkcl redis-cluster -n ${NAMESPACE} --type='json' -p='[{"op": "replace", "path": "/spec/config", "value":"maxmemory 200mb\nmaxmemory-samples 5\nmaxmemory-policy allkeys-lru\nappendonly yes\nprotected-mode no\nloadmodule /usr/lib/redis/modules/redisgraph.so"}]'
+	kubectl patch rkcl redis-cluster -n ${NAMESPACE} --type='json' -p='[{"op": "replace", "path": "/spec/config", "value":"maxmemory 200mb\nmaxmemory-examples 5\nmaxmemory-policy allkeys-lru\nappendonly yes\nprotected-mode no\nloadmodule /usr/lib/redis/modules/redisgraph.so"}]'
 
 
 ##@ Integration with OLM

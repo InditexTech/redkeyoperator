@@ -58,17 +58,17 @@ initializeRedisCluster() {
 installRedisCluster() {
     local result=0
     local resultMessage="INFO:: RedisCluster created and run correctly"
-    rm -f config/samples/kustomization.yaml
-    cat <<EOF >config/samples/kustomization.yaml
+    rm -f config/examples/kustomization.yaml
+    cat <<EOF >config/examples/kustomization.yaml
 resources:
  - TYPE_REDISCLUSTER
 EOF
     if [[ "$typeRedisCluster" == "storage" ]]; then
-        sed -i "s|TYPE_REDISCLUSTER|redis_v1alpha1_rediscluster-storage.yaml|g" "config/samples/kustomization.yaml"
+        sed -i "s|TYPE_REDISCLUSTER|redis_v1alpha1_rediscluster-storage.yaml|g" "config/examples/kustomization.yaml"
     elif [[ "$typeRedisCluster" == "ephemeral" ]]; then
-        sed -i "s|TYPE_REDISCLUSTER|redis_v1alpha1_rediscluster-ephemeral.yaml|g" "config/samples/kustomization.yaml"
+        sed -i "s|TYPE_REDISCLUSTER|redis_v1alpha1_rediscluster-ephemeral.yaml|g" "config/examples/kustomization.yaml"
     elif [[ "$typeRedisCluster" == "repmaster" ]]; then
-        sed -i "s|TYPE_REDISCLUSTER|redis_v1alpha1_rediscluster-repmaster.yaml|g" "config/samples/kustomization.yaml"
+        sed -i "s|TYPE_REDISCLUSTER|redis_v1alpha1_rediscluster-repmaster.yaml|g" "config/examples/kustomization.yaml"
     fi
 
     make IMG=$image NAMESPACE=$namespace int-test
