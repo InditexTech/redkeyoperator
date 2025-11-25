@@ -1,4 +1,4 @@
-# How to deploy Redis
+# How to deploy a Redis Cluster
 
 ## CRD
 
