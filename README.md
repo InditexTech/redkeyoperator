@@ -3,7 +3,7 @@
 
 A **RedKey Cluster** is a key/value cluster using either [Redis Official Image](https://hub.docker.com/_/redis) or [Valkey Official Image](https://hub.docker.com/r/valkey/valkey/) images to create its nodes (note that all cluster nodes must use the same image).
 
-**RedKey Operator** is the easiest way to deploy and manage a RedKey Cluster in Kubernetes implementing the [operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/).
+**RedKey Operator** goal is to deploy and manage a RedKey Cluster in Kubernetes, implementing the [operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/).
 
 This operator implements a controller that extends the Kubernetes API allowing to seamlessly deploy a RedKey cluster, monitor the deployed resources implementing a reconciliation loop, logging events, manage cluster scaling and recover from errors.
 
@@ -19,7 +19,7 @@ RedKey operator is built using [kubebuilder](https://github.com/kubernetes-sigs/
   - Update node pods resources
 - Ensure cluster health
 - Slots allocation
-- Ephemeral cluster (pure cache-like behavior) or using persistence
+- Ephemeral cluster (without persistent volumes) or using persistence
 - RedisGraph support
 
 ## Documentation
