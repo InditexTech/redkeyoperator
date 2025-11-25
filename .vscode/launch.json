@@ -9,13 +9,6 @@
             "program": "cmd/main.go"
         },
         {
-            "name": "Redis Webhook",
-            "type": "go",
-            "request": "launch",
-            "mode": "auto",
-            "program": "webhook/main.go"
-        },
-        {
             "name": "Connect to Manager",
             "type": "go",
             "request": "attach",

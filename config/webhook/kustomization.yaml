@@ -1,9 +1,0 @@
-resources:
-- ../rbac
-- bases/service.yaml
-- bases/deployment.yaml
-- bases/secret.yaml
-- bases/namespace.yaml
-- bases/allow-webhook-traffic.yaml
-
-namespace: redkey-operator-webhook
