@@ -1,7 +1,7 @@
 # Operator Guide - Table of Contents
 
 * [Operator deployment](operator-deployment.md)
-* [RedKey Robin](robin.md)
+* [Redkey Robin](robin.md)
 * [How to deploy a Redis Cluster](redis-deployment.md)
 * [Ephemeral Mode / Zero Persistent Volume Claims](ephemeral-cluster.md)
 * [Master-Replica Clusters](master-replica-cluster.md)
