@@ -2,11 +2,11 @@
 
 ## Backup procedure
 
-RedKey Operator configures full RDB backup to run every 15 minutes if there is at least one change. RDB backup should be uploaded to S3 with a Cronjob process for each node.
+Redkey Operator configures full RDB backup to run every 15 minutes if there is at least one change. RDB backup should be uploaded to S3 with a Cronjob process for each node.
 
 RDB file is recorded under `/data/dump.rdb`.
 
-![RedKey backup](../images/redisbackup.png)
+![Redkey backup](../images/redisbackup.png)
 
 ## Restore procedure
 
@@ -14,4 +14,4 @@ Currently, there is no automated restore procedure. It's advised to manually fet
 
 ## Nodes layout
 
-![RedKey PVC Nodes Layout](../images/redispvcnodeslayout.png)
+![Redkey PVC Nodes Layout](../images/redispvcnodeslayout.png)

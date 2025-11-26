@@ -1,29 +1,29 @@
 # Developer Guide
 
-Quickly provision RedKey cluster environments in Kubernetes or Openshift.
+Quickly provision Redkey cluster environments in Kubernetes or Openshift.
 
-The operator relies on RedKey cluster functionality to serve client requests.
+The operator relies on Redkey cluster functionality to serve client requests.
 
 ## Local development and testing
 
-A *local K8s cluster* can be used to deploy the RedKey Operator from a pre-built image or directly compiling from the source code.
+A *local K8s cluster* can be used to deploy the Redkey Operator from a pre-built image or directly compiling from the source code.
 
 This will be helpfull to develop and test new features, fix bugs, and test releases locally.
 
-As we will see below, you can use the `make` command to deploy the different components, as well as to deploy a sample RedKey Cluster, or use the scripts that automate the basic workflows.
+As we will see below, you can use the `make` command to deploy the different components, as well as to deploy a sample Redkey Cluster, or use the scripts that automate the basic workflows.
 
 ## Development profiles
 
-Three **Deployment Profiles** have been defined. Basically, these profiles determine which image will be used to deploy the RedKey Operator pod. These are the 3 Deployment Profiles and the default images used to create the RedKey Operator pod:
+Three **Deployment Profiles** have been defined. Basically, these profiles determine which image will be used to deploy the Redkey Operator pod. These are the 3 Deployment Profiles and the default images used to create the Redkey Operator pod:
 
-| Profile | Image used to create the RedKey Operator pod | Purpose                                         |
+| Profile | Image used to create the Redkey Operator pod | Purpose                                         |
 |---------|----------------------------------------------|-------------------------------------------------|
 | debug   | delve:1.24.6                                 | Debug code from your IDE using Delve            |
 | dev     | redkey-operator:1.3.0                        | Test a locally built (from source code) release |
 
 ## Create your Kubernetes cluster
 
-You can deploy your own Kubernetes cluster locally to develop RedKey Operator with the tool of your choice (Docker Desktop, Rancher Desktop, K3D, Kind,...).
+You can deploy your own Kubernetes cluster locally to develop Redkey Operator with the tool of your choice (Docker Desktop, Rancher Desktop, K3D, Kind,...).
 
 We recommend you to use Kind. To start a local registry and a K8S cluster with Kind you can use the following script (from Kind official doc page):
 
@@ -96,22 +96,22 @@ EOF
 set -o errexit
 ```
 
-## RedKey Operator
+## Redkey Operator
 
-### Deploy RedKey Operator from a custom image
+### Deploy Redkey Operator from a custom image
 
-Once your K8s cluster and registry are ready to work with, you need to make available the image you want to use to deploy RedKey Operator.
+Once your K8s cluster and registry are ready to work with, you need to make available the image you want to use to deploy Redkey Operator.
 
 Your cluster must be configured to be able to access your local registry.
 
 We provide and easy way to build and push the images for `dev` and `debug` profiles:
 
-- `make docker-build`: builds an image containing the RedKey Operator manager built from the source code. This image is published in Docker local registry.
+- `make docker-build`: builds an image containing the Redkey Operator manager built from the source code. This image is published in Docker local registry.
 - `make docker-push`: pushes the image built with the command above to the corresponding registry.
-- `make debug-docker-build`: builds an image that will allow us to create an *empty* pod as the RedKey operator to which we will copy the manager binary and run it, as we'll explain later.
+- `make debug-docker-build`: builds an image that will allow us to create an *empty* pod as the Redkey operator to which we will copy the manager binary and run it, as we'll explain later.
 - `make debug-docker-push`: pushes the image built with the command above to he corresponding registry.
 
-**To test a released RedKey Operator version you'll have to manually pull the image, tag and push to your local registry.**
+**To test a released Redkey Operator version you'll have to manually pull the image, tag and push to your local registry.**
 
 The image names used by default by each profile (shown in the table above) can be overwritten using the environment variables:
 
@@ -132,7 +132,7 @@ make debug-docker-build IMG_DEV=localhost:5001/redkey-operator:0.1.0
 make debug-docker-push IMG_DEV=localhost:5001/redkey-operator:0.1.0
 ```
 
-Once the RedKey Operator is available in your local registry, you can follow these steps to deploy it into you K8s cluster:
+Once the Redkey Operator is available in your local registry, you can follow these steps to deploy it into you K8s cluster:
 
 1. Install the CRD.
 
@@ -140,7 +140,7 @@ Once the RedKey Operator is available in your local registry, you can follow the
 make install
 ```
 
-2. Create the namespace in which you want you RedKey Operator to be deployed. By default, `make` uses `redkey-operator`. Is you want to use a different namespace you should use the `NAMESPACE` environment variable to overwritte this value with the one of your choice.
+2. Create the namespace in which you want you Redkey Operator to be deployed. By default, `make` uses `redkey-operator`. Is you want to use a different namespace you should use the `NAMESPACE` environment variable to overwritte this value with the one of your choice.
 
 ```shell
 kubectl create ns redkey-operator
@@ -148,7 +148,7 @@ kubectl create ns redkey-operator
 
 >**The default namespace used by make command is `redkey-operator`. This value can be overwritten using the `NAMESPACE` environment variable.**
 
-3. Generate the manifests, according to the profile you choose to use, to deploy the RedKey Operator. Use the `PROFILE` environment variable to define the profile to use. The manifests are generated in `deployment` directory.
+3. Generate the manifests, according to the profile you choose to use, to deploy the Redkey Operator. Use the `PROFILE` environment variable to define the profile to use. The manifests are generated in `deployment` directory.
 
 ```shell
 make process-manifests PROFILE=debug IMG_DEBUG="localhost:5001/redkey-operator:delve"
@@ -156,7 +156,7 @@ make process-manifests PROFILE=debug IMG_DEBUG="localhost:5001/redkey-operator:d
 
 >**If no `PROFILE` environment variable defined, the default value is `dev`.**
 
-4. Deploy the RedKey Operator. Uses the `deployment/deployment.yml` generated in the above step.
+4. Deploy the Redkey Operator. Uses the `deployment/deployment.yml` generated in the above step.
 
 ```shell
 make deploy
@@ -164,9 +164,9 @@ make deploy
 
 >**`make` will install the needed tools like `kustomize`, `control-gen` and `envtest` if not available.**
 
-### Debuging RedKey Operator
+### Debuging Redkey Operator
 
-If you followed the steps described above to deploy the RedKey Operator using the `debug` profile you'll have the CRD deployed and a redkey-operator pod running.
+If you followed the steps described above to deploy the Redkey Operator using the `debug` profile you'll have the CRD deployed and a redkey-operator pod running.
 
 This pod is created using a `golang` image with `Delve` installed on it. This will allow us to easily debug the manager code following these steps:
 
@@ -220,22 +220,22 @@ Before redeploying the operator code using `make debug` you can delete the opera
 
 >**!! Go 1.16 or above is needed to use Delve debugging !!**
 
-## RedKey Operator Webhook
+## Redkey Operator Webhook
 
-### Deploy RedKey Operator Webhook from a custom image
+### Deploy Redkey Operator Webhook from a custom image
 
-Once your K8s cluster and registry are ready to work with, you need to make available the image you want to use to deploy RedKey Operator Webhook.
+Once your K8s cluster and registry are ready to work with, you need to make available the image you want to use to deploy Redkey Operator Webhook.
 
 Your cluster must be configured to be able to access your local registry.
 
 We provide and easy way to build and push the images for `dev` and `debug` profiles:
 
-- `make docker-build-webhook`: builds an image containing the RedKey Operator webhook built from the source code. This image is published in Docker local registry.
+- `make docker-build-webhook`: builds an image containing the Redkey Operator webhook built from the source code. This image is published in Docker local registry.
 - `make docker-push-webhook`: pushes the image built with the command above to the corresponding registry.
-- `make debug-docker-build`: builds an image that will allow us to create an *empty* pod as the RedKey operator to which we will copy the manager binary and run it, as we'll explain later.
+- `make debug-docker-build`: builds an image that will allow us to create an *empty* pod as the Redkey operator to which we will copy the manager binary and run it, as we'll explain later.
 - `make debug-docker-push`: pushes the image built with the command above to he corresponding registry.
 
-**To test a released RedKey Operator Webhook version you'll have to manually pull the image, tag and push to your local registry.**
+**To test a released Redkey Operator Webhook version you'll have to manually pull the image, tag and push to your local registry.**
 
 The image names used by default by each profile (shown in the table above) can be overwritten using the environment variables:
 
@@ -256,7 +256,7 @@ make debug-docker-build-webhook IMG_DEV_WEBHOOK=localhost:5001/redkey-operator-w
 make debug-docker-push-webhook IMG_DEV_WEBHOOK=localhost:5001/redkey-operator-webhook:0.1.0
 ```
 
-Once the RedKey Operator is available in your local registry, you can follow these steps to deploy it into you K8s cluster:
+Once the Redkey Operator is available in your local registry, you can follow these steps to deploy it into you K8s cluster:
 
 1. Install the CRD.
 
@@ -264,7 +264,7 @@ Once the RedKey Operator is available in your local registry, you can follow the
 make install
 ```
 
-2. Create the namespace in which you want you RedKey Operator Webhook to be deployed. By default, `make` uses `redkey-operator-webhook`. Is you want to use a different namespace you should use the `WEBHOOK_NAMESPACE` environment variable to overwritte this value with the one of your choice.
+2. Create the namespace in which you want you Redkey Operator Webhook to be deployed. By default, `make` uses `redkey-operator-webhook`. Is you want to use a different namespace you should use the `WEBHOOK_NAMESPACE` environment variable to overwritte this value with the one of your choice.
 
 ```shell
 kubectl create ns redkey-operator-webhook
@@ -272,7 +272,7 @@ kubectl create ns redkey-operator-webhook
 
 >**The default namespace used by make command is `redkey-operato-webhook`. This value can be overwritten using the `WEBHOOK_NAMESPACE` environment variable.**
 
-3. Generate the manifests, according to the profile you choose to use, to deploy the RedKey Operator. Use the `PROFILE` environment variable to define the profile to use. The manifests are generated in `deployment` directory.
+3. Generate the manifests, according to the profile you choose to use, to deploy the Redkey Operator. Use the `PROFILE` environment variable to define the profile to use. The manifests are generated in `deployment` directory.
 
 ```shell
 make process-manifests-webhook PROFILE=debug IMG_DEBUG="localhost:5001/redkey-operator:delve"
@@ -280,7 +280,7 @@ make process-manifests-webhook PROFILE=debug IMG_DEBUG="localhost:5001/redkey-op
 
 >**If no `PROFILE` environment variable defined, the default value is `dev`.**
 
-4. Deploy the RedKey Operator Webhook. Uses the `deployment/webhook.yml` generated in the above step.
+4. Deploy the Redkey Operator Webhook. Uses the `deployment/webhook.yml` generated in the above step.
 
 ```shell
 make deploy-webhook
@@ -288,9 +288,9 @@ make deploy-webhook
 
 >**`make` will install the needed tools like `kustomize`, `control-gen` and `envtest` if not available.**
 
-### Debuging RedKey Operator Webhook
+### Debuging Redkey Operator Webhook
 
-If you followed the steps described above to deploy the RedKey Operator Webhook using the `debug` profile you'll have the CRD deployed and a redkey-operator-webhook pod running.
+If you followed the steps described above to deploy the Redkey Operator Webhook using the `debug` profile you'll have the CRD deployed and a redkey-operator-webhook pod running.
 
 This pod is created using a `golang` image with `Delve` installed on it. This will allow us to easily debug the webhook code following these steps:
 
@@ -355,19 +355,19 @@ make uninstall
 kubectl delete ns redkey-operator
 ```
 
-## Deploying a RedKey cluster
+## Deploying a Redkey cluster
 
-You can deploy a sample RedKey Cluster from `config/samples` folder running:
+You can deploy a sample Redkey Cluster from `config/samples` folder running:
 
 ```shell
 make apply-rkcl
 ```
 
-This will apply the manifest file to create a three nodes ephemeral RedKeyCluster object with `purgeKeysOnRebalance` set to **true**.
+This will apply the manifest file to create a three nodes ephemeral RedkeyCluster object with `purgeKeysOnRebalance` set to **true**.
 
-As [Redkey Robin](https://github.com/InditexTech/redkeyrobin) image is required to being able to deploy the RedKey cluster, you should ensure the image is available in your K8s cluster. You'll find how to build the image from the GitHub repository.
+As [Redkey Robin](https://github.com/InditexTech/redkeyrobin) image is required to being able to deploy the Redkey cluster, you should ensure the image is available in your K8s cluster. You'll find how to build the image from the GitHub repository.
 
-In order to set the image name to be used when creating your local RedKey cluster you can sen the environment variable `IMG_ROBIN`. The value set to this variable will be used to kustomize the manifests that will be applied to create the sample RedKeyCluster.
+In order to set the image name to be used when creating your local Redkey cluster you can sen the environment variable `IMG_ROBIN`. The value set to this variable will be used to kustomize the manifests that will be applied to create the sample RedkeyCluster.
 
 ## Tests
 
@@ -379,7 +379,7 @@ make test
 
 ## How to test the operator with CRC and operator-sdk locally (OLM deployment)
 
-These commands allows us to deploy with OLM the RedKey Operator in a OC cluster in local environment
+These commands allows us to deploy with OLM the Redkey Operator in a OC cluster in local environment
 
 ### Prerequisites
 

@@ -1,6 +1,6 @@
 # Troubleshooting
 
-The RedKey Operator is a complex piece of software. In some cases it can self-recover from service losses but in other cases a cluster administrator has to intervene. This document helps administrators how to solve failing clusters.
+The Redkey Operator is a complex piece of software. In some cases it can self-recover from service losses but in other cases a cluster administrator has to intervene. This document helps administrators how to solve failing clusters.
 
 The first section describes [cluster failure scenarios](#cluster-failure-scenarios) and show to solve them.
 
@@ -10,7 +10,7 @@ The second section lists [commands](#cluster-manager-commands) used to solve the
 
 ### Openshift 3 does not support OLM and runs on an older kube-api version
 
-RedKey Operator is deployed in a production intranet cluster, which runs on Openshift 3. Openshift 3 uses an old `kube-api` version which comes with `CRD apiextension v1beta1`. The solution is to [generate Openshift 3 CRDs](#generate-openshift-3-crds).
+Redkey Operator is deployed in a production intranet cluster, which runs on Openshift 3. Openshift 3 uses an old `kube-api` version which comes with `CRD apiextension v1beta1`. The solution is to [generate Openshift 3 CRDs](#generate-openshift-3-crds).
 
 ### Downgrade a failing operator
 
@@ -32,7 +32,7 @@ You can find the node IP information by running the [nodes command](#gathering-n
 
 ## Cluster manager commands
 
-Below are a list of commands and code snippets for inspecting and repairing the cluster. Most commands use kubectl combined with the RedKey cluster manager tool. This tool is invoked with
+Below are a list of commands and code snippets for inspecting and repairing the cluster. Most commands use kubectl combined with the Redkey cluster manager tool. This tool is invoked with
 
 ```
 $ redis-cli --cluster ...

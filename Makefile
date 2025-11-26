@@ -49,7 +49,7 @@ TEST_REPORT_OUTPUT_E2E = ".local/test_report_e2e.ndjson"
 # .............................................................................
 # / IMPORTANT VARIABLES
 # .............................................................................
-# CHANNELS define the bundle channels used in the bundle. 
+# CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "preview,fast,stable")
 # To re-generate a bundle for other specific channels without changing the standard setup, you can:
 # - use the CHANNELS as arg of the bundle target (e.g make bundle CHANNELS=preview,fast,stable)
@@ -58,7 +58,7 @@ ifneq ($(origin CHANNELS), undefined)
 BUNDLE_CHANNELS := --channels=$(CHANNELS)
 endif
 
-# DEFAULT_CHANNEL defines the default channel used in the bundle. 
+# DEFAULT_CHANNEL defines the default channel used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g DEFAULT_CHANNEL = "stable")
 # To re-generate a bundle for any other default channel without changing the default setup, you can:
 # - use the DEFAULT_CHANNEL as arg of the bundle target (e.g make bundle DEFAULT_CHANNEL=stable)
@@ -75,7 +75,7 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
-# BUNDLE_IMG defines the image:tag used for the bundle. 
+# BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
 BUNDLE_IMG ?= controller-bundle:$(version)
 
@@ -141,7 +141,7 @@ deps: ## Installs dependencies
 	$(info $(M) installing dependencies)
 	GONOSUMDB=honnef.co/go/* GONOPROXY=honnef.co/go/* $(GO) install honnef.co/go/tools/cmd/staticcheck@v0.6.1
 
-.PHONY: version 
+.PHONY: version
 version:: ## Print the current version of the project.
 	@echo "$(version)"
 
@@ -155,7 +155,7 @@ version-set:: ## Set the project version to the given version, using the NEW_VER
 	@echo "Setting version to $(NEW_VERSION)"
 	sed -ri 's/(.*)(VERSION\s*:=\s*)([0-9]+\.[0-9]+\.[0-9]+)(-SNAPSHOT)(.*)/echo "\1\2$(NEW_VERSION)\5"/ge' Makefile
 
-.PHONY: checkfmt 
+.PHONY: checkfmt
 checkfmt: ## Check format validation
 	$(info $(M) running gofmt checking code style)
 	@fmtRes=$$($(GOFMT) -d $(SRC)); \
@@ -165,17 +165,17 @@ checkfmt: ## Check format validation
 		exit 1; \
 	fi
 
-.PHONY: fmt 
+.PHONY: fmt
 fmt: ## Run gofmt on all source files
 	$(info $(M) running go fmt)
 	$(GOFMT) -l -w $(SRC)
 
-.PHONY: lint 
+.PHONY: lint
 lint: deps ## Run golint
 	$(info $(M) running staticcheck)
 	$(GOLINT) ./...
 
-.PHONY: vet 
+.PHONY: vet
 vet: ## Run go vet
 	$(info $(M) running go vet)
 	$(GO) vet ./...
@@ -300,8 +300,8 @@ process-manifests-webhook: kustomize ##	Generate the kustomized yamls into the `
 
 	$(info $(M) generating certificates...)
 	openssl req -newkey rsa:2048 -nodes -keyout certs/server.key \
-  		-subj "/C=AU/CN=${WEBHOOK_NAMESPACE}.${CN}" \
-  		-out certs/server.csr
+		-subj "/C=AU/CN=${WEBHOOK_NAMESPACE}.${CN}" \
+		-out certs/server.csr
 	openssl x509 -req \
 		-extfile <(printf "subjectAltName=DNS:redkey-operator-webhook-service.${WEBHOOK_NAMESPACE}.svc,DNS:redkey-operator-webhook-service.${WEBHOOK_NAMESPACE}.svc.cluster.local") \
 		-in certs/server.csr \
@@ -360,7 +360,7 @@ undeploy-webhook: process-manifests-webhook ##		Delete the webhook from the K8s 
 	kubectl delete -f deployment/webhook.yaml
 
 OPERATOR=$(shell kubectl -n ${NAMESPACE} get po -l='control-plane=redkey-operator' -o=jsonpath='{.items[0].metadata.name}')
-dev-deploy: ## 		Build a new manager binary, copy the file to the operator pod and run it.
+dev-deploy: ##		Build a new manager binary, copy the file to the operator pod and run it.
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -gcflags="all=-N -l" -o bin/manager ./cmd/main.go
 	kubectl wait -n ${NAMESPACE} --for=condition=ready pod -l control-plane=redkey-operator
 	kubectl cp ./bin/manager $(OPERATOR):/manager -n ${NAMESPACE}
@@ -399,7 +399,7 @@ apply-all: docker-build docker-push process-manifests install deploy apply-rkcl
 delete-all: delete-rkcl undeploy uninstall
 
 WEBHOOK=$(shell kubectl -n ${WEBHOOK_NAMESPACE} get po -l='control-plane=redkey-operator-webhook' -o=jsonpath='{.items[0].metadata.name}')
-dev-deploy-webhook: ## 		Build a new webhook binary, copy the file to the webhook pod and run it.
+dev-deploy-webhook: ##		Build a new webhook binary, copy the file to the webhook pod and run it.
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -gcflags="all=-N -l" -C webhook -o ../bin/webhook  main.go
 	kubectl wait -n ${WEBHOOK_NAMESPACE} --for=condition=ready pod -l control-plane=redkey-operator-webhook
 	kubectl cp ./bin/webhook $(WEBHOOK):/webhook -n ${WEBHOOK_NAMESPACE}
@@ -474,7 +474,7 @@ redis-forget: ## Forget nodes of RedKey cluster
 
 redis-benchmark: # Benckmark a RedKey cluster
 	if [ "$(WORKSPACE)" == "default" ]; then \
-  		kubectl exec -it -n $(NSTEST) redis-cluster-0 -- redis-benchmark -c 100 -n 100000 -t set,get; \
+		kubectl exec -it -n $(NSTEST) redis-cluster-0 -- redis-benchmark -c 100 -n 100000 -t set,get; \
 	else \
 	  if [ -z "$(REDIS_POD)" ]; then \
 	    echo "ERROR:: No pods running to benchmark, starts your cluster to use this feature."; \
@@ -501,12 +501,12 @@ redis-insert:
 	rm -f /tmp/data.txt
 	for ((i=1;i<=100;i++)); do echo "set $${RANDOM}$${RANDOM} $${RANDOM}$${RANDOM}" >> /tmp/data.txt; done
 	if [ "$(WORKSPACE)" == "test" ]; then \
-  		cat /tmp/data.txt | kubectl exec -i -n $(NSTEST) redis-cluster-0 -- redis-cli -c; \
+		cat /tmp/data.txt | kubectl exec -i -n $(NSTEST) redis-cluster-0 -- redis-cli -c; \
 	else \
 	  if [ -z "$(REDIS_POD)" ]; then \
 	    echo "ERROR:: No pods running to insert data, starts your cluster to use this feature."; \
 	  else \
-    	cat /tmp/data.txt | kubectl exec -i $(REDIS_POD) -n ${NAMESPACE} -- redis-cli -c; \
+	cat /tmp/data.txt | kubectl exec -i $(REDIS_POD) -n ${NAMESPACE} -- redis-cli -c; \
 	  fi \
 	fi
 
@@ -546,7 +546,7 @@ OPERATOR_SDK = $(shell which operator-sdk)
 endif
 endif
 
-.PHONY: bundle 
+.PHONY: bundle
 bundle: kustomize manifests ## Generate the files for bundle.
 	rm -rf bundle/manifests/*
 	rm -rf bundle/metadata/*
@@ -555,7 +555,7 @@ bundle: kustomize manifests ## Generate the files for bundle.
 	$(KUSTOMIZE) build config | $(OPERATOR_SDK) generate bundle -q --overwrite --channels $(CHANNELS) --version $(version) $(BUNDLE_METADATA_OPTS)
 	$(OPERATOR_SDK) bundle validate ./bundle
 
-.PHONY: bundle-build 
+.PHONY: bundle-build
 bundle-build: ## Build the bundle image.
 	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
@@ -569,15 +569,15 @@ ginkgo:
 
 .PHONY: test-e2e
 test-e2e: process-manifests-crd ginkgo ## Execute e2e application test
-	$(info running e2e tests...)	
+	$(info running e2e tests...)
 	ginkgo -procs=$(TEST_PARALLEL_PROCESS) \
-	    	-vv \
+		-vv \
 			./test/e2e \
-	    	GOMAXPROCS=$(GOMAXPROCS) \
-	    	OPERATOR_IMAGE=$(IMG) \
-	    	REDIS_IMAGE=$(REDIS_IMAGE) \
-	    	CHANGED_REDIS_IMAGE=$(CHANGED_REDIS_IMAGE) \
-	    	SIDECARD_IMAGE=$(SIDECARD_IMAGE)
+		GOMAXPROCS=$(GOMAXPROCS) \
+		OPERATOR_IMAGE=$(IMG) \
+		REDIS_IMAGE=$(REDIS_IMAGE) \
+		CHANGED_REDIS_IMAGE=$(CHANGED_REDIS_IMAGE) \
+		SIDECARD_IMAGE=$(SIDECARD_IMAGE)
 
 .PHONY: test-e2e-cov
 test-e2e-cov: process-manifests-crd ginkgo ## Execute e2e application test
@@ -600,7 +600,7 @@ test-e2e-cov: process-manifests-crd ginkgo ## Execute e2e application test
 			SIDECARD_IMAGE=$(SIDECARD_IMAGE)
 
 
-.PHONY: test-sonar 
+.PHONY: test-sonar
 test-sonar:	## Execute the application test for Sonar (coverage + test report)
 	$(info $(M) running tests and generating sonar report)
 	$(eval TEST_COVERAGE_PROFILE_OUTPUT_DIRNAME=$(shell dirname $(TEST_COVERAGE_PROFILE_OUTPUT)))
@@ -609,7 +609,7 @@ test-sonar:	## Execute the application test for Sonar (coverage + test report)
 	$(GO) test ./controllers/ ./internal/*/ -coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT) -json > $(TEST_REPORT_OUTPUT)
 
 .PHONY: test-cov
-test-cov: 	## Execute the application test with coverage
+test-cov:	## Execute the application test with coverage
 	$(info $(M) running tests and generating coverage report)
 	$(eval TEST_REPORT_OUTPUT_DIRNAME=$(shell dirname $(TEST_REPORT_OUTPUT)))
 	mkdir -p $(TEST_REPORT_OUTPUT_DIRNAME)
@@ -631,5 +631,5 @@ int-test-apply:	## Apply manifests and metadata files.
 	sleep 3 # We need to sleep for a bit to make sure the CRDs are registered before we apply the test
 	kubectl apply -f config/int-test/tests.yaml
 
-# .PHONY=int-test 
+# .PHONY=int-test
 # int-test: kustomize int-test-generate int-test-apply ## Generate manifests and metadata, then apply generated files.

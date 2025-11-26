@@ -342,16 +342,16 @@
         <mxCell id="aAkpJWbWGLXDjZrMgsH--75" value="c" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fontSize=9;fillColor=#E6FFCC;" vertex="1" parent="1">
           <mxGeometry x="383" y="1276" width="10" height="10" as="geometry" />
         </mxCell>
-        <mxCell id="aAkpJWbWGLXDjZrMgsH--77" value="RedKey cluster creation&amp;nbsp; | cluster meet | cluster rebalance" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;labelBackgroundColor=#5CA5D5;fontColor=#FFFFFF;fontSize=14;spacingTop=0;spacing=2;textShadow=1;" vertex="1" parent="1">
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--77" value="Redkey cluster creation&amp;nbsp; | cluster meet | cluster rebalance" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;labelBackgroundColor=#5CA5D5;fontColor=#FFFFFF;fontSize=14;spacingTop=0;spacing=2;textShadow=1;" vertex="1" parent="1">
           <mxGeometry x="280" y="30" width="383" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="aAkpJWbWGLXDjZrMgsH--78" value="RedKey cluster scale" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;labelBackgroundColor=#5CA5D5;fontColor=#FFFFFF;fontSize=14;spacingTop=0;spacing=2;textShadow=1;" vertex="1" parent="1">
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--78" value="Redkey cluster scale" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;labelBackgroundColor=#5CA5D5;fontColor=#FFFFFF;fontSize=14;spacingTop=0;spacing=2;textShadow=1;" vertex="1" parent="1">
           <mxGeometry x="88.5" y="590" width="383" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="aAkpJWbWGLXDjZrMgsH--79" value="RedKey cluster upgrade" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;labelBackgroundColor=#5CA5D5;fontColor=#FFFFFF;fontSize=14;spacingTop=0;spacing=2;textShadow=1;" vertex="1" parent="1">
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--79" value="Redkey cluster upgrade" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;labelBackgroundColor=#5CA5D5;fontColor=#FFFFFF;fontSize=14;spacingTop=0;spacing=2;textShadow=1;" vertex="1" parent="1">
           <mxGeometry x="489.5" y="590" width="383" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="aAkpJWbWGLXDjZrMgsH--80" value="RedKey cluster in error" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;labelBackgroundColor=#5CA5D5;fontColor=#FFFFFF;fontSize=14;spacingTop=0;spacing=2;textShadow=1;" vertex="1" parent="1">
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--80" value="Redkey cluster in error" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;labelBackgroundColor=#5CA5D5;fontColor=#FFFFFF;fontSize=14;spacingTop=0;spacing=2;textShadow=1;" vertex="1" parent="1">
           <mxGeometry x="369.5" y="980" width="383" height="30" as="geometry" />
         </mxCell>
       </root>

@@ -1,8 +1,8 @@
 # Key purge (purgeKeysOnRebalance)
 
-When using RedKey Cluster as a cache (`ephemeral` parameter set to **true**), we have the option to tell the Operator whether we want to keep the keys when performing scaling or upgrade operations, or whether we want to discard them.
+When using Redkey Cluster as a cache (`ephemeral` parameter set to **true**), we have the option to tell the Operator whether we want to keep the keys when performing scaling or upgrade operations, or whether we want to discard them.
 
-When using RedKey Cluster as a cache (ephemeral parameter set to true), we have the option to tell the Operator whether we want to keep the keys when performing scaling or upgrade operations, or whether we want to discard them.
+When using Redkey Cluster as a cache (ephemeral parameter set to true), we have the option to tell the Operator whether we want to keep the keys when performing scaling or upgrade operations, or whether we want to discard them.
 
 Scaling or upgrade operations have a **high computational and time cost**, as they involve resharding or moving slots (and their keys) between nodes of the cluster itself.
 
@@ -12,19 +12,19 @@ More details about the Status and Sustatus for these operations can be found [he
 
 ## Fast operations
 
-The fast mode of scaling and upgrade operations implies a **total loss of the keys** stored in the RedKey Cluster.
+The fast mode of scaling and upgrade operations implies a **total loss of the keys** stored in the Redkey Cluster.
 
-In this mode, the Operator is actually recreating the RedKey Cluster, recreating the pods that make it up and relying on Robin to meet the new nodes, distribute the slots, and ensure that it remains in a healthy state.
+In this mode, the Operator is actually recreating the Redkey Cluster, recreating the pods that make it up and relying on Robin to meet the new nodes, distribute the slots, and ensure that it remains in a healthy state.
 
 The cluster will be properly scaled or have the updated configuration.
 
 This is the fastest way to perform scaling and upgrade operations.
 
-Quick operations will only be applied if the RedKey Cluster is set to `purgeKeysOnRebalance` set to **true**.
+Quick operations will only be applied if the Redkey Cluster is set to `purgeKeysOnRebalance` set to **true**.
 
 ## Slow Operations
 
-If we want to preserve keys during RedKey Cluster upgrades and scales, then we need to use slow operations. To do this, we must configure the cluster with `purgeKeysOnRebalance` set to **false**.
+If we want to preserve keys during Redkey Cluster upgrades and scales, then we need to use slow operations. To do this, we must configure the cluster with `purgeKeysOnRebalance` set to **false**.
 
 In this case, the Operator makes sure to move the slots (and their keys) from one node to another node or nodes within the cluster itself, before recreating that node or discarding it.
 
