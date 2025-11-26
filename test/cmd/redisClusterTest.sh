@@ -1414,7 +1414,7 @@ allTest() {
 }
 
 #######################################
-# Initialize a new RedKey operator in local environment.
+# Initialize a new Redkey operator in local environment.
 # Globals:
 #   namespace=$1
 #   image=$2

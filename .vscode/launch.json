@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "RedKey Manager",
+            "name": "Redkey Manager",
             "type": "go",
             "request": "launch",
             "mode": "auto",

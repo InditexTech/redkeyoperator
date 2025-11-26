@@ -36,7 +36,7 @@ jobs:
           body: |
             Check out the [changelog](CHANGELOG.md) for version v${{ steps.makefile_version.outputs.version }}
   publish-operator-image:
-    name: Publish RedKey Operator image to the registry
+    name: Publish Redkey Operator image to the registry
     needs: create-release
     runs-on: ubuntu-latest
     steps:
@@ -62,7 +62,7 @@ jobs:
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.OPERATOR_NAME }}:${{ steps.makefile_version.outputs.version }}
 #   publish-operator:
-#     name: Publish RedKey Operator to OperatorHub.io
+#     name: Publish Redkey Operator to OperatorHub.io
 #     needs: [create-release, publish-operator-image]
 #     runs-on: ubuntu-latest
 #     steps:

@@ -300,20 +300,20 @@ port-forward: ##		Port forwarding of port 40000 for debugging the manager with D
 delete-operator: ##		Delete the operator pod (redkey-operator) in order to have a new clean pod created.
 	kubectl delete pod $(OPERATOR) -n ${NAMESPACE}
 
-apply-rkcl: ##		Apply the sample RedKey Cluster manifest.
-	$(info $(M) creating sample RedKey cluster)
+apply-rkcl: ##		Apply the sample Redkey Cluster manifest.
+	$(info $(M) creating sample Redkey cluster)
 	$(KUSTOMIZE) build config/samples/ephemeral | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | $(SED) 's,image: redkey-robin:0.1.0,image: ${IMG_ROBIN},' | kubectl apply -f -
 
-delete-rkcl: ##		Delete the sample RedKey Cluster manifest.
-	$(info $(M) deleting sample RedKey cluster)
+delete-rkcl: ##		Delete the sample Redkey Cluster manifest.
+	$(info $(M) deleting sample Redkey cluster)
 	$(KUSTOMIZE) build config/samples/ephemeral | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | $(SED) 's,image: redkey-robin:0.1.0,image: ${IMG_ROBIN},' | kubectl delete -f -
 
-apply-debug-rkcl: ##		Apply the sample RedKey Cluster manifest for Robin debugging.
-	$(info $(M) creating sample RedKey cluster)
+apply-debug-rkcl: ##		Apply the sample Redkey Cluster manifest for Robin debugging.
+	$(info $(M) creating sample Redkey cluster)
 	$(KUSTOMIZE) build config/samples/robin-debug | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | $(SED) 's,image: redkey-robin:0.1.0,image: ${IMG_DEBUG},' | kubectl apply -f -
 
-delete-debug-rkcl: ##		Delete the sample RedKey Cluster manifest for Robin debugging.
-	$(info $(M) deleting sample RedKey cluster)
+delete-debug-rkcl: ##		Delete the sample Redkey Cluster manifest for Robin debugging.
+	$(info $(M) deleting sample Redkey cluster)
 	$(KUSTOMIZE) build config/samples/robin-debug | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | $(SED) 's,image: redkey-robin:0.1.0,image: ${IMG_DEBUG},' | kubectl delete -f -
 
 apply-all: docker-build docker-push process-manifests install deploy apply-rkcl
@@ -360,22 +360,22 @@ $(ENVTEST):
 ##@ Troubleshooting
 
 REDIS_PODS=$(shell kubectl get po -n ${NAMESPACE} --field-selector=status.phase=Running  -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name' )
-redis-check: ## Check information in pods related to RedKey cluster.
+redis-check: ## Check information in pods related to Redkey cluster.
 	for POD in $(REDIS_PODS); do kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli --cluster check localhost:6379; done
 
-redis-nodes: ## Check nodes of RedKey cluster.
+redis-nodes: ## Check nodes of Redkey cluster.
 	for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli CLUSTER NODES | sort; done
 
-redis-slots: ## Check slots of RedKey cluster.
+redis-slots: ## Check slots of Redkey cluster.
 	for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli CLUSTER SLOTS | sort; done
 
-redis-info: ## Check info of RedKey cluster
+redis-info: ## Check info of Redkey cluster
 	for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli CLUSTER INFO | sort; done
 
-redis-forget: ## Forget nodes of RedKey cluster
+redis-forget: ## Forget nodes of Redkey cluster
 	for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli CLUSTER FORGET $(nodeid); done
 
-redis-benchmark: # Benckmark a RedKey cluster
+redis-benchmark: # Benckmark a Redkey cluster
 	if [ "$(WORKSPACE)" == "default" ]; then \
   		kubectl exec -it -n $(NSTEST) redis-cluster-0 -- redis-benchmark -c 100 -n 100000 -t set,get; \
 	else \
@@ -386,10 +386,10 @@ redis-benchmark: # Benckmark a RedKey cluster
 	  fi \
 	fi
 
-redis-fix: ## Fix RedKey cluster
+redis-fix: ## Fix Redkey cluster
 	for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli --cluster fix localhost:6379; done
 
-redis-rebalance: ## Rebalance slots of RedKey cluster
+redis-rebalance: ## Rebalance slots of Redkey cluster
 	for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli --cluster rebalance --cluster-use-empty-masters localhost:6379; done
 
 args = `arg="$(filter-out $@,$(MAKECMDGOALS))" && echo $${arg:-${1}}`

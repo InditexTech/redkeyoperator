@@ -1,17 +1,17 @@
-![RedKey Operator icon](docs/images/redkey-logo-50.png)
-# RedKey Operator for Kubernetes
+![Redkey Operator icon](docs/images/redkey-logo-50.png)
+# Redkey Operator for Kubernetes
 
-A **RedKey Cluster** is a key/value cluster using either [Redis Official Image](https://hub.docker.com/_/redis) or [Valkey Official Image](https://hub.docker.com/r/valkey/valkey/) images to create its nodes (note that all cluster nodes must use the same image).
+A **Redkey Cluster** is a key/value cluster using either [Redis Official Image](https://hub.docker.com/_/redis) or [Valkey Official Image](https://hub.docker.com/r/valkey/valkey/) images to create its nodes (note that all cluster nodes must use the same image).
 
-**RedKey Operator** is the easiest way to deploy and manage a RedKey Cluster in Kubernetes implementing the [operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/).
+**Redkey Operator** is the easiest way to deploy and manage a Redkey Cluster in Kubernetes implementing the [operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/).
 
-This operator implements a controller that extends the Kubernetes API allowing to seamlessly deploy a RedKey cluster, monitor the deployed resources implementing a reconciliation loop, logging events, manage cluster scaling and recover from errors.
+This operator implements a controller that extends the Kubernetes API allowing to seamlessly deploy a Redkey cluster, monitor the deployed resources implementing a reconciliation loop, logging events, manage cluster scaling and recover from errors.
 
-RedKey operator is built using [kubebuilder](https://github.com/kubernetes-sigs/kubebuilder) and [operator-sdk](https://github.com/operator-framework/operator-sdk).
+Redkey operator is built using [kubebuilder](https://github.com/kubernetes-sigs/kubebuilder) and [operator-sdk](https://github.com/operator-framework/operator-sdk).
 
 ## Features
 
-- RedKey Cluster creation
+- Redkey Cluster creation
 - Cluster scaling up and down
 - Cluster upgrading
   - Update node pods image
@@ -28,9 +28,9 @@ Refer to [operator guide](./docs/operator-guide/toc.md) to have an overview of t
 
 If you are a developer, you'll find interesting information in the [developer guide](./docs/developer-guide.md).
 
-Learn about [RedKey Cluster Status and Substatus](./docs/redkey-cluster-status.md).
+Learn about [Redkey Cluster Status and Substatus](./docs/redkey-cluster-status.md).
 
-Discover [RedKey Robin](./docs/redkey-robin.md).
+Discover [Redkey Robin](./docs/redkey-robin.md).
 
 The importance of the [purgeKeysOnRebalance](./docs/purge-keys-on-rebalance.md) parameter.
 
