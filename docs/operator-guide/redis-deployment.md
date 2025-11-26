@@ -50,6 +50,12 @@ spec:
           name: rediscluster-sample-robin-config
 ```
 
+You can deploy an example RedkeyCluster executing:
+
+```
+make apply-rkcl
+```
+
 ### Redis configuration
 
 The `config` item contains the Redis specific configuration attributes that are usually set in the `redis.conf` Redis configuration file (you'll find a complete self-documented [redis.conf](https://redis.io/docs/management/config-file/) file in Redis documentation).
