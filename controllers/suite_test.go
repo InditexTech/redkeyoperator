@@ -242,9 +242,9 @@ func CreateRedkeyCluster() *redkeyv1.RedkeyCluster {
 			Labels:     map[string]string{"team": "team-a"},
 		},
 		Spec: redkeyv1.RedkeyClusterSpec{
-			Auth:     redkeyv1.RedisAuth{},
-			Version:  "6.0.2",
-			Replicas: 1,
+			Auth:      redkeyv1.RedisAuth{},
+			Version:   "6.0.2",
+			Primaries: 1,
 			Config: `
 			maxmemory 500mb
 

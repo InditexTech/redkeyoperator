@@ -20,15 +20,15 @@ import (
 //   - the images set in RedkeyCluster under spec and the image set in the StatefulSet object are not the same.
 //     The cluster is upgraded, reconfiguring the objects to solve these mismatches.
 //
-// StatusScalingDown: RedkeyCluster replicas > StatefulSet replicas
+// StatusScalingDown: RedkeyCluster primaries > StatefulSet replicas
 //
 //	The cluster enters in this status to remove excess nodes.
 //
-// StatusScalingUp: RedkeyCluster replicas < StatefulSet replicas
+// StatusScalingUp: RedkeyCluster primaries < StatefulSet replicas
 //
-//	The cluster enters in this status to create the needed nodes to equal the desired replicas with the current replicas.
+//	The cluster enters in this status to create the needed nodes to equal the desired primary nodes count with the current primary nodes count.
 //
-// Ready: The cluster has the correct configuration, the desired number of replicas, is rebalances and ready to be used.
+// Ready: The cluster has the correct configuration, the desired number of primary nodes, is rebalances and ready to be used.
 //
 //	The operator checks pediodically if the cluster can be kept in this status.
 //
@@ -116,15 +116,15 @@ type RedkeyClusterSpec struct {
 	// Redis version
 	Version string `json:"version,omitempty"`
 
-	// Replicas specifies the number of Redis nodes in the cluster.
+	// Primaries specifies the number of Redis primary nodes in the cluster.
 	// +kubebuilder:validation:Required
-	Replicas int32 `json:"replicas"`
+	Primaries int32 `json:"primaries"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=0
-	// ReplicasPerMaster specifies how many replicas should be attached to each Redis Master
-	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Number of replicas per Master Node"
-	ReplicasPerMaster int32 `json:"replicasPerMaster,omitempty"`
+	// ReplicasPerPrimary specifies how many replicas should be attached to each Redis Primary node
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Number of replicas per Primary Node"
+	ReplicasPerPrimary int32 `json:"replicasPerPrimary,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// Image is the Redis image to use.
@@ -191,7 +191,7 @@ type RedkeyClusterSpec struct {
 }
 
 func (redkeyClusterSpec RedkeyClusterSpec) NodesNeeded() int {
-	return int(redkeyClusterSpec.Replicas + (redkeyClusterSpec.Replicas * redkeyClusterSpec.ReplicasPerMaster))
+	return int(redkeyClusterSpec.Primaries + (redkeyClusterSpec.Primaries * redkeyClusterSpec.ReplicasPerPrimary))
 }
 
 // Provides the ability to override the generated manifest of several child resources.
@@ -233,7 +233,7 @@ type SlotRange struct {
 type RedisNode struct {
 	Name      string `json:"name"`
 	IP        string `json:"ip"`
-	IsMaster  bool   `json:"isMaster"`
+	IsPrimary bool   `json:"isPrimary"`
 	ReplicaOf string `json:"replicaOf"`
 }
 
@@ -250,8 +250,8 @@ type Pdb struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=rkcl
 // +kubebuilder:storageversion
-// +kubebuilder:printcolumn:name="Masters",type="integer",priority=0,JSONPath=".spec.replicas",description="Amount of Redis master nodes"
-// +kubebuilder:printcolumn:name="Replicas",type="integer",priority=0,JSONPath=".spec.replicasPerMaster",description="Amount of replicas per master node"
+// +kubebuilder:printcolumn:name="Primaries",type="integer",priority=0,JSONPath=".spec.primaries",description="Amount of Redis primary nodes"
+// +kubebuilder:printcolumn:name="Replicas",type="integer",priority=0,JSONPath=".spec.replicasPerPrimary",description="Amount of replicas per primary node"
 // +kubebuilder:printcolumn:name="Ephemeral",type="boolean",priority=0,JSONPath=".spec.ephemeral",description="Cluster ephemeral"
 // +kubebuilder:printcolumn:name="PurgeKeys",type="boolean",priority=0,JSONPath=".spec.purgeKeysOnRebalance",description="Purge keys on rebalance"
 // +kubebuilder:printcolumn:name="Image",type="string",priority=0,JSONPath=".spec.image",description="Source image for Redis instance"
@@ -261,8 +261,8 @@ type Pdb struct {
 // +kubebuilder:printcolumn:name="Status",type="string",priority=0,JSONPath=".status.status",description="The cluster status"
 // +kubebuilder:printcolumn:name="Substatus",type="string",priority=0,JSONPath=".status.substatus.status",description="The cluster substatus"
 // +kubebuilder:printcolumn:name="Partition",type="string",priority=5,JSONPath=".status.substatus.upgradingPartition",description="Upgrading partition"
-// +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas,selectorpath=.status.selector
-// +kubebuilder:validation:XValidation:rule="self.spec.replicas == oldSelf.spec.replicas || !has(self.status) || self.status.status == 'Ready'", message="Changing the number of replicas is not allowed unless the cluster is in 'Ready' status"
+// +kubebuilder:subresource:scale:specpath=.spec.primaries,statuspath=.status.primaries,selectorpath=.status.selector
+// +kubebuilder:validation:XValidation:rule="self.spec.primaries == oldSelf.spec.primaries || !has(self.status) || self.status.status == 'Ready'", message="Changing the number of primaries is not allowed unless the cluster is in 'Ready' status"
 // RedkeyCluster is the Schema for the redkeyclusters API
 type RedkeyCluster struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -310,7 +310,7 @@ func CompareStatuses(a, b *RedkeyClusterStatus) bool {
 				break
 			}
 		}
-		if nodeA.Name != nodeB.Name || nodeA.IP != nodeB.IP || nodeA.IsMaster != nodeB.IsMaster || nodeA.ReplicaOf != nodeB.ReplicaOf {
+		if nodeA.Name != nodeB.Name || nodeA.IP != nodeB.IP || nodeA.IsPrimary != nodeB.IsPrimary || nodeA.ReplicaOf != nodeB.ReplicaOf {
 			return false
 		}
 	}

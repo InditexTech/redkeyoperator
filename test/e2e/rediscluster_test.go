@@ -118,11 +118,11 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 	)
 
 	// mustCreateAndReady creates a cluster and blocks until it's Ready
-	mustCreateAndReady := func(name string, replicas, replicasPerMaster int32, storage, image string, purgeKeys, ephemeral bool, pdb redkeyv1.Pdb, userOverride redkeyv1.RedkeyClusterOverrideSpec) *redkeyv1.RedkeyCluster {
+	mustCreateAndReady := func(name string, primaries, replicasPerPrimary int32, storage, image string, purgeKeys, ephemeral bool, pdb redkeyv1.Pdb, userOverride redkeyv1.RedkeyClusterOverrideSpec) *redkeyv1.RedkeyCluster {
 		key := types.NamespacedName{Namespace: namespace.Name, Name: name}
 		Expect(framework.EnsureClusterExistsOrCreate(
 			ctx, k8sClient, key,
-			replicas, replicasPerMaster,
+			primaries, replicasPerPrimary,
 			storage, image, purgeKeys, ephemeral,
 			pdb, userOverride,
 		)).To(Succeed())
@@ -130,7 +130,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 		rc, err := framework.WaitForReady(ctx, k8sClient, key)
 
 		Expect(err).NotTo(HaveOccurred())
-		Expect(rc.Spec.Replicas).To(Equal(replicas))
+		Expect(rc.Spec.Primaries).To(Equal(primaries))
 		Expect(rc.Spec.Storage).To(Equal(storage))
 		Expect(rc.Spec.PurgeKeysOnRebalance).To(Equal(purgeKeys))
 		Expect(rc.Spec.Ephemeral).To(Equal(ephemeral))
@@ -139,7 +139,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 		Expect(rc.Spec.Auth).To(Equal(redkeyv1.RedisAuth{}))
 		Expect(rc.Spec.Image).To(Equal(getRedisImage()))
 		Expect(rc.Spec.Pdb).To(Equal(pdb))
-		Expect(rc.Spec.ReplicasPerMaster).To(Equal(replicasPerMaster))
+		Expect(rc.Spec.ReplicasPerPrimary).To(Equal(replicasPerPrimary))
 		Expect(rc.Name).To(Equal(name))
 		return rc
 	}
@@ -163,7 +163,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 	})
 
 	Context("Lifecycle: create & scale", func() {
-		const base = "rdcl"
+		const base = "rkcl"
 
 		// helper: every phase in want must appear somewhere in trace
 		expectPhases := func(trace []string, want ...string) {
@@ -181,13 +181,13 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 
 				mustCreateAndReady(name, initial, 0, "", getRedisImage(), true, true, redkeyv1.Pdb{}, redkeyv1.RedkeyClusterOverrideSpec{})
 
-				// change replicas → wait Ready again
+				// change primaries → wait Ready again
 				rc, trace, err := framework.ChangeCluster(ctx, k8sClient, key,
 					framework.ChangeClusterOptions{
-						Mutate: func(r *redkeyv1.RedkeyCluster) { r.Spec.Replicas = target },
+						Mutate: func(r *redkeyv1.RedkeyCluster) { r.Spec.Primaries = target },
 					})
 				Expect(err).NotTo(HaveOccurred())
-				Expect(rc.Spec.Replicas).To(Equal(target))
+				Expect(rc.Spec.Primaries).To(Equal(target))
 
 				// every wanted phase must have shown up at least once
 				expectPhases(trace, phases...)
@@ -327,7 +327,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 		BeforeEach(func() {
 			key = types.NamespacedName{Namespace: namespace.Name, Name: baseName}
 
-			// create cluster (3 replicas are enough)
+			// create cluster (3 primaries are enough)
 			mustCreateAndReady(baseName, 3, 0, "", getRedisImage(), true, true,
 				redkeyv1.Pdb{}, redkeyv1.RedkeyClusterOverrideSpec{})
 
@@ -371,7 +371,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 			key = types.NamespacedName{Namespace: namespace.Name, Name: clusterName}
 			mustCreateAndReady(
 				clusterName,
-				3, 0, // replicas / per-master
+				3, 0, // primaries / replcias-per-primary
 				"", getRedisImage(), true, true, // storage / image / purgeKeys / ephemeral
 				redkeyv1.Pdb{},                       // no-PDB
 				redkeyv1.RedkeyClusterOverrideSpec{}, // no override
@@ -383,7 +383,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 		checkRC := func(rc *redkeyv1.RedkeyCluster, applied map[string]string) {
 			Expect(rc).NotTo(BeNil())
 			Expect(rc.Status.Status).To(Equal(redkeyv1.StatusReady))
-			Expect(rc.Spec.Replicas).To(Equal(int32(3))) // never touched by this test
+			Expect(rc.Spec.Primaries).To(Equal(int32(3))) // never touched by this test
 			// .Spec.Labels must equal what we just applied
 			Expect(*rc.Spec.Labels).To(Equal(applied))
 		}
@@ -471,11 +471,11 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 			)
 		})
 
-		checkRC := func(rc *redkeyv1.RedkeyCluster, wantReplicas int32) {
+		checkRC := func(rc *redkeyv1.RedkeyCluster, wantPrimaries int32) {
 			Expect(rc).NotTo(BeNil())
 			Expect(rc.Status.Status).To(Equal(redkeyv1.StatusReady))
 			Expect(rc.Spec.Storage).To(Equal(initialPVC))
-			Expect(rc.Spec.Replicas).To(Equal(wantReplicas))
+			Expect(rc.Spec.Primaries).To(Equal(wantPrimaries))
 		}
 
 		// ---------------------------------------------------------------- table
@@ -520,11 +520,11 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				},
 			),
 
-			Entry("scale up to 6 replicas",
+			Entry("scale up to 6 primaries",
 				tc{
 					desc: "scale-up",
 					mutate: func(r *redkeyv1.RedkeyCluster) {
-						r.Spec.Replicas = 6
+						r.Spec.Primaries = 6
 					},
 					wantRep:    6,
 					wantPhases: []string{redkeyv1.StatusScalingUp, redkeyv1.StatusReady},
@@ -535,7 +535,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				tc{
 					desc: "scale-down",
 					mutate: func(r *redkeyv1.RedkeyCluster) {
-						r.Spec.Replicas = 1
+						r.Spec.Primaries = 1
 					},
 					wantRep:    1,
 					wantPhases: []string{redkeyv1.StatusScalingDown, redkeyv1.StatusReady},
@@ -544,11 +544,11 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 		)
 	})
 
-	Context("Master-Replica layout", func() {
+	Context("Primary-Replica layout", func() {
 		const (
-			clusterName   = "master-test"
-			initReplicas  = int32(5)
-			initPerMaster = int32(1)
+			clusterName    = "primary-test"
+			initPrimaries  = int32(5)
+			initPerPrimary = int32(1)
 		)
 
 		var key types.NamespacedName
@@ -558,7 +558,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 			// single bootstrap for every entry
 			mustCreateAndReady(
 				clusterName,
-				initReplicas, initPerMaster,
+				initPrimaries, initPerPrimary,
 				"", // no PVC
 				getRedisImage(),
 				true, // purgeKeys
@@ -570,25 +570,25 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 
 		// ---------------------------------------------------------------- helpers
 
-		checkLayout := func(rep, perMaster int32) {
+		checkLayout := func(primaries, perPrimary int32) {
 			Eventually(func() (bool, error) {
-				return framework.ValidateRedkeyClusterMasterSlave(
-					ctx, k8sClient, key, rep, perMaster)
+				return framework.ValidateRedkeyClusterPrimaryReplica(
+					ctx, k8sClient, key, primaries, perPrimary)
 			}, defaultWait*2, defaultPoll).Should(BeTrue())
 		}
 
 		type tc struct {
-			desc          string
-			mutate        func(*redkeyv1.RedkeyCluster)
-			wantRep       int32
-			wantPerMaster int32
-			wantPhases    []string
+			desc           string
+			mutate         func(*redkeyv1.RedkeyCluster)
+			wantRep        int32
+			wantPerPrimary int32
+			wantPhases     []string
 		}
 
-		DescribeTable("master/replica mutations",
+		DescribeTable("primary/replica mutations",
 			func(t tc) {
 				if t.mutate == nil {
-					checkLayout(t.wantRep, t.wantPerMaster)
+					checkLayout(t.wantRep, t.wantPerPrimary)
 					return
 				}
 
@@ -597,20 +597,20 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 					framework.ChangeClusterOptions{Mutate: t.mutate},
 				)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(rc.Spec.Replicas).To(Equal(t.wantRep))
-				Expect(rc.Spec.ReplicasPerMaster).To(Equal(t.wantPerMaster))
+				Expect(rc.Spec.Primaries).To(Equal(t.wantRep))
+				Expect(rc.Spec.ReplicasPerPrimary).To(Equal(t.wantPerPrimary))
 				Expect(phases).To(ContainElements(t.wantPhases))
 
-				checkLayout(t.wantRep, t.wantPerMaster)
+				checkLayout(t.wantRep, t.wantPerPrimary)
 			},
 
 			// ──────────────────────────────────────────────────────────
 			Entry("baseline distribution is correct",
 				tc{
-					desc:          "validateInitial",
-					mutate:        nil,
-					wantRep:       initReplicas,
-					wantPerMaster: initPerMaster,
+					desc:           "validateInitial",
+					mutate:         nil,
+					wantRep:        initPrimaries,
+					wantPerPrimary: initPerPrimary,
 				},
 			),
 
@@ -618,12 +618,12 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				tc{
 					desc: "scaleUp",
 					mutate: func(r *redkeyv1.RedkeyCluster) {
-						r.Spec.Replicas = 7
-						r.Spec.ReplicasPerMaster = 2
+						r.Spec.Primaries = 7
+						r.Spec.ReplicasPerPrimary = 2
 					},
-					wantRep:       7,
-					wantPerMaster: 2,
-					wantPhases:    []string{redkeyv1.StatusScalingUp, redkeyv1.StatusReady},
+					wantRep:        7,
+					wantPerPrimary: 2,
+					wantPhases:     []string{redkeyv1.StatusScalingUp, redkeyv1.StatusReady},
 				},
 			),
 
@@ -631,12 +631,12 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				tc{
 					desc: "scaleDown",
 					mutate: func(r *redkeyv1.RedkeyCluster) {
-						r.Spec.Replicas = 3
-						r.Spec.ReplicasPerMaster = 1
+						r.Spec.Primaries = 3
+						r.Spec.ReplicasPerPrimary = 1
 					},
-					wantRep:       3,
-					wantPerMaster: 1,
-					wantPhases:    []string{redkeyv1.StatusScalingDown, redkeyv1.StatusReady},
+					wantRep:        3,
+					wantPerPrimary: 1,
+					wantPhases:     []string{redkeyv1.StatusScalingDown, redkeyv1.StatusReady},
 				},
 			),
 		)
@@ -680,7 +680,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 		}
 
 		type tc struct {
-			replicas   int32 // target after mutate; 0 == "no scale"
+			primaries  int32 // target after mutate; 0 == "no scale"
 			wantPhases []string
 		}
 
@@ -689,15 +689,15 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				insert()
 
 				// optional scale
-				if t.replicas > 0 {
+				if t.primaries > 0 {
 					var trace []string
 					var err error
 					rc, trace, err = framework.ChangeCluster(ctx, k8sClient, key,
 						framework.ChangeClusterOptions{
-							Mutate: func(r *redkeyv1.RedkeyCluster) { r.Spec.Replicas = t.replicas },
+							Mutate: func(r *redkeyv1.RedkeyCluster) { r.Spec.Primaries = t.primaries },
 						})
 					Expect(err).NotTo(HaveOccurred())
-					Expect(rc.Spec.Replicas).To(Equal(t.replicas))
+					Expect(rc.Spec.Primaries).To(Equal(t.primaries))
 					Expect(trace).To(ContainElements(t.wantPhases))
 				}
 
@@ -706,19 +706,19 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 			},
 
 			Entry("no scale",
-				tc{replicas: 0},
+				tc{primaries: 0},
 			),
 
 			Entry("scale from 5 → 7",
 				tc{
-					replicas:   7,
+					primaries:  7,
 					wantPhases: []string{redkeyv1.StatusScalingUp, redkeyv1.StatusReady},
 				},
 			),
 
 			Entry("scale from 5 → 3",
 				tc{
-					replicas:   3,
+					primaries:  3,
 					wantPhases: []string{redkeyv1.StatusScalingDown, redkeyv1.StatusReady},
 				},
 			),
@@ -939,13 +939,13 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 						},
 						{
 							desc:       "scale to zero (PDB removed)",
-							mutate:     func(r *redkeyv1.RedkeyCluster) { r.Spec.Replicas = 0 },
+							mutate:     func(r *redkeyv1.RedkeyCluster) { r.Spec.Primaries = 0 },
 							wantPDB:    false,
 							wantPhases: []string{redkeyv1.StatusReady},
 						},
 						{
 							desc:       "scale up (PDB recreated)",
-							mutate:     func(r *redkeyv1.RedkeyCluster) { r.Spec.Replicas = 3 },
+							mutate:     func(r *redkeyv1.RedkeyCluster) { r.Spec.Primaries = 3 },
 							wantPDB:    true,
 							wantPhases: []string{redkeyv1.StatusScalingUp, redkeyv1.StatusReady},
 						},
@@ -967,13 +967,13 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 						},
 						{
 							desc:       "scale to zero (PDB removed)",
-							mutate:     func(r *redkeyv1.RedkeyCluster) { r.Spec.Replicas = 0 },
+							mutate:     func(r *redkeyv1.RedkeyCluster) { r.Spec.Primaries = 0 },
 							wantPDB:    false,
 							wantPhases: []string{redkeyv1.StatusReady},
 						},
 						{
 							desc:       "scale up (PDB recreated)",
-							mutate:     func(r *redkeyv1.RedkeyCluster) { r.Spec.Replicas = 3 },
+							mutate:     func(r *redkeyv1.RedkeyCluster) { r.Spec.Primaries = 3 },
 							wantPDB:    true,
 							wantPhases: []string{redkeyv1.StatusScalingUp, redkeyv1.StatusReady},
 						},
@@ -1036,9 +1036,9 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 					base, strings.ReplaceAll(strings.ToLower(t.desc), " ", "-"))
 				key := types.NamespacedName{Namespace: namespace.Name, Name: name}
 
-				// create a 3-master cluster
+				// create a 3-primaries cluster
 				rc := mustCreateAndReady(name,
-					3 /*masters*/, 0, /*replicasPerMaster*/
+					3 /*primaries*/, 0, /*replicasPerPrimary*/
 					"" /*storage*/, getRedisImage(), true /*purgeKeys*/, true, /*ephemeral*/
 					redkeyv1.Pdb{}, redkeyv1.RedkeyClusterOverrideSpec{})
 

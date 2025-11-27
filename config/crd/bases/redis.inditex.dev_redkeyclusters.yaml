@@ -17,12 +17,12 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - description: Amount of Redis master nodes
-      jsonPath: .spec.replicas
-      name: Masters
+    - description: Amount of Redis primary nodes
+      jsonPath: .spec.primaries
+      name: Primaries
       type: integer
-    - description: Amount of replicas per master node
-      jsonPath: .spec.replicasPerMaster
+    - description: Amount of replicas per primary node
+      jsonPath: .spec.replicasPerPrimary
       name: Replicas
       type: integer
     - description: Cluster ephemeral
@@ -4244,12 +4244,12 @@ spec:
                     - type: string
                     x-kubernetes-int-or-string: true
                 type: object
-              purgeKeysOnRebalance:
-                type: boolean
-              replicas:
+              primaries:
                 format: int32
                 type: integer
-              replicasPerMaster:
+              purgeKeysOnRebalance:
+                type: boolean
+              replicasPerPrimary:
                 default: 0
                 format: int32
                 type: integer
@@ -7939,7 +7939,7 @@ spec:
               version:
                 type: string
             required:
-            - replicas
+            - primaries
             type: object
             x-kubernetes-validations:
             - message: Ephemeral or storage must be set
@@ -7989,7 +7989,7 @@ spec:
                   properties:
                     ip:
                       type: string
-                    isMaster:
+                    isPrimary:
                       type: boolean
                     name:
                       type: string
@@ -7997,7 +7997,7 @@ spec:
                       type: string
                   required:
                   - ip
-                  - isMaster
+                  - isPrimary
                   - name
                   - replicaOf
                   type: object
@@ -8018,15 +8018,15 @@ spec:
             type: object
         type: object
         x-kubernetes-validations:
-        - message: Changing the number of replicas is not allowed unless the cluster
+        - message: Changing the number of primaries is not allowed unless the cluster
             is in 'Ready' status
-          rule: self.spec.replicas == oldSelf.spec.replicas || !has(self.status) ||
-            self.status.status == 'Ready'
+          rule: self.spec.primaries == oldSelf.spec.primaries || !has(self.status)
+            || self.status.status == 'Ready'
     served: true
     storage: true
     subresources:
       scale:
         labelSelectorPath: .status.selector
-        specReplicasPath: .spec.replicas
-        statusReplicasPath: .status.replicas
+        specReplicasPath: .spec.primaries
+        statusReplicasPath: .status.primaries
       status: {}

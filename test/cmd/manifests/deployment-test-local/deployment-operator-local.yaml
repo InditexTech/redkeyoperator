@@ -300,7 +300,7 @@ metadata:
     control-plane: redis-operator
   name: redis-operator
 spec:
-  replicas: 1
+  primaries: 1
   selector:
     matchLabels:
       control-plane: redis-operator

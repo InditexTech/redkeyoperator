@@ -431,14 +431,14 @@ func CompareConfigurations(a, b *Configuration) bool {
 	return reflect.DeepEqual(a2, b)
 }
 
-func (cn *ClusterNodes) GetMasterNodes() []*Node {
-	masterNodes := make([]*Node, 0)
+func (cn *ClusterNodes) GetPrimaryNodes() []*Node {
+	primaryNodes := make([]*Node, 0)
 	for _, node := range cn.Nodes {
 		if strings.Contains(node.Flags, "master") {
-			masterNodes = append(masterNodes, &node)
+			primaryNodes = append(primaryNodes, &node)
 		}
 	}
-	return masterNodes
+	return primaryNodes
 }
 
 func (cn *ClusterNodes) GetReplicaNodes() []*Node {

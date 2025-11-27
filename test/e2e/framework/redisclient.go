@@ -40,7 +40,7 @@ const (
 	CLUSTERINFOCMD         string = "redis-cli cluster info"
 	CLUSTERNODESCMD        string = "redis-cli cluster nodes"
 	EXPECTEDKEYS           int    = 30
-	WAIT_FOR_RDCL_DELETION int    = 180
+	WAIT_FOR_RKCL_DELETION int    = 180
 	defaultConfig                 = `save ""
 appendonly no
 maxmemory 70mb`
@@ -67,7 +67,7 @@ func EnsureClusterExistsOrCreate(
 	ctx context.Context,
 	c client.Client,
 	key types.NamespacedName,
-	replicas, replicasPerMaster int32,
+	primaries, replicasPerPrimary int32,
 	storage, image string,
 	purgeKeys, ephemeral bool,
 	pdb redkeyv1.Pdb,
@@ -86,7 +86,7 @@ func EnsureClusterExistsOrCreate(
 		rc.Spec = redkeyv1.RedkeyClusterSpec{
 			Auth:                 redkeyv1.RedisAuth{},
 			Version:              version,
-			Replicas:             replicas,
+			Primaries:            primaries,
 			Ephemeral:            ephemeral,
 			Image:                image,
 			Config:               defaultConfig,
@@ -107,9 +107,9 @@ func EnsureClusterExistsOrCreate(
 			rc.Spec.Pdb = pdb
 		}
 
-		// Replicas‑per‑master override
-		if replicasPerMaster > 0 {
-			rc.Spec.ReplicasPerMaster = replicasPerMaster
+		// Replicas‑per‑primary override
+		if replicasPerPrimary > 0 {
+			rc.Spec.ReplicasPerPrimary = replicasPerPrimary
 		}
 
 		// Start with the user’s override (if any), or an empty one
@@ -361,13 +361,13 @@ func CheckRedkeyCluster(k8Client client.Client, ctx context.Context, redkeyClust
 		LabelSelector: labelSelector,
 	})
 
-	rdclStatus, err := inspectRedkeyClusterStatus(allPods)
+	rkclStatus, err := inspectRedkeyClusterStatus(allPods)
 
 	if err != nil {
 		return false, err
 	}
 
-	isOkStatus := checkRedkeyClusterConditions(rdclStatus)
+	isOkStatus := checkRedkeyClusterConditions(rkclStatus)
 
 	return isOkStatus, nil
 }
@@ -608,14 +608,14 @@ func getNodeIPsFromStdOut(stdOut string) string {
 	return nodeIPs
 }
 
-// ValidateRedkeyClusterMasterSlave waits until Ready, then checks that
-// the number of masters & replicas-per-master match, and the StatefulSet
+// ValidateRedkeyClusterPrimaryReplica waits until Ready, then checks that
+// the number of primaries & replicas-per-primary match, and the StatefulSet
 // has the correct total replica count.
-func ValidateRedkeyClusterMasterSlave(
+func ValidateRedkeyClusterPrimaryReplica(
 	ctx context.Context,
 	c client.Client,
 	key types.NamespacedName,
-	replicas, replicasPerMaster int32,
+	primaries, replicasPerPrimary int32,
 ) (bool, error) {
 	// Wait until .Status == "Ready"
 	rc, err := WaitForReady(ctx, c, key)
@@ -623,16 +623,16 @@ func ValidateRedkeyClusterMasterSlave(
 		return false, err
 	}
 
-	// Now rc.Spec.Replicas and rc.Spec.ReplicasPerMaster are defined
-	if rc.Spec.Replicas < 3 || replicas < 3 {
-		return false, fmt.Errorf("replicas must be >= 3")
+	// Now rc.Spec.Primaries and rc.Spec.ReplicasPerPrimary are defined
+	if rc.Spec.Primaries < 3 || primaries < 3 {
+		return false, fmt.Errorf("primaries must be >= 3")
 	}
-	if rc.Spec.ReplicasPerMaster < 1 || replicasPerMaster < 1 {
-		return false, fmt.Errorf("replicasPerMaster must be >= 1")
+	if rc.Spec.ReplicasPerPrimary < 1 || replicasPerPrimary < 1 {
+		return false, fmt.Errorf("replicasPerPrimary must be >= 1")
 	}
 
 	// Expected total pods in the StatefulSet:
-	expectedSTS := rc.Spec.Replicas + rc.Spec.Replicas*rc.Spec.ReplicasPerMaster
+	expectedSTS := rc.Spec.Primaries + rc.Spec.Primaries*rc.Spec.ReplicasPerPrimary
 
 	// Fetch the StatefulSet
 	sts := &appsv1.StatefulSet{}
@@ -648,11 +648,11 @@ func ValidateRedkeyClusterMasterSlave(
 	}
 
 	// Finally ensure the Spec values match the inputs
-	if rc.Spec.Replicas != replicas || rc.Spec.ReplicasPerMaster != replicasPerMaster {
+	if rc.Spec.Primaries != primaries || rc.Spec.ReplicasPerPrimary != replicasPerPrimary {
 		return false, fmt.Errorf(
 			"spec (%d,%d) != expected (%d,%d)",
-			rc.Spec.Replicas, rc.Spec.ReplicasPerMaster,
-			replicas, replicasPerMaster,
+			rc.Spec.Primaries, rc.Spec.ReplicasPerPrimary,
+			primaries, replicasPerPrimary,
 		)
 	}
 

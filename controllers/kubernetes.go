@@ -30,7 +30,7 @@ func (r *RedkeyClusterReconciler) checkAndCreateK8sObjects(ctx context.Context, 
 	var configMap *corev1.ConfigMap
 
 	// RedkeyCluster check
-	err = r.checkAndUpdateRDCL(ctx, req.Name, redkeyCluster)
+	err = r.checkAndUpdateRKCL(ctx, req.Name, redkeyCluster)
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error checking RedkeyCluster object")
 		return immediateRequeue, err
@@ -58,10 +58,10 @@ func (r *RedkeyClusterReconciler) checkAndCreateK8sObjects(ctx context.Context, 
 	return immediateRequeue, err
 }
 
-func (r *RedkeyClusterReconciler) checkAndUpdateRDCL(ctx context.Context, redisName string, redkeyCluster *redkeyv1.RedkeyCluster) error {
+func (r *RedkeyClusterReconciler) checkAndUpdateRKCL(ctx context.Context, redisName string, redkeyCluster *redkeyv1.RedkeyCluster) error {
 	// Label redis.RedkeyClusterLabel needed by Redis backup
 	if _, ok := redkeyCluster.Labels[redis.RedkeyClusterLabel]; !ok {
-		r.logInfo(redkeyCluster.NamespacedName(), "RDCL object not containing label", "label", redis.RedkeyClusterLabel)
+		r.logInfo(redkeyCluster.NamespacedName(), "RKCL object not containing label", "label", redis.RedkeyClusterLabel)
 		redkeyCluster.ObjectMeta.Labels[redis.RedkeyClusterLabel] = redisName
 		if err := r.Update(ctx, redkeyCluster); err != nil {
 			return err
@@ -70,7 +70,7 @@ func (r *RedkeyClusterReconciler) checkAndUpdateRDCL(ctx context.Context, redisN
 	}
 	// Label redis.RedkeyClusterComponentLabel needed by Redis backup
 	if _, ok := redkeyCluster.Labels[redis.RedkeyClusterComponentLabel]; !ok {
-		r.logInfo(redkeyCluster.NamespacedName(), "RDCL object not containing label", "label", redis.RedkeyClusterComponentLabel)
+		r.logInfo(redkeyCluster.NamespacedName(), "RKCL object not containing label", "label", redis.RedkeyClusterComponentLabel)
 		redkeyCluster.ObjectMeta.Labels[redis.RedkeyClusterComponentLabel] = "redis"
 		if err := r.Update(ctx, redkeyCluster); err != nil {
 			return err
@@ -134,7 +134,7 @@ func (r *RedkeyClusterReconciler) createConfigMap(req ctrl.Request, spec redkeyv
 		r.logInfo(req.NamespacedName, "requirepass field not found in secret", "secretdata", secret.Data)
 	}
 
-	redisConfMap := redis.MergeWithDefaultConfig(newRedkeyClusterConf, spec.Ephemeral, spec.ReplicasPerMaster)
+	redisConfMap := redis.MergeWithDefaultConfig(newRedkeyClusterConf, spec.Ephemeral, spec.ReplicasPerPrimary)
 
 	redisConf := redis.MapToConfigString(redisConfMap)
 	cm := corev1.ConfigMap{
@@ -279,7 +279,7 @@ func (r *RedkeyClusterReconciler) inferResources(req ctrl.Request, spec redkeyv1
 	desiredConfig := redis.MergeWithDefaultConfig(
 		redis.ConfigStringToMap(config),
 		spec.Ephemeral,
-		spec.ReplicasPerMaster)
+		spec.ReplicasPerPrimary)
 
 	maxMemoryInt, err := redis.ExtractMaxMemory(desiredConfig)
 	if err != nil {
@@ -480,8 +480,8 @@ func (ef *RedkeyClusterReconciler) deletePVC(ctx context.Context, client client.
 // GetStatefulSetSelectorLabel returns the label key that should be used to find RedkeyCluster nodes for
 // backwards compatibility with the old version RedkeyCluster.
 // The implementation has been moved, and this exists merely as an alias for backward compatibility
-func (r *RedkeyClusterReconciler) getStatefulSetSelectorLabel(rdcl *redkeyv1.RedkeyCluster) string {
-	return kubernetes.GetStatefulSetSelectorLabel(context.TODO(), r.Client, rdcl)
+func (r *RedkeyClusterReconciler) getStatefulSetSelectorLabel(rkcl *redkeyv1.RedkeyCluster) string {
+	return kubernetes.GetStatefulSetSelectorLabel(context.TODO(), r.Client, rkcl)
 }
 
 func (r *RedkeyClusterReconciler) updateStatefulSet(ctx context.Context, statefulSet *v1.StatefulSet, redkeyCluster *redkeyv1.RedkeyCluster) (*v1.StatefulSet, error) {

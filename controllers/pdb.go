@@ -81,7 +81,7 @@ func (r *RedkeyClusterReconciler) updatePodDisruptionBudget(ctx context.Context,
 }
 
 func (r *RedkeyClusterReconciler) checkAndManagePodDisruptionBudget(ctx context.Context, req ctrl.Request, redkeyCluster *redkeyv1.RedkeyCluster) {
-	if redkeyCluster.Spec.Pdb.Enabled && redkeyCluster.Spec.Replicas > 1 {
+	if redkeyCluster.Spec.Pdb.Enabled && redkeyCluster.Spec.Primaries > 1 {
 		_, err := r.FindExistingPodDisruptionBudgetFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redkeyCluster.Name + "-pdb", Namespace: redkeyCluster.Namespace}})
 		if err != nil {
 			if errors.IsNotFound(err) {
@@ -97,13 +97,13 @@ func (r *RedkeyClusterReconciler) checkAndManagePodDisruptionBudget(ctx context.
 			}
 		}
 	}
-	if redkeyCluster.Spec.Replicas == 1 || !redkeyCluster.Spec.Pdb.Enabled {
+	if redkeyCluster.Spec.Primaries == 1 || !redkeyCluster.Spec.Pdb.Enabled {
 		r.deletePodDisruptionBudget(ctx, redkeyCluster)
 	}
 }
 
 func (r *RedkeyClusterReconciler) checkAndUpdatePodDisruptionBudget(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster) error {
-	if redkeyCluster.Spec.Pdb.Enabled && redkeyCluster.Spec.Replicas > 1 {
+	if redkeyCluster.Spec.Pdb.Enabled && redkeyCluster.Spec.Primaries > 1 {
 		// Check if the pdb availables are changed
 
 		pdb, err := r.FindExistingPodDisruptionBudgetFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redkeyCluster.Name + "-pdb", Namespace: redkeyCluster.Namespace}})

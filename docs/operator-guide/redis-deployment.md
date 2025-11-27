@@ -19,7 +19,7 @@ spec:
   labels:
     redis-name: rediscluster-sample
     app: myapp
-  replicas: 3
+  primaries: 3
   storage: 3Gi
   image: redislabs/redisgraph:2.8.9
   resources:
@@ -59,7 +59,7 @@ The `config` item contains the Redis specific configuration attributes that are 
 
 Currently, Redkey operator **only deploys Rdis in cluster mode**.
 
-However, it's possible to set `replicas: 1` to deploy a single instance Redkey cluster. With this configuration, all the slots will be by force allocated to that instance.
+However, it's possible to set `primaries: 1` to deploy a single instance Redkey cluster. With this configuration, all the slots will be by force allocated to that instance.
 
 ## Live reloading
 

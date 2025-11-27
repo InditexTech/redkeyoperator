@@ -47,7 +47,7 @@
             <mxPoint x="671" y="445" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="aAkpJWbWGLXDjZrMgsH--13" value="&lt;div style=&quot;white-space-collapse: preserve; font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; line-height: 19px;&quot;&gt;clusterInfo[&quot;cluster_state&quot;] != &quot;ok&quot;&lt;/div&gt;&lt;div style=&quot;white-space-collapse: preserve; font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; line-height: 19px;&quot;&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&amp;amp;&amp;amp; clusterInfo[&quot;cluster_slots_ok&quot;] == &quot;0&quot;&lt;/div&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&amp;amp;&amp;amp; len(readyNodes) != redisCluster.NodesNeeded()&lt;/div&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&amp;amp;&amp;amp; redisCluster.Spec.Replicas != 0&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;" style="edgeLabel;html=1;align=right;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=default;" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--10">
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--13" value="&lt;div style=&quot;white-space-collapse: preserve; font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; line-height: 19px;&quot;&gt;clusterInfo[&quot;cluster_state&quot;] != &quot;ok&quot;&lt;/div&gt;&lt;div style=&quot;white-space-collapse: preserve; font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; line-height: 19px;&quot;&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&amp;amp;&amp;amp; clusterInfo[&quot;cluster_slots_ok&quot;] == &quot;0&quot;&lt;/div&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&amp;amp;&amp;amp; len(readyNodes) != redisCluster.NodesNeeded()&lt;/div&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&amp;amp;&amp;amp; redisCluster.Spec.Pimaries != 0&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;" style="edgeLabel;html=1;align=right;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=default;" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--10">
           <mxGeometry x="-0.1407" y="-3" relative="1" as="geometry">
             <mxPoint x="72" y="-4" as="offset" />
           </mxGeometry>
@@ -58,7 +58,7 @@
             <mxPoint x="671" y="445" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="aAkpJWbWGLXDjZrMgsH--14" value="&lt;div style=&quot;white-space-collapse: preserve; font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; line-height: 19px;&quot;&gt;clusterInfo[&quot;cluster_state&quot;] != &quot;ok&quot;&lt;/div&gt;&lt;div style=&quot;white-space-collapse: preserve; font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; line-height: 19px;&quot;&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&amp;amp;&amp;amp; clusterInfo[&quot;cluster_slots_ok&quot;] == &quot;0&quot;&lt;/div&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&amp;amp;&amp;amp; len(readyNodes) != redisCluster.NodesNeeded()&lt;/div&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&amp;amp;&amp;amp; redisCluster.Spec.Replicas == 0&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;" style="edgeLabel;html=1;align=left;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=default;" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--11">
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--14" value="&lt;div style=&quot;white-space-collapse: preserve; font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; line-height: 19px;&quot;&gt;clusterInfo[&quot;cluster_state&quot;] != &quot;ok&quot;&lt;/div&gt;&lt;div style=&quot;white-space-collapse: preserve; font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; line-height: 19px;&quot;&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&amp;amp;&amp;amp; clusterInfo[&quot;cluster_slots_ok&quot;] == &quot;0&quot;&lt;/div&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&amp;amp;&amp;amp; len(readyNodes) != redisCluster.NodesNeeded()&lt;/div&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&amp;amp;&amp;amp; redisCluster.Spec.Pimaries == 0&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;" style="edgeLabel;html=1;align=left;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=default;" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--11">
           <mxGeometry x="-0.2064" y="-1" relative="1" as="geometry">
             <mxPoint x="-66" y="-4" as="offset" />
           </mxGeometry>
@@ -114,7 +114,7 @@
             <mxPoint x="140" y="832" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="aAkpJWbWGLXDjZrMgsH--32" value="rdcl.NodesNeeded&lt;div&gt;&amp;lt;&lt;/div&gt;&lt;div&gt;sts.Spec.Replicas&lt;/div&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--27">
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--32" value="rkcl.NodesNeeded&lt;div&gt;&amp;lt;&lt;/div&gt;&lt;div&gt;sts.Spec.Replicas&lt;/div&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--27">
           <mxGeometry x="-0.1506" y="1" relative="1" as="geometry">
             <mxPoint x="-56" y="-15" as="offset" />
           </mxGeometry>
@@ -125,7 +125,7 @@
             <mxPoint x="470" y="602" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="aAkpJWbWGLXDjZrMgsH--33" value="rdcl.NodesNeeded&lt;div&gt;==&lt;/div&gt;&lt;div&gt;sts.Spec.Replicas&lt;/div&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--28">
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--33" value="rkcl.NodesNeeded&lt;div&gt;==&lt;/div&gt;&lt;div&gt;sts.Spec.Replicas&lt;/div&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--28">
           <mxGeometry x="0.0747" y="-3" relative="1" as="geometry">
             <mxPoint x="9" y="42" as="offset" />
           </mxGeometry>
@@ -136,7 +136,7 @@
             <mxPoint x="420" y="652" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="aAkpJWbWGLXDjZrMgsH--34" value="rdcl.NodesNeeded&lt;div&gt;==&lt;/div&gt;&lt;div&gt;sts.Spec.Replicas&lt;/div&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--29">
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--34" value="rkcl.NodesNeeded&lt;div&gt;==&lt;/div&gt;&lt;div&gt;sts.Spec.Replicas&lt;/div&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--29">
           <mxGeometry x="-0.1688" y="-1" relative="1" as="geometry">
             <mxPoint x="-25" y="31" as="offset" />
           </mxGeometry>
@@ -147,7 +147,7 @@
             <mxPoint x="408" y="841" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="aAkpJWbWGLXDjZrMgsH--31" value="rdcl.NodesNeeded&lt;div&gt;&amp;gt;&lt;/div&gt;&lt;div&gt;sts.Spec.Replicas&lt;/div&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--30">
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--31" value="rkcl.NodesNeeded&lt;div&gt;&amp;gt;&lt;/div&gt;&lt;div&gt;sts.Spec.Replicas&lt;/div&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--30">
           <mxGeometry x="0.0596" y="1" relative="1" as="geometry">
             <mxPoint x="42" y="-25" as="offset" />
           </mxGeometry>
@@ -251,7 +251,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="aAkpJWbWGLXDjZrMgsH--61" value="redisCluster..checkStorageConfigConsistency&lt;div&gt;&amp;amp;&amp;amp; rdcl.NodesNeeded &amp;gt; sts.Spec.Replicas&lt;/div&gt;" style="edgeLabel;html=1;align=left;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--60">
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--61" value="redisCluster..checkStorageConfigConsistency&lt;div&gt;&amp;amp;&amp;amp; rkcl.NodesNeeded &amp;gt; sts.Spec.Replicas&lt;/div&gt;" style="edgeLabel;html=1;align=left;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--60">
           <mxGeometry x="-0.0925" y="-10" relative="1" as="geometry">
             <mxPoint x="-19" y="-13" as="offset" />
           </mxGeometry>
@@ -328,7 +328,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="aAkpJWbWGLXDjZrMgsH--72" value="&lt;span style=&quot;text-align: left;&quot;&gt;redisCluster..checkStorageConfigConsistency&lt;/span&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&amp;amp;&amp;amp; rdcl.NodesNeeded &amp;lt; sts.Spec.Replicas&lt;/div&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--67">
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--72" value="&lt;span style=&quot;text-align: left;&quot;&gt;redisCluster..checkStorageConfigConsistency&lt;/span&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&amp;amp;&amp;amp; rkcl.NodesNeeded &amp;lt; sts.Spec.Replicas&lt;/div&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--67">
           <mxGeometry x="0.2103" relative="1" as="geometry">
             <mxPoint x="79" y="13" as="offset" />
           </mxGeometry>

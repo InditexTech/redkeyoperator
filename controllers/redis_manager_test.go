@@ -25,7 +25,7 @@ var reconciler = newReconciler(rc, recorder)
 var configMap = newConfigMap()
 
 func TestUpdateScalingStatus_ScalingDown(t *testing.T) {
-	numStatefulSetReplicas := rc.Spec.Replicas + 1
+	numStatefulSetReplicas := rc.Spec.Primaries + 1
 
 	reconciler.FindExistingStatefulSetFunc = mockStatefulSet(newStatefulSet(rc, numStatefulSetReplicas))
 
@@ -37,7 +37,7 @@ func TestUpdateScalingStatus_ScalingDown(t *testing.T) {
 }
 
 func TestUpdateScalingStatus_ScalingUp(t *testing.T) {
-	numStatefulSetReplicas := rc.Spec.Replicas - 1
+	numStatefulSetReplicas := rc.Spec.Primaries - 1
 
 	reconciler.FindExistingStatefulSetFunc = mockStatefulSet(newStatefulSet(rc, numStatefulSetReplicas))
 
@@ -52,7 +52,7 @@ func TestUpdateScalingStatus_ScalingDown_Completed(t *testing.T) {
 	rc.Status.Status = redkeyv1.StatusScalingDown
 	rc.Status.Conditions = []metav1.Condition{redkeyv1.ConditionScalingDown}
 
-	numStatefulSetReplicas := rc.Spec.Replicas
+	numStatefulSetReplicas := rc.Spec.Primaries
 
 	reconciler.FindExistingStatefulSetFunc = mockStatefulSet(newStatefulSet(rc, numStatefulSetReplicas))
 
@@ -67,7 +67,7 @@ func TestUpdateScalingStatus_ScalingUp_Completed(t *testing.T) {
 	rc.Status.Status = redkeyv1.StatusScalingUp
 	rc.Status.Conditions = []metav1.Condition{redkeyv1.ConditionScalingUp}
 
-	numStatefulSetReplicas := rc.Spec.Replicas
+	numStatefulSetReplicas := rc.Spec.Primaries
 
 	readyNodes := newReadyNodes(int(numStatefulSetReplicas))
 
@@ -84,7 +84,7 @@ func TestUpdateScalingStatus_ScalingUp_Completed(t *testing.T) {
 }
 
 func TestUpdateScalingStatus_ScalingUp_In_Progress(t *testing.T) {
-	numStatefulSetReplicas := rc.Spec.Replicas - 1
+	numStatefulSetReplicas := rc.Spec.Primaries - 1
 
 	readyNodes := newReadyNodes(int(numStatefulSetReplicas))
 
@@ -109,7 +109,7 @@ func TestUpdateUpgradingStatus_Upgrading_Config_Not_Changed(t *testing.T) {
 	configMap.Data = make(map[string]string)
 	configMap.Data["redis.conf"] = redis.GenerateRedisConfig(rc)
 
-	numStatefulSetReplicas := rc.Spec.Replicas
+	numStatefulSetReplicas := rc.Spec.Primaries
 
 	sset := newStatefulSet(rc, numStatefulSetReplicas)
 
@@ -130,7 +130,7 @@ func TestUpdateUpgradingStatus_Upgrading_Completed(t *testing.T) {
 	configMap.Data = make(map[string]string)
 	configMap.Data["redis.conf"] = redis.GenerateRedisConfig(rc)
 
-	reconciler.FindExistingStatefulSetFunc = mockStatefulSet(newStatefulSet(rc, rc.Spec.Replicas))
+	reconciler.FindExistingStatefulSetFunc = mockStatefulSet(newStatefulSet(rc, rc.Spec.Primaries))
 	reconciler.FindExistingConfigMapFunc = mockConfigMap(configMap)
 
 	_ = reconciler.updateUpgradingStatus(newContext(), rc)
@@ -140,7 +140,7 @@ func TestUpdateUpgradingStatus_Upgrading_Completed(t *testing.T) {
 }
 
 func TestUpdateUpgradingStatus_Upgrading_Config_Changed(t *testing.T) {
-	numStatefulSetReplicas := rc.Spec.Replicas
+	numStatefulSetReplicas := rc.Spec.Primaries
 
 	redisConfig := redis.ConfigStringToMap(rc.Spec.Config)
 
@@ -161,7 +161,7 @@ func TestUpdateUpgradingStatus_Upgrading_Config_Changed(t *testing.T) {
 }
 
 func TestUpdateUpgradingStatus_Upgrading_Limits_Cpu_Changed(t *testing.T) {
-	numStatefulSetReplicas := rc.Spec.Replicas
+	numStatefulSetReplicas := rc.Spec.Primaries
 
 	configMap.Data = make(map[string]string)
 	configMap.Data["redis.conf"] = redis.GenerateRedisConfig(rc)
@@ -182,7 +182,7 @@ func TestUpdateUpgradingStatus_Upgrading_Limits_Cpu_Changed(t *testing.T) {
 }
 
 func TestUpdateUpgradingStatus_Upgrading_Requests_Cpu_Changed(t *testing.T) {
-	numStatefulSetReplicas := rc.Spec.Replicas
+	numStatefulSetReplicas := rc.Spec.Primaries
 
 	configMap.Data = make(map[string]string)
 	configMap.Data["redis.conf"] = redis.GenerateRedisConfig(rc)
@@ -203,7 +203,7 @@ func TestUpdateUpgradingStatus_Upgrading_Requests_Cpu_Changed(t *testing.T) {
 }
 
 func TestUpdateUpgradingStatus_Upgrading_Limits_Memory_Changed(t *testing.T) {
-	numStatefulSetReplicas := rc.Spec.Replicas
+	numStatefulSetReplicas := rc.Spec.Primaries
 
 	configMap.Data = make(map[string]string)
 	configMap.Data["redis.conf"] = redis.GenerateRedisConfig(rc)
@@ -224,7 +224,7 @@ func TestUpdateUpgradingStatus_Upgrading_Limits_Memory_Changed(t *testing.T) {
 }
 
 func TestUpdateUpgradingStatus_Upgrading_Requests_Memory_Changed(t *testing.T) {
-	numStatefulSetReplicas := rc.Spec.Replicas
+	numStatefulSetReplicas := rc.Spec.Primaries
 
 	configMap.Data = make(map[string]string)
 	configMap.Data["redis.conf"] = redis.GenerateRedisConfig(rc)
@@ -245,7 +245,7 @@ func TestUpdateUpgradingStatus_Upgrading_Requests_Memory_Changed(t *testing.T) {
 }
 
 func TestUpdateUpgradingStatus_Upgrading_Image_Changed(t *testing.T) {
-	numStatefulSetReplicas := rc.Spec.Replicas
+	numStatefulSetReplicas := rc.Spec.Primaries
 
 	configMap.Data = make(map[string]string)
 	configMap.Data["redis.conf"] = redis.GenerateRedisConfig(rc)

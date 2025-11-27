@@ -82,12 +82,12 @@ func (r *RedkeyClusterReconciler) ReconcileClusterObject(ctx context.Context, re
 	// Check storage configuration consistency, updating status if needed.
 	r.checkStorageConfigConsistency(ctx, redkeyCluster, redkeyCluster.Status.Status != redkeyv1.StatusError)
 
-	// Redkey cluster scaled to 0 replicas?
+	// Redkey cluster scaled to 0 primaries?
 	// If it's a newly deployed cluster it won't have a status set yet and won't be catched here.
-	if redkeyCluster.Spec.Replicas == 0 && redkeyCluster.Status.Status != "" {
-		err = r.clusterScaledToZeroReplicas(ctx, redkeyCluster)
+	if redkeyCluster.Spec.Primaries == 0 && redkeyCluster.Status.Status != "" {
+		err = r.clusterScaledToZeroPrimaries(ctx, redkeyCluster)
 		if err != nil {
-			r.logError(redkeyCluster.NamespacedName(), err, "Error managing cluster scaled to 0 replicas")
+			r.logError(redkeyCluster.NamespacedName(), err, "Error managing cluster scaled to 0 primaries")
 		}
 
 		// Requeue to recheck, reconciliation ends here!
@@ -211,24 +211,24 @@ func (r *RedkeyClusterReconciler) reconcileStatusConfiguring(ctx context.Context
 		r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin to check the cluster readiness")
 		return true, DefaultRequeueTimeout
 	}
-	replicas, replicasPerMaster, err := robinRedis.GetReplicas()
+	primaries, replicasPerPrimary, err := robinRedis.GetReplicas()
 	if err != nil {
-		r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin replicas")
+		r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin primaries/replicasPerPrimary")
 		return true, DefaultRequeueTimeout
 	}
 
-	// Update Robin replicas if needed.
-	if replicas != int(redkeyCluster.Spec.Replicas) || replicasPerMaster != int(redkeyCluster.Spec.ReplicasPerMaster) {
-		r.logInfo(redkeyCluster.NamespacedName(), "Robin replicas updated", "replicas before", replicas, "replicas after", redkeyCluster.Spec.Replicas,
-			"replicas per master before", replicasPerMaster, "replicas per master after", redkeyCluster.Spec.ReplicasPerMaster)
-		err = robinRedis.SetReplicas(int(redkeyCluster.Spec.Replicas), int(redkeyCluster.Spec.ReplicasPerMaster))
+	// Update Robin primaries/replicasPerPrimary if needed.
+	if primaries != int(redkeyCluster.Spec.Primaries) || replicasPerPrimary != int(redkeyCluster.Spec.ReplicasPerPrimary) {
+		r.logInfo(redkeyCluster.NamespacedName(), "Robin nodes count updated", "primaries before", primaries, "primaries after", redkeyCluster.Spec.Primaries,
+			"replicas per primary before", replicasPerPrimary, "replicas per primary after", redkeyCluster.Spec.ReplicasPerPrimary)
+		err = robinRedis.SetReplicas(int(redkeyCluster.Spec.Primaries), int(redkeyCluster.Spec.ReplicasPerPrimary))
 		if err != nil {
-			r.logError(redkeyCluster.NamespacedName(), err, "Error updating Robin replicas")
+			r.logError(redkeyCluster.NamespacedName(), err, "Error updating Robin primaries/replicasPerPrimary")
 			return true, DefaultRequeueTimeout
 		}
-		err = robin.PersistRobinReplicas(ctx, r.Client, redkeyCluster, int(redkeyCluster.Spec.Replicas), int(redkeyCluster.Spec.ReplicasPerMaster))
+		err = robin.PersistRobinReplicas(ctx, r.Client, redkeyCluster, int(redkeyCluster.Spec.Primaries), int(redkeyCluster.Spec.ReplicasPerPrimary))
 		if err != nil {
-			r.logError(redkeyCluster.NamespacedName(), err, "Error persisting Robin replicas")
+			r.logError(redkeyCluster.NamespacedName(), err, "Error persisting Robin primaries/replicasPerPrimary")
 			return true, DefaultRequeueTimeout
 		}
 		return true, DefaultRequeueTimeout // Requeue to let Robin update the cluster
@@ -388,7 +388,7 @@ func (r *RedkeyClusterReconciler) refreshClusterNodesInfo(ctx context.Context, r
 	updatedNodes := make(map[string]*redkeyv1.RedisNode, 0)
 	for _, node := range clusterNodes.Nodes {
 		updatedNodes[node.Id] = &redkeyv1.RedisNode{IP: node.Ip, Name: node.Name, ReplicaOf: node.MasterId}
-		updatedNodes[node.Id].IsMaster = strings.Contains(node.Flags, "master")
+		updatedNodes[node.Id].IsPrimary = strings.Contains(node.Flags, "master")
 	}
 
 	redkeyCluster.Status.Nodes = updatedNodes
@@ -399,7 +399,7 @@ func (r *RedkeyClusterReconciler) refreshClusterNodesInfo(ctx context.Context, r
 // Checks storage configuration for inconsistencies.
 // If the parameter is set to true if a check fail the function returns issuing log info, generating an event and setting the Redkey cluster Status to Error.
 // Returns true if all checks pass or false if any checks fail.
-func (r *RedkeyClusterReconciler) checkStorageConfigConsistency(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster, updateRDCL bool) bool {
+func (r *RedkeyClusterReconciler) checkStorageConfigConsistency(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster, updateRKCL bool) bool {
 	var stsStorage, stsStorageClassName string
 
 	sts, err := r.FindExistingStatefulSet(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redkeyCluster.Name, Namespace: redkeyCluster.Namespace}})
@@ -429,8 +429,8 @@ func (r *RedkeyClusterReconciler) checkStorageConfigConsistency(ctx context.Cont
 	// - Updates to redkeyCluster.Spec.Storage are not allowed
 	if !redkeyCluster.Spec.Ephemeral && redkeyCluster.Spec.Storage != "" && stsStorage != "" && redkeyCluster.Spec.Storage != stsStorage {
 		err = errors.NewBadRequest("spec: Forbidden: updates to redkeyCluster.Spec.Storage field are not allowed")
-		r.logError(redkeyCluster.NamespacedName(), err, "Cluster storage configuration updates are forbidden", "STS storage", stsStorage, "RDCL storage", redkeyCluster.Spec.Storage)
-		if updateRDCL {
+		r.logError(redkeyCluster.NamespacedName(), err, "Cluster storage configuration updates are forbidden", "STS storage", stsStorage, "RKCL storage", redkeyCluster.Spec.Storage)
+		if updateRKCL {
 			r.Recorder.Event(redkeyCluster, "Warning", "ClusterError", err.Error())
 			redkeyCluster.Status.Status = redkeyv1.StatusError
 		}
@@ -439,8 +439,8 @@ func (r *RedkeyClusterReconciler) checkStorageConfigConsistency(ctx context.Cont
 	// - Unset redkeyCluster.Spec.Storage is not allowed
 	if !redkeyCluster.Spec.Ephemeral && redkeyCluster.Spec.Storage == "" && stsStorage != "" {
 		err = errors.NewBadRequest("spec: Forbidden: updates to redkeyCluster.Spec.Storage field are not allowed")
-		r.logError(redkeyCluster.NamespacedName(), err, "Cluster storage configuration updates are forbidden", "STS storage", stsStorage, "RDCL storage", redkeyCluster.Spec.Storage)
-		if updateRDCL {
+		r.logError(redkeyCluster.NamespacedName(), err, "Cluster storage configuration updates are forbidden", "STS storage", stsStorage, "RKCL storage", redkeyCluster.Spec.Storage)
+		if updateRKCL {
 			r.Recorder.Event(redkeyCluster, "Warning", "ClusterError", err.Error())
 			redkeyCluster.Status.Status = redkeyv1.StatusError
 		}
@@ -449,8 +449,8 @@ func (r *RedkeyClusterReconciler) checkStorageConfigConsistency(ctx context.Cont
 	// - Updates to redkeyCluster.Spec.StorageClassName are not allowed
 	if !redkeyCluster.Spec.Ephemeral && redkeyCluster.Spec.StorageClassName != "" && stsStorageClassName != "" && redkeyCluster.Spec.StorageClassName != stsStorageClassName {
 		err = errors.NewBadRequest("spec: Forbidden: updates to redkeyCluster.Spec.StorageClassName field are not allowed")
-		r.logError(redkeyCluster.NamespacedName(), err, "Cluster storage configuration updates are forbidden", "STS storageClassName", stsStorageClassName, "RDCL storageClassName", redkeyCluster.Spec.StorageClassName)
-		if updateRDCL {
+		r.logError(redkeyCluster.NamespacedName(), err, "Cluster storage configuration updates are forbidden", "STS storageClassName", stsStorageClassName, "RKCL storageClassName", redkeyCluster.Spec.StorageClassName)
+		if updateRKCL {
 			r.Recorder.Event(redkeyCluster, "Warning", "ClusterError", err.Error())
 			redkeyCluster.Status.Status = redkeyv1.StatusError
 		}
@@ -459,8 +459,8 @@ func (r *RedkeyClusterReconciler) checkStorageConfigConsistency(ctx context.Cont
 	// - Set redkeyCluster.Spec.StorageClassName is not allowed
 	if !redkeyCluster.Spec.Ephemeral && redkeyCluster.Spec.StorageClassName != "" && stsStorageClassName == "" {
 		err = errors.NewBadRequest("spec: Forbidden: updates to redkeyCluster.Spec.StorageClassName field are not allowed")
-		r.logError(redkeyCluster.NamespacedName(), err, "Cluster storage configuration updates are forbidden", "STS storageClassName", stsStorageClassName, "RDCL storageClassName", redkeyCluster.Spec.StorageClassName)
-		if updateRDCL {
+		r.logError(redkeyCluster.NamespacedName(), err, "Cluster storage configuration updates are forbidden", "STS storageClassName", stsStorageClassName, "RKCL storageClassName", redkeyCluster.Spec.StorageClassName)
+		if updateRKCL {
 			r.Recorder.Event(redkeyCluster, "Warning", "ClusterError", err.Error())
 			redkeyCluster.Status.Status = redkeyv1.StatusError
 		}
@@ -469,8 +469,8 @@ func (r *RedkeyClusterReconciler) checkStorageConfigConsistency(ctx context.Cont
 	// - Unset redkeyClusterSpec.StorageClassName is not allowed
 	if !redkeyCluster.Spec.Ephemeral && redkeyCluster.Spec.StorageClassName == "" && stsStorageClassName != "" {
 		err = errors.NewBadRequest("spec: Forbidden: updates to redkeyCluster.Spec.StorageClassName field are not allowed")
-		r.logError(redkeyCluster.NamespacedName(), err, "Cluster storage configuration updates are forbidden", "STS stsStorageClassName", stsStorageClassName, "RDCL stsStorageClassName", redkeyCluster.Spec.StorageClassName)
-		if updateRDCL {
+		r.logError(redkeyCluster.NamespacedName(), err, "Cluster storage configuration updates are forbidden", "STS stsStorageClassName", stsStorageClassName, "RKCL stsStorageClassName", redkeyCluster.Spec.StorageClassName)
+		if updateRKCL {
 			r.Recorder.Event(redkeyCluster, "Warning", "ClusterError", err.Error())
 			redkeyCluster.Status.Status = redkeyv1.StatusError
 		}
@@ -480,7 +480,7 @@ func (r *RedkeyClusterReconciler) checkStorageConfigConsistency(ctx context.Cont
 	if !redkeyCluster.Spec.Ephemeral && len(sts.Spec.VolumeClaimTemplates) == 0 {
 		err = errors.NewBadRequest("spec: Error: non ephemeral cluster without VolumeClaimTemplates defined in the StatefulSet")
 		r.logError(redkeyCluster.NamespacedName(), err, "Cluster misconfigured (probably trying to change from ephemeral to non ephemeral)")
-		if updateRDCL {
+		if updateRKCL {
 			r.Recorder.Event(redkeyCluster, "Warning", "ClusterError", err.Error())
 			redkeyCluster.Status.Status = redkeyv1.StatusError
 		}
@@ -491,7 +491,7 @@ func (r *RedkeyClusterReconciler) checkStorageConfigConsistency(ctx context.Cont
 	if redkeyCluster.Spec.Ephemeral && len(sts.Spec.VolumeClaimTemplates) > 0 {
 		err = errors.NewBadRequest("spec: Error: ephemeral cluster with VolumeClaimTemplates defined in the StatefulSet")
 		r.logError(redkeyCluster.NamespacedName(), err, "Cluster misconfigured (probably trying to change from non ephemeral to ephemeral)")
-		if updateRDCL {
+		if updateRKCL {
 			r.Recorder.Event(redkeyCluster, "Warning", "ClusterError", err.Error())
 			redkeyCluster.Status.Status = redkeyv1.StatusError
 		}

@@ -6,7 +6,8 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: redis-cluster-ephemeral
 spec:
-  replicas: 3
+  primaries: 3
+  replicasPerPrimary: 0
   ephemeral: true
   accessModes: 
   - ReadWriteOnce

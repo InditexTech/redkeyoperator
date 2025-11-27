@@ -40,7 +40,7 @@ spec:
     enabled: true
     pdbSizeAvailable: 50%
     pdbSizeUnavailable: 0
-  replicas: 3
+  primaries: 3
   resources:
     limits:
       cpu: 50m

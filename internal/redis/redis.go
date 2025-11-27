@@ -44,7 +44,7 @@ var defaultPort = corev1.ServicePort{
 
 func CreateStatefulSet(ctx context.Context, req ctrl.Request, spec redkeyv1.RedkeyClusterSpec, labels map[string]string) (*v1.StatefulSet, error) {
 	var err error = nil
-	//	req ctrl.Request, replicas int32, redisImage string, storage string
+
 	redisImage := spec.Image
 	replicas := int32(spec.NodesNeeded())
 
@@ -501,12 +501,12 @@ func ConfigStringToMap(config string) map[string][]string {
 
 func GenerateRedisConfig(redkeyCluster *redkeyv1.RedkeyCluster) string {
 	// Assuming RedkeyClusterType is the type of redkeyCluster
-	// and it has Spec with Config, Ephemeral, and ReplicasPerMaster fields
+	// and it has Spec with Config, Ephemeral, and ReplicasPerPrimary fields
 	// Convert string configuration to map
 	newRedkeyClusterConf := ConfigStringToMap(redkeyCluster.Spec.Config)
 
 	// Merge new configuration with the default
-	redisConfMap := MergeWithDefaultConfig(newRedkeyClusterConf, redkeyCluster.Spec.Ephemeral, redkeyCluster.Spec.ReplicasPerMaster)
+	redisConfMap := MergeWithDefaultConfig(newRedkeyClusterConf, redkeyCluster.Spec.Ephemeral, redkeyCluster.Spec.ReplicasPerPrimary)
 
 	// Convert the merged configuration map to a string
 	redisConf := MapToConfigString(redisConfMap)
@@ -553,8 +553,8 @@ func ExtractMaxMemory(desiredConfig map[string][]string) (int, error) {
 	return maxMemoryInt, nil
 }
 
-// Default configuration params for Master-Replica clusters.
-func DefaultConfigMasterReplica() map[string]string {
+// Default configuration params for Primary-Replica clusters.
+func DefaultConfigPrimaryReplica() map[string]string {
 	config := make(map[string]string)
 	config["maxmemory"] = "1600mb"
 	config["maxmemory-samples"] = "5"
@@ -574,8 +574,8 @@ func DefaultConfigMasterReplica() map[string]string {
 	return config
 }
 
-// Default configuration params for not Master-Replica clusters.
-func DefaultConfigNotMasterReplica() map[string]string {
+// Default configuration params for not Primary-Replica clusters.
+func DefaultConfigNotPrimaryReplica() map[string]string {
 	config := make(map[string]string)
 	config["maxmemory"] = "1600mb"
 	config["maxmemory-samples"] = "5"
@@ -591,8 +591,8 @@ func DefaultConfigNotMasterReplica() map[string]string {
 	return config
 }
 
-// Ephemeral clusters configuration params for Master-Replica clusters.
-func EphemeralConfigMasterReplica() map[string]string {
+// Ephemeral clusters configuration params for Primary-Replica clusters.
+func EphemeralConfigPrimaryReplica() map[string]string {
 	config := make(map[string]string)
 	config["maxmemory"] = "1600mb"
 	config["maxmemory-samples"] = "5"
@@ -612,8 +612,8 @@ func EphemeralConfigMasterReplica() map[string]string {
 	return config
 }
 
-// Ephemeral clusters configuration params for not Master-Replica clusters.
-func EphemeralConfigNotMasterReplica() map[string]string {
+// Ephemeral clusters configuration params for not Primary-Replica clusters.
+func EphemeralConfigNotPrimaryReplica() map[string]string {
 	config := make(map[string]string)
 	config["maxmemory"] = "1600mb"
 	config["maxmemory-samples"] = "5"
@@ -629,21 +629,21 @@ func EphemeralConfigNotMasterReplica() map[string]string {
 	return config
 }
 
-func GetDefaultConfiguration(ephemeral bool, replicasPerMaster int32) map[string]string {
+func GetDefaultConfiguration(ephemeral bool, replicasPerPrimary int32) map[string]string {
 	switch {
-	case ephemeral && replicasPerMaster > 0:
-		return EphemeralConfigMasterReplica()
+	case ephemeral && replicasPerPrimary > 0:
+		return EphemeralConfigPrimaryReplica()
 	case ephemeral:
-		return EphemeralConfigNotMasterReplica()
-	case !ephemeral && replicasPerMaster > 0:
-		return DefaultConfigMasterReplica()
+		return EphemeralConfigNotPrimaryReplica()
+	case !ephemeral && replicasPerPrimary > 0:
+		return DefaultConfigPrimaryReplica()
 	default:
-		return DefaultConfigNotMasterReplica()
+		return DefaultConfigNotPrimaryReplica()
 	}
 }
 
-func MergeWithDefaultConfig(newConfig map[string][]string, ephemeral bool, replicasPerMaster int32) map[string][]string {
-	defaultConfig := GetDefaultConfiguration(ephemeral, replicasPerMaster)
+func MergeWithDefaultConfig(newConfig map[string][]string, ephemeral bool, replicasPerPrimary int32) map[string][]string {
+	defaultConfig := GetDefaultConfiguration(ephemeral, replicasPerPrimary)
 	allowConfiguration := make(map[string][]string, len(defaultConfig))
 
 	overrideNotAllowed := map[string]bool{

@@ -15,19 +15,19 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-// RdclInterface defines the methods to be implemented by Redis Clients
-type RdclInterface interface {
+// RkclInterface defines the methods to be implemented by Redis Clients
+type RkclInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*redkeyv1.RedkeyClusterList, error)
 	Get(ctx context.Context, name string, options metav1.GetOptions) (*redkeyv1.RedkeyCluster, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 }
 
-type rdclClient struct {
+type rkclClient struct {
 	restClient rest.Interface
 	ns         string
 }
 
-func (c *rdclClient) List(ctx context.Context, opts metav1.ListOptions) (*redkeyv1.RedkeyClusterList, error) {
+func (c *rkclClient) List(ctx context.Context, opts metav1.ListOptions) (*redkeyv1.RedkeyClusterList, error) {
 	result := redkeyv1.RedkeyClusterList{}
 	err := c.restClient.
 		Get().
@@ -41,7 +41,7 @@ func (c *rdclClient) List(ctx context.Context, opts metav1.ListOptions) (*redkey
 	return &result, err
 }
 
-func (c *rdclClient) Get(ctx context.Context, name string, opts metav1.GetOptions) (*redkeyv1.RedkeyCluster, error) {
+func (c *rkclClient) Get(ctx context.Context, name string, opts metav1.GetOptions) (*redkeyv1.RedkeyCluster, error) {
 	result := redkeyv1.RedkeyCluster{}
 	err := c.restClient.
 		Get().
@@ -55,7 +55,7 @@ func (c *rdclClient) Get(ctx context.Context, name string, opts metav1.GetOption
 	return &result, err
 }
 
-func (c *rdclClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+func (c *rkclClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.restClient.Get().
 		AbsPath("/apis/redis.inditex.dev/v1").
@@ -67,7 +67,7 @@ func (c *rdclClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.
 
 // V1Interface defines the interface to communicate with all GroupVersion. It now just bears a client for Redkey Clusters
 type V1Interface interface {
-	RedkeyClusters(namespace string) RdclInterface
+	RedkeyClusters(namespace string) RkclInterface
 }
 
 // V1Client is the struct that bears the rest Interface. It implements RedkeyClusters method, which satisfies the redisv1Interface
@@ -92,8 +92,8 @@ func NewForConfig(c *rest.Config) (*V1Client, error) {
 }
 
 // RedkeyClusters returns the interface which will allow the caller to access the implemented methods of the interface
-func (c *V1Client) RedkeyClusters(namespace string) RdclInterface {
-	return &rdclClient{
+func (c *V1Client) RedkeyClusters(namespace string) RkclInterface {
+	return &rkclClient{
 		restClient: c.restClient,
 		ns:         namespace,
 	}

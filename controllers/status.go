@@ -119,11 +119,11 @@ func (r *RedkeyClusterReconciler) updateScalingStatus(ctx context.Context, redke
 	if realExpectedReplicas < currSsetReplicas {
 		redkeyCluster.Status.Status = redkeyv1.StatusScalingDown
 		setConditionFalse(logger, redkeyCluster, redkeyv1.ConditionScalingUp)
-		r.setConditionTrue(redkeyCluster, redkeyv1.ConditionScalingDown, fmt.Sprintf("Scaling down from %d to %d nodes", currSsetReplicas, redkeyCluster.Spec.Replicas))
+		r.setConditionTrue(redkeyCluster, redkeyv1.ConditionScalingDown, fmt.Sprintf("Scaling down from %d to %d nodes", currSsetReplicas, redkeyCluster.Spec.Primaries))
 	}
 	if realExpectedReplicas > currSsetReplicas {
 		redkeyCluster.Status.Status = redkeyv1.StatusScalingUp
-		r.setConditionTrue(redkeyCluster, redkeyv1.ConditionScalingUp, fmt.Sprintf("Scaling up from %d to %d nodes", currSsetReplicas, redkeyCluster.Spec.Replicas))
+		r.setConditionTrue(redkeyCluster, redkeyv1.ConditionScalingUp, fmt.Sprintf("Scaling up from %d to %d nodes", currSsetReplicas, redkeyCluster.Spec.Primaries))
 		setConditionFalse(logger, redkeyCluster, redkeyv1.ConditionScalingDown)
 	}
 	if realExpectedReplicas == currSsetReplicas {

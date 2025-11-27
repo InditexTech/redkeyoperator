@@ -44,7 +44,7 @@ func newScheme() *runtime.Scheme {
 func newReconciler(redis *redkeyv1.RedkeyCluster, recorder record.EventRecorder) *RedkeyClusterReconciler {
 	ctrl.SetLogger(zap.New(zap.WriteTo(ginkgo.GinkgoWriter), zap.UseDevMode(true)))
 
-	var defaultReplicas int32 = 3
+	var defaultPrimaries int32 = 3
 
 	scheme := newScheme()
 
@@ -56,7 +56,7 @@ func newReconciler(redis *redkeyv1.RedkeyCluster, recorder record.EventRecorder)
 		ConcurrentMigrate:           3,
 		Recorder:                    recorder,
 		GetReadyNodesFunc:           mockReadyNodes(make(map[string]*redkeyv1.RedisNode)),
-		FindExistingStatefulSetFunc: mockStatefulSet(newStatefulSet(redis, defaultReplicas)),
+		FindExistingStatefulSetFunc: mockStatefulSet(newStatefulSet(redis, defaultPrimaries)),
 		FindExistingConfigMapFunc:   mockConfigMap(newConfigMap()),
 	}
 
@@ -91,9 +91,9 @@ func newRedkeyCluster() *redkeyv1.RedkeyCluster {
 			Conditions: []metav1.Condition{},
 		},
 		Spec: redkeyv1.RedkeyClusterSpec{
-			Replicas: 3,
-			Config:   r.MapToConfigString(r.MergeWithDefaultConfig(nil, false, 0)),
-			Image:    "redkey-operator:0.3.0",
+			Primaries: 3,
+			Config:    r.MapToConfigString(r.MergeWithDefaultConfig(nil, false, 0)),
+			Image:     "redkey-operator:0.3.0",
 			Resources: &corev1.ResourceRequirements{
 				Limits:   newLimits(),
 				Requests: newRequests(),

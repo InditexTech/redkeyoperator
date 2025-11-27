@@ -6,14 +6,14 @@ The implemented status are:
 
 - **Initializing**: The necessary Kubernetes objects have been created (primarily a StatefulSet, which manages the pods on the Redis nodes, and Redkey Robin Deployment). The operator is waiting for all the pods to be ready and Robin to start responding.
 - **Configuring**: Robin is responsible for building the cluster, performing the necessary meets between all nodes, assigning slots to ensure everyone is covered, and making sure the cluster is balanced. The operator waits for Robin to confirm that the cluster is ready.
-- **Ready**: The cluster has the correct configuration, the desired number of replicas, is rebalanced and ready to be used. The Redis clusters health in this status will be checked by the Operador periodically asking their Robin services.
+- **Ready**: The cluster has the correct configuration, the desired number of primaries and replicas per primary, is rebalanced and ready to be used. The Redis clusters health in this status will be checked by the Operador periodically asking their Robin services.
 - **Upgrading**: The cluster is being upgraded, reconfiguring the objects to solve the mismatches. A RedkeyCluster enters this status when when:
   - there are differences between the existing configuration in the configmap and the configuration of the RedkeyCluster object merged with the default configuration set in the code.
   - there is a mismatch between the StatefulSet object labels and the RedkeyCluster Spec labels.
   - a mismatch exists between RedkeyCluster resources defined under spec and effective resources defined in the StatefulSet.
   - the images set in RedkeyCluster under spec and the image set in the StatefulSet object are not the same.
-- **ScalingDown**: The cluster enters in this status to remove excess nodes. RedkeyCluster replicas > StatefulSet replicas.
-- **ScalingUp**: The cluster enters in this status to create the needed nodes to equal the desired replicas with the current replicas. RedkeyCluster replicas < StatefulSet replicas.
+- **ScalingDown**: The cluster enters in this status to remove excess nodes. RedkeyCluster nodes (primaries * replicas per primary) > StatefulSet replicas.
+- **ScalingUp**: The cluster enters in this status to create the needed nodes to equal the desired nodes with the current nodes. RedkeyCluster primaries * replicas per primary < StatefulSet replicas.
 - **Error**: An error is detected in the cluster. The operator tries to recover the cluster from error checking the configuration and/or scaling the cluster.
   - Storage capacity mismatch.
   - Storage class mismatch.
@@ -33,12 +33,12 @@ The status flow in creating a new Redkey Cluster is as simple as this:
 The following is an example of the sequence of states that we can see when deploying the sample Redkey Cluster* (command `kubectl get rkcl -w`):
 
 ```
-NAME                      MASTERS   REPLICAS   EPHEMERAL   PURGEKEYS   IMAGE              STORAGE   STATUS       SUBSTATUS
-redis-cluster-ephemeral   3         0          true        true        redis:8-bookworm                      
-redis-cluster-ephemeral   3         0          true        true        redis:8-bookworm             Initializing   
-redis-cluster-ephemeral   3         0          true        true        redis:8-bookworm             Configuring    
-redis-cluster-ephemeral   3         0          true        true        redis:8-bookworm             Configuring    
-redis-cluster-ephemeral   3         0          true        true        redis:8-bookworm             Ready 
+NAME                      PRIMARIES   REPLICAS   EPHEMERAL   PURGEKEYS   IMAGE              STORAGE   STATUS       SUBSTATUS
+redis-cluster-ephemeral   3           0          true        true        redis:8-bookworm                      
+redis-cluster-ephemeral   3           0          true        true        redis:8-bookworm             Initializing   
+redis-cluster-ephemeral   3           0          true        true        redis:8-bookworm             Configuring    
+redis-cluster-ephemeral   3           0          true        true        redis:8-bookworm             Configuring    
+redis-cluster-ephemeral   3           0          true        true        redis:8-bookworm             Ready 
 ```
 
 \* The sample Redkey Cluster can be deployed from the project code by executing `make apply-rkcl`.
@@ -58,17 +58,17 @@ Two Substatus are defined:
 
 ![Redkey Cluster Scaling Up Fast](./images/redkey-cluster-substatus-scalingup-fast.png)
 
-This is an example of the Status and SubStatus changes when scaling the sample Redkey Cluster from 3 to 5 replicas:
+This is an example of the Status and SubStatus changes when scaling the sample Redkey Cluster from 3 to 5 primaries:
 
 
 ```
-NAME                      MASTERS   REPLICAS   EPHEMERAL   PURGEKEYS   IMAGE              STORAGE   STATUS   SUBSTATUS
-redis-cluster-ephemeral   3         0          true        true        redis:8-bookworm             Ready    
-redis-cluster-ephemeral   5         0          true        true        redis:8-bookworm             Ready    
-redis-cluster-ephemeral   5         0          true        true        redis:8-bookworm             ScalingUp   
-redis-cluster-ephemeral   5         0          true        true        redis:8-bookworm             ScalingUp   FastScaling
-redis-cluster-ephemeral   5         0          true        true        redis:8-bookworm             ScalingUp   EndingFastScaling
-redis-cluster-ephemeral   5         0          true        true        redis:8-bookworm             Ready 
+NAME                      PRIMARIES   REPLICAS   EPHEMERAL   PURGEKEYS   IMAGE              STORAGE   STATUS   SUBSTATUS
+redis-cluster-ephemeral   3           0          true        true        redis:8-bookworm             Ready    
+redis-cluster-ephemeral   5           0          true        true        redis:8-bookworm             Ready    
+redis-cluster-ephemeral   5           0          true        true        redis:8-bookworm             ScalingUp   
+redis-cluster-ephemeral   5           0          true        true        redis:8-bookworm             ScalingUp   FastScaling
+redis-cluster-ephemeral   5           0          true        true        redis:8-bookworm             ScalingUp   EndingFastScaling
+redis-cluster-ephemeral   5           0          true        true        redis:8-bookworm             Ready 
 ```
 
 ### Redkey Cluster Scaling Up (Slow scaling)
@@ -81,17 +81,17 @@ Three Substatus are defined:
 
 ![Redkey Cluster Scaling Up Slow](./images/redkey-cluster-substatus-scalingup-slow.png)
 
-This is an example of the Status and SubStatus changes when scaling the sample Redkey Cluster from 3 to 5 replicas, having previously changed the `purgeKeysOnRebalance` parameter to **false**:
+This is an example of the Status and SubStatus changes when scaling the sample Redkey Cluster from 3 to 5 primaries, having previously changed the `purgeKeysOnRebalance` parameter to **false**:
 
 ```
-NAME                      MASTERS   REPLICAS   EPHEMERAL   PURGEKEYS   IMAGE              STORAGE   STATUS   SUBSTATUS
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm             Ready    
-redis-cluster-ephemeral   5         0          true        false       redis:8-bookworm             Ready    
-redis-cluster-ephemeral   5         0          true        false       redis:8-bookworm             ScalingUp   
-redis-cluster-ephemeral   5         0          true        false       redis:8-bookworm             ScalingUp   PodScaling
-redis-cluster-ephemeral   5         0          true        false       redis:8-bookworm             ScalingUp   RobinScaling
-redis-cluster-ephemeral   5         0          true        false       redis:8-bookworm             ScalingUp   EndingScaling
-redis-cluster-ephemeral   5         0          true        false       redis:8-bookworm             Ready 
+NAME                      PRIMARIES   REPLICAS   EPHEMERAL   PURGEKEYS   IMAGE              STORAGE   STATUS   SUBSTATUS
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm             Ready    
+redis-cluster-ephemeral   5           0          true        false       redis:8-bookworm             Ready    
+redis-cluster-ephemeral   5           0          true        false       redis:8-bookworm             ScalingUp   
+redis-cluster-ephemeral   5           0          true        false       redis:8-bookworm             ScalingUp   PodScaling
+redis-cluster-ephemeral   5           0          true        false       redis:8-bookworm             ScalingUp   RobinScaling
+redis-cluster-ephemeral   5           0          true        false       redis:8-bookworm             ScalingUp   EndingScaling
+redis-cluster-ephemeral   5           0          true        false       redis:8-bookworm             Ready 
 ```
 
 ### Redkey Cluster Scaling Down (Fast scaling)
@@ -103,16 +103,16 @@ In this case, the same SubStatus rules apply as for the Fast Scaling Up operatio
 
 ![Redkey Cluster Scaling Up Fast](./images/redkey-cluster-substatus-scalingdown-fast.png)
 
-This is an example of the Status and SubStatus changes when scaling the sample Redkey Cluster from 5 to 3 replicas:
+This is an example of the Status and SubStatus changes when scaling the sample Redkey Cluster from 5 to 3 primaries:
 
 ```
-NAME                      MASTERS   REPLICAS   EPHEMERAL   PURGEKEYS   IMAGE              STORAGE   STATUS   SUBSTATUS
-redis-cluster-ephemeral   5         0          true        true        redis:8-bookworm             Ready    
-redis-cluster-ephemeral   3         0          true        true        redis:8-bookworm             Ready    
-redis-cluster-ephemeral   3         0          true        true        redis:8-bookworm             ScalingDown   
-redis-cluster-ephemeral   3         0          true        true        redis:8-bookworm             ScalingDown   FastScaling
-redis-cluster-ephemeral   3         0          true        true        redis:8-bookworm             ScalingDown   EndingFastScaling
-redis-cluster-ephemeral   3         0          true        true        redis:8-bookworm             Ready 
+NAME                      PRIMARIES   REPLICAS   EPHEMERAL   PURGEKEYS   IMAGE              STORAGE   STATUS   SUBSTATUS
+redis-cluster-ephemeral   5           0          true        true        redis:8-bookworm             Ready    
+redis-cluster-ephemeral   3           0          true        true        redis:8-bookworm             Ready    
+redis-cluster-ephemeral   3           0          true        true        redis:8-bookworm             ScalingDown   
+redis-cluster-ephemeral   3           0          true        true        redis:8-bookworm             ScalingDown   FastScaling
+redis-cluster-ephemeral   3           0          true        true        redis:8-bookworm             ScalingDown   EndingFastScaling
+redis-cluster-ephemeral   3           0          true        true        redis:8-bookworm             Ready 
 ```
 
 ### Redkey Cluster Scaling Down (Slow scaling)
@@ -124,16 +124,16 @@ Two Substatus are defined:
 
 ![Redkey Cluster Scaling Down Slow](./images/redkey-cluster-substatus-scalingdown-slow.png)
 
-This is an example of the Status and SubStatus changes when scaling the sample Redkey Cluster from 5 to 3 replicas, having previously changed the `purgeKeysOnRebalance` parameter to **false**:
+This is an example of the Status and SubStatus changes when scaling the sample Redkey Cluster from 5 to 3 primaries, having previously changed the `purgeKeysOnRebalance` parameter to **false**:
 
 ```
-NAME                      MASTERS   REPLICAS   EPHEMERAL   PURGEKEYS   IMAGE              STORAGE   STATUS   SUBSTATUS
-redis-cluster-ephemeral   5         0          true        false       redis:8-bookworm             Ready    
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm             Ready    
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm             ScalingDown   
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm             ScalingDown   RobinScaling
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm             ScalingDown   PodScaling
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm             Ready  
+NAME                      PRIMARIES   REPLICAS   EPHEMERAL   PURGEKEYS   IMAGE              STORAGE   STATUS   SUBSTATUS
+redis-cluster-ephemeral   5           0          true        false       redis:8-bookworm             Ready    
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm             Ready    
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm             ScalingDown   
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm             ScalingDown   RobinScaling
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm             ScalingDown   PodScaling
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm             Ready  
 ```
 
 ### Redkey Cluster Upgrading (Fast upgrading)
@@ -148,12 +148,12 @@ Two Substatus are defined:
 This is an example of the Status and SubStatus changes when upgrading the sample Redkey Cluster:
 
 ```
-NAME                      MASTERS   REPLICAS   EPHEMERAL   PURGEKEYS   IMAGE              STORAGE   STATUS   SUBSTATUS
-redis-cluster-ephemeral   3         0          true        true        redis:8-bookworm             Ready    
-redis-cluster-ephemeral   3         0          true        true        redis:8-bookworm             Upgrading   
-redis-cluster-ephemeral   3         0          true        true        redis:8-bookworm             Upgrading   FastUpgrading
-redis-cluster-ephemeral   3         0          true        true        redis:8-bookworm             Upgrading   EndingFastUpgrading
-redis-cluster-ephemeral   3         0          true        true        redis:8-bookworm             Ready  
+NAME                      PRIMARIES   REPLICAS   EPHEMERAL   PURGEKEYS   IMAGE              STORAGE   STATUS   SUBSTATUS
+redis-cluster-ephemeral   3           0          true        true        redis:8-bookworm             Ready    
+redis-cluster-ephemeral   3           0          true        true        redis:8-bookworm             Upgrading   
+redis-cluster-ephemeral   3           0          true        true        redis:8-bookworm             Upgrading   FastUpgrading
+redis-cluster-ephemeral   3           0          true        true        redis:8-bookworm             Upgrading   EndingFastUpgrading
+redis-cluster-ephemeral   3           0          true        true        redis:8-bookworm             Ready  
 ```
 
 ### Redkey Cluster Upgrading (Slow upgrading)
@@ -175,28 +175,28 @@ Current partition can be shown using `kubectl get rkcl -o wide`.
 This is an example of the Status and SubStatus changes when upgrading the sample Redkey Cluster, having previously changed the `purgeKeysOnRebalance` parameter to **false**:
 
 ```
-NAME                      MASTERS   REPLICAS   EPHEMERAL   PURGEKEYS   IMAGE              STORAGE   STORAGECLASSNAME   DELETEPVC   STATUS   SUBSTATUS   PARTITION
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm                                            Ready                
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm                                            Ready                
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm                                            Upgrading               
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm                                            Upgrading   ScalingUp   
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm                                            Upgrading   SlowUpgrading   
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm                                            Upgrading   SlowUpgrading   
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm                                            Upgrading   SlowUpgrading   3
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm                                            Upgrading   RollingConfig   3
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm                                            Upgrading   SlowUpgrading   2
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm                                            Upgrading   SlowUpgrading   2
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm                                            Upgrading   SlowUpgrading   2
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm                                            Upgrading   RollingConfig   2
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm                                            Upgrading   RollingConfig   2
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm                                            Upgrading   SlowUpgrading   1
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm                                            Upgrading   SlowUpgrading   1
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm                                            Upgrading   RollingConfig   1
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm                                            Upgrading   RollingConfig   1
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm                                            Upgrading   SlowUpgrading   0
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm                                            Upgrading   RollingConfig   0
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm                                            Upgrading   EndingSlowUpgrading   0
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm                                            Upgrading   EndingSlowUpgrading   0
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm                                            Upgrading   ScalingDown           0
-redis-cluster-ephemeral   3         0          true        false       redis:8-bookworm                                            Ready    
+NAME                      PRIMARIES   REPLICAS   EPHEMERAL   PURGEKEYS   IMAGE              STORAGE   STORAGECLASSNAME   DELETEPVC   STATUS   SUBSTATUS   PARTITION
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Ready                
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Ready                
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading               
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   ScalingUp   
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   SlowUpgrading   
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   SlowUpgrading   
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   SlowUpgrading   3
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   RollingConfig   3
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   SlowUpgrading   2
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   SlowUpgrading   2
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   SlowUpgrading   2
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   RollingConfig   2
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   RollingConfig   2
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   SlowUpgrading   1
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   SlowUpgrading   1
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   RollingConfig   1
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   RollingConfig   1
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   SlowUpgrading   0
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   RollingConfig   0
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   EndingSlowUpgrading   0
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   EndingSlowUpgrading   0
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   ScalingDown           0
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Ready    
 ```
