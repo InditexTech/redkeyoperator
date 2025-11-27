@@ -17,8 +17,8 @@ import (
 
 // RdclInterface defines the methods to be implemented by Redis Clients
 type RdclInterface interface {
-	List(ctx context.Context, opts metav1.ListOptions) (*redkeyv1.RedKeyClusterList, error)
-	Get(ctx context.Context, name string, options metav1.GetOptions) (*redkeyv1.RedKeyCluster, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*redkeyv1.RedkeyClusterList, error)
+	Get(ctx context.Context, name string, options metav1.GetOptions) (*redkeyv1.RedkeyCluster, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 }
 
@@ -27,8 +27,8 @@ type rdclClient struct {
 	ns         string
 }
 
-func (c *rdclClient) List(ctx context.Context, opts metav1.ListOptions) (*redkeyv1.RedKeyClusterList, error) {
-	result := redkeyv1.RedKeyClusterList{}
+func (c *rdclClient) List(ctx context.Context, opts metav1.ListOptions) (*redkeyv1.RedkeyClusterList, error) {
+	result := redkeyv1.RedkeyClusterList{}
 	err := c.restClient.
 		Get().
 		AbsPath("/apis/redis.inditex.dev/redisv1").
@@ -41,8 +41,8 @@ func (c *rdclClient) List(ctx context.Context, opts metav1.ListOptions) (*redkey
 	return &result, err
 }
 
-func (c *rdclClient) Get(ctx context.Context, name string, opts metav1.GetOptions) (*redkeyv1.RedKeyCluster, error) {
-	result := redkeyv1.RedKeyCluster{}
+func (c *rdclClient) Get(ctx context.Context, name string, opts metav1.GetOptions) (*redkeyv1.RedkeyCluster, error) {
+	result := redkeyv1.RedkeyCluster{}
 	err := c.restClient.
 		Get().
 		AbsPath("/apis/redis.inditex.dev/v1").
@@ -65,12 +65,12 @@ func (c *rdclClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.
 		Watch(ctx)
 }
 
-// V1Interface defines the interface to communicate with all GroupVersion. It now just bears a client for RedKey Clusters
+// V1Interface defines the interface to communicate with all GroupVersion. It now just bears a client for Redkey Clusters
 type V1Interface interface {
-	RedKeyClusters(namespace string) RdclInterface
+	RedkeyClusters(namespace string) RdclInterface
 }
 
-// V1Client is the struct that bears the rest Interface. It implements RedKeyClusters method, which satisfies the redisv1Interface
+// V1Client is the struct that bears the rest Interface. It implements RedkeyClusters method, which satisfies the redisv1Interface
 type V1Client struct {
 	restClient rest.Interface
 }
@@ -91,8 +91,8 @@ func NewForConfig(c *rest.Config) (*V1Client, error) {
 	return &V1Client{restClient: client}, nil
 }
 
-// RedKeyClusters returns the interface which will allow the caller to access the implemented methods of the interface
-func (c *V1Client) RedKeyClusters(namespace string) RdclInterface {
+// RedkeyClusters returns the interface which will allow the caller to access the implemented methods of the interface
+func (c *V1Client) RedkeyClusters(namespace string) RdclInterface {
 	return &rdclClient{
 		restClient: c.restClient,
 		ns:         namespace,

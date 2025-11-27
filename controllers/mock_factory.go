@@ -28,7 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-func newClient(rc *redkeyv1.RedKeyCluster, s *runtime.Scheme) client.Client {
+func newClient(rc *redkeyv1.RedkeyCluster, s *runtime.Scheme) client.Client {
 	return fake.NewClientBuilder().WithObjects(rc).WithScheme(s).Build()
 }
 
@@ -41,14 +41,14 @@ func newScheme() *runtime.Scheme {
 	return s
 }
 
-func newReconciler(redis *redkeyv1.RedKeyCluster, recorder record.EventRecorder) *RedKeyClusterReconciler {
+func newReconciler(redis *redkeyv1.RedkeyCluster, recorder record.EventRecorder) *RedkeyClusterReconciler {
 	ctrl.SetLogger(zap.New(zap.WriteTo(ginkgo.GinkgoWriter), zap.UseDevMode(true)))
 
 	var defaultReplicas int32 = 3
 
 	scheme := newScheme()
 
-	reconciler := &RedKeyClusterReconciler{
+	reconciler := &RedkeyClusterReconciler{
 		Client:                      newClient(redis, scheme),
 		Scheme:                      scheme,
 		Log:                         ctrl.Log.WithName("controllers").WithName("redkeycluster"),
@@ -67,7 +67,7 @@ func newContext() context.Context {
 	return context.Background()
 }
 
-func newRequest(rc *redkeyv1.RedKeyCluster) ctrl.Request {
+func newRequest(rc *redkeyv1.RedkeyCluster) ctrl.Request {
 	return ctrl.Request{
 		NamespacedName: types.NamespacedName{
 			Namespace: rc.Namespace,
@@ -76,7 +76,7 @@ func newRequest(rc *redkeyv1.RedKeyCluster) ctrl.Request {
 	}
 }
 
-func newRedKeyCluster() *redkeyv1.RedKeyCluster {
+func newRedkeyCluster() *redkeyv1.RedkeyCluster {
 	om := metav1.ObjectMeta{
 		Name:      "redis-cluster",
 		Namespace: "unittest",
@@ -84,13 +84,13 @@ func newRedKeyCluster() *redkeyv1.RedKeyCluster {
 			"label-key": "label-value",
 		},
 	}
-	return &redkeyv1.RedKeyCluster{
+	return &redkeyv1.RedkeyCluster{
 		ObjectMeta: om,
-		Status: redkeyv1.RedKeyClusterStatus{
+		Status: redkeyv1.RedkeyClusterStatus{
 			Status:     redkeyv1.StatusReady,
 			Conditions: []metav1.Condition{},
 		},
-		Spec: redkeyv1.RedKeyClusterSpec{
+		Spec: redkeyv1.RedkeyClusterSpec{
 			Replicas: 3,
 			Config:   r.MapToConfigString(r.MergeWithDefaultConfig(nil, false, 0)),
 			Image:    "redkey-operator:0.3.0",
@@ -113,8 +113,8 @@ func newLimits() corev1.ResourceList {
 	}
 }
 
-func mockReadyNodes(nodes map[string]*redkeyv1.RedisNode) func(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) (map[string]*redkeyv1.RedisNode, error) {
-	return func(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) (map[string]*redkeyv1.RedisNode, error) {
+func mockReadyNodes(nodes map[string]*redkeyv1.RedisNode) func(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster) (map[string]*redkeyv1.RedisNode, error) {
+	return func(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster) (map[string]*redkeyv1.RedisNode, error) {
 		return nodes, nil
 	}
 }
@@ -133,7 +133,7 @@ func mockStatefulSet(sset *v1.StatefulSet) func(ctx context.Context, req ctrl.Re
 	}
 }
 
-func newStatefulSet(redis *redkeyv1.RedKeyCluster, numReplicas int32) *v1.StatefulSet {
+func newStatefulSet(redis *redkeyv1.RedkeyCluster, numReplicas int32) *v1.StatefulSet {
 	req := newRequest(redis)
 	spec := redis.Spec
 	labels := make(map[string]string)

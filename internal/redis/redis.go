@@ -29,8 +29,8 @@ import (
 
 const RedisCommPort = 6379
 const RedisGossPort = 16379
-const RedKeyClusterLabel = "redkey-cluster-name"
-const RedKeyClusterComponentLabel = "redis.redkeycluster.operator/component"
+const RedkeyClusterLabel = "redkey-cluster-name"
+const RedkeyClusterComponentLabel = "redis.redkeycluster.operator/component"
 
 var defaultPort = corev1.ServicePort{
 	Name:     "client",
@@ -42,7 +42,7 @@ var defaultPort = corev1.ServicePort{
 	},
 }
 
-func CreateStatefulSet(ctx context.Context, req ctrl.Request, spec redkeyv1.RedKeyClusterSpec, labels map[string]string) (*v1.StatefulSet, error) {
+func CreateStatefulSet(ctx context.Context, req ctrl.Request, spec redkeyv1.RedkeyClusterSpec, labels map[string]string) (*v1.StatefulSet, error) {
 	var err error = nil
 	//	req ctrl.Request, replicas int32, redisImage string, storage string
 	redisImage := spec.Image
@@ -53,8 +53,8 @@ func CreateStatefulSet(ctx context.Context, req ctrl.Request, spec redkeyv1.RedK
 	}
 
 	defaultLabels := map[string]string{
-		RedKeyClusterLabel:          req.Name,
-		RedKeyClusterComponentLabel: common.ComponentLabelRedis,
+		RedkeyClusterLabel:          req.Name,
+		RedkeyClusterComponentLabel: common.ComponentLabelRedis,
 	}
 
 	// Add default labels and apply them to the statefulset.
@@ -79,7 +79,7 @@ func CreateStatefulSet(ctx context.Context, req ctrl.Request, spec redkeyv1.RedK
 			ServiceName: req.Name,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{RedKeyClusterLabel: req.Name, RedKeyClusterComponentLabel: common.ComponentLabelRedis},
+					Labels: map[string]string{RedkeyClusterLabel: req.Name, RedkeyClusterComponentLabel: common.ComponentLabelRedis},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -249,7 +249,7 @@ func cleanStatefulSetResult(result, original, override *v1.StatefulSet) {
 	}
 }
 
-func AddStatefulSetStorage(statefulSet *v1.StatefulSet, req ctrl.Request, spec redkeyv1.RedKeyClusterSpec) error {
+func AddStatefulSetStorage(statefulSet *v1.StatefulSet, req ctrl.Request, spec redkeyv1.RedkeyClusterSpec) error {
 	storage := spec.Storage
 	if storage == "" {
 		return errors.New("non ephemeral cluster with no storage defined in spec.Storage")
@@ -331,7 +331,7 @@ func CreateService(Namespace, Name string, labels map[string]string) *corev1.Ser
 			Ports: []corev1.ServicePort{
 				defaultPort,
 			},
-			Selector:  map[string]string{RedKeyClusterLabel: Name, RedKeyClusterComponentLabel: common.ComponentLabelRedis},
+			Selector:  map[string]string{RedkeyClusterLabel: Name, RedkeyClusterComponentLabel: common.ComponentLabelRedis},
 			ClusterIP: "None",
 		},
 	}
@@ -392,7 +392,7 @@ func cleanServiceResult(result, original, override *corev1.Service) {
 
 	// Assure to clean selector if override does not set them
 	if len(override.Spec.Selector) == 0 {
-		result.Spec.Selector = map[string]string{RedKeyClusterLabel: original.Name, RedKeyClusterComponentLabel: common.ComponentLabelRedis}
+		result.Spec.Selector = map[string]string{RedkeyClusterLabel: original.Name, RedkeyClusterComponentLabel: common.ComponentLabelRedis}
 	}
 }
 
@@ -499,14 +499,14 @@ func ConfigStringToMap(config string) map[string][]string {
 	return configMap
 }
 
-func GenerateRedisConfig(redkeyCluster *redkeyv1.RedKeyCluster) string {
-	// Assuming RedKeyClusterType is the type of redkeyCluster
+func GenerateRedisConfig(redkeyCluster *redkeyv1.RedkeyCluster) string {
+	// Assuming RedkeyClusterType is the type of redkeyCluster
 	// and it has Spec with Config, Ephemeral, and ReplicasPerMaster fields
 	// Convert string configuration to map
-	newRedKeyClusterConf := ConfigStringToMap(redkeyCluster.Spec.Config)
+	newRedkeyClusterConf := ConfigStringToMap(redkeyCluster.Spec.Config)
 
 	// Merge new configuration with the default
-	redisConfMap := MergeWithDefaultConfig(newRedKeyClusterConf, redkeyCluster.Spec.Ephemeral, redkeyCluster.Spec.ReplicasPerMaster)
+	redisConfMap := MergeWithDefaultConfig(newRedkeyClusterConf, redkeyCluster.Spec.Ephemeral, redkeyCluster.Spec.ReplicasPerMaster)
 
 	// Convert the merged configuration map to a string
 	redisConf := MapToConfigString(redisConfMap)

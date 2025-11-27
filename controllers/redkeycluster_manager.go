@@ -37,11 +37,11 @@ const (
 	ErrorRequeueTimeout     time.Duration = 30
 )
 
-func NewRedKeyClusterReconciler(mgr ctrl.Manager, maxConcurrentReconciles int, concurrentMigrates int) *RedKeyClusterReconciler {
+func NewRedkeyClusterReconciler(mgr ctrl.Manager, maxConcurrentReconciles int, concurrentMigrates int) *RedkeyClusterReconciler {
 	eventRecorder := mgr.GetEventRecorderFor("redkeycluster-controller")
-	reconciler := &RedKeyClusterReconciler{
+	reconciler := &RedkeyClusterReconciler{
 		Client:                  mgr.GetClient(),
-		Log:                     ctrl.Log.WithName("controllers").WithName("RedKeyCluster"),
+		Log:                     ctrl.Log.WithName("controllers").WithName("RedkeyCluster"),
 		Scheme:                  mgr.GetScheme(),
 		Recorder:                eventRecorder,
 		MaxConcurrentReconciles: maxConcurrentReconciles,
@@ -61,12 +61,12 @@ func NewRedKeyClusterReconciler(mgr ctrl.Manager, maxConcurrentReconciles int, c
 	return reconciler
 }
 
-func (r *RedKeyClusterReconciler) ReconcileClusterObject(ctx context.Context, req ctrl.Request, redkeyCluster *redkeyv1.RedKeyCluster) (ctrl.Result, error) {
+func (r *RedkeyClusterReconciler) ReconcileClusterObject(ctx context.Context, req ctrl.Request, redkeyCluster *redkeyv1.RedkeyCluster) (ctrl.Result, error) {
 	var err error
 	var requeueAfter time.Duration = DefaultRequeueTimeout
 	currentStatus := redkeyCluster.Status
 
-	r.logInfo(redkeyCluster.NamespacedName(), "RedKeyCluster reconciler start", "status", redkeyCluster.Status.Status)
+	r.logInfo(redkeyCluster.NamespacedName(), "RedkeyCluster reconciler start", "status", redkeyCluster.Status.Status)
 
 	// Checks the existance of the ConfigMap, StatefulSet, Pods, Robin Deployment, PDB and Service,
 	// creating the objects not created yet.
@@ -82,7 +82,7 @@ func (r *RedKeyClusterReconciler) ReconcileClusterObject(ctx context.Context, re
 	// Check storage configuration consistency, updating status if needed.
 	r.checkStorageConfigConsistency(ctx, redkeyCluster, redkeyCluster.Status.Status != redkeyv1.StatusError)
 
-	// RedKey cluster scaled to 0 replicas?
+	// Redkey cluster scaled to 0 replicas?
 	// If it's a newly deployed cluster it won't have a status set yet and won't be catched here.
 	if redkeyCluster.Spec.Replicas == 0 && redkeyCluster.Status.Status != "" {
 		err = r.clusterScaledToZeroReplicas(ctx, redkeyCluster)
@@ -91,7 +91,7 @@ func (r *RedKeyClusterReconciler) ReconcileClusterObject(ctx context.Context, re
 		}
 
 		// Requeue to recheck, reconciliation ends here!
-		r.logInfo(redkeyCluster.NamespacedName(), "RedKeyCluster reconciler end", "status", redkeyCluster.Status.Status)
+		r.logInfo(redkeyCluster.NamespacedName(), "RedkeyCluster reconciler end", "status", redkeyCluster.Status.Status)
 		return ctrl.Result{RequeueAfter: time.Second * ReadyRequeueTimeout}, err
 	}
 
@@ -132,7 +132,7 @@ func (r *RedKeyClusterReconciler) ReconcileClusterObject(ctx context.Context, re
 		updateErr = r.updateClusterStatus(ctx, redkeyCluster)
 	}
 
-	r.logInfo(redkeyCluster.NamespacedName(), "RedKeyCluster reconciler end", "status", redkeyCluster.Status.Status)
+	r.logInfo(redkeyCluster.NamespacedName(), "RedkeyCluster reconciler end", "status", redkeyCluster.Status.Status)
 
 	if requeue {
 		return ctrl.Result{RequeueAfter: time.Second * requeueAfter}, updateErr
@@ -140,9 +140,9 @@ func (r *RedKeyClusterReconciler) ReconcileClusterObject(ctx context.Context, re
 	return ctrl.Result{}, updateErr
 }
 
-func (r *RedKeyClusterReconciler) reconcileStatusNew(redkeyCluster *redkeyv1.RedKeyCluster) (bool, time.Duration) {
+func (r *RedkeyClusterReconciler) reconcileStatusNew(redkeyCluster *redkeyv1.RedkeyCluster) (bool, time.Duration) {
 	var requeue = true
-	r.logInfo(redkeyCluster.NamespacedName(), "New RedKeyCluster. Initializing...")
+	r.logInfo(redkeyCluster.NamespacedName(), "New RedkeyCluster. Initializing...")
 	if redkeyCluster.Status.Nodes == nil {
 		redkeyCluster.Status.Nodes = make(map[string]*redkeyv1.RedisNode, 0)
 	}
@@ -150,7 +150,7 @@ func (r *RedKeyClusterReconciler) reconcileStatusNew(redkeyCluster *redkeyv1.Red
 	return requeue, DefaultRequeueTimeout
 }
 
-func (r *RedKeyClusterReconciler) reconcileStatusInitializing(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) (bool, time.Duration) {
+func (r *RedkeyClusterReconciler) reconcileStatusInitializing(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster) (bool, time.Duration) {
 
 	sset, err := r.FindExistingStatefulSet(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redkeyCluster.Name, Namespace: redkeyCluster.Namespace}})
 	if err != nil {
@@ -201,10 +201,10 @@ func (r *RedKeyClusterReconciler) reconcileStatusInitializing(ctx context.Contex
 	return false, DefaultRequeueTimeout
 }
 
-func (r *RedKeyClusterReconciler) reconcileStatusConfiguring(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) (bool, time.Duration) {
+func (r *RedkeyClusterReconciler) reconcileStatusConfiguring(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster) (bool, time.Duration) {
 	var requeue = true
 
-	// Ask Robin for RedKey cluster readiness
+	// Ask Robin for Redkey cluster readiness
 	logger := r.getHelperLogger((redkeyCluster.NamespacedName()))
 	robinRedis, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
 	if err != nil {
@@ -246,13 +246,13 @@ func (r *RedKeyClusterReconciler) reconcileStatusConfiguring(ctx context.Context
 	}
 	r.logInfo(redkeyCluster.NamespacedName(), "Robin reports cluster is ready")
 
-	// RedKey cluster is ok, moving to Ready status
+	// Redkey cluster is ok, moving to Ready status
 	redkeyCluster.Status.Status = redkeyv1.StatusReady
 
 	return requeue, DefaultRequeueTimeout
 }
 
-func (r *RedKeyClusterReconciler) reconcileStatusReady(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) (bool, time.Duration) {
+func (r *RedkeyClusterReconciler) reconcileStatusReady(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster) (bool, time.Duration) {
 	var requeue = true
 	var requeueAfter time.Duration = ReadyRequeueTimeout
 
@@ -262,7 +262,7 @@ func (r *RedKeyClusterReconciler) reconcileStatusReady(ctx context.Context, redk
 		r.logError(redkeyCluster.NamespacedName(), err, "Error checking PDB changes")
 	}
 
-	// Check and update RedKeyCluster status value accordingly to its configuration and status
+	// Check and update RedkeyCluster status value accordingly to its configuration and status
 	// -> Cluster needs to be scaled?
 	if redkeyCluster.Status.Status == redkeyv1.StatusReady {
 		err = r.updateScalingStatus(ctx, redkeyCluster)
@@ -282,7 +282,7 @@ func (r *RedKeyClusterReconciler) reconcileStatusReady(ctx context.Context, redk
 	return requeue, requeueAfter
 }
 
-func (r *RedKeyClusterReconciler) reconcileStatusUpgrading(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) (bool, time.Duration) {
+func (r *RedkeyClusterReconciler) reconcileStatusUpgrading(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster) (bool, time.Duration) {
 	var requeue = true
 
 	err := r.upgradeCluster(ctx, redkeyCluster)
@@ -294,7 +294,7 @@ func (r *RedKeyClusterReconciler) reconcileStatusUpgrading(ctx context.Context, 
 	return requeue, UpgradingDefaultTimeout
 }
 
-func (r *RedKeyClusterReconciler) reconcileStatusScalingDown(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) (bool, time.Duration) {
+func (r *RedkeyClusterReconciler) reconcileStatusScalingDown(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster) (bool, time.Duration) {
 	var requeue = true
 	immediateRequeue, err := r.scaleCluster(ctx, redkeyCluster)
 	if err != nil {
@@ -315,7 +315,7 @@ func (r *RedKeyClusterReconciler) reconcileStatusScalingDown(ctx context.Context
 	return requeue, ScalingDefaultTimeout
 }
 
-func (r *RedKeyClusterReconciler) reconcileStatusScalingUp(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) (bool, time.Duration) {
+func (r *RedkeyClusterReconciler) reconcileStatusScalingUp(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster) (bool, time.Duration) {
 	var requeue = true
 	immediateRequeue, err := r.scaleCluster(ctx, redkeyCluster)
 	if err != nil {
@@ -336,7 +336,7 @@ func (r *RedKeyClusterReconciler) reconcileStatusScalingUp(ctx context.Context, 
 	return requeue, ScalingDefaultTimeout
 }
 
-func (r *RedKeyClusterReconciler) reconcileStatusError(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) (bool, time.Duration) {
+func (r *RedkeyClusterReconciler) reconcileStatusError(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster) (bool, time.Duration) {
 	var requeue = true
 	var requeueAfter = ErrorRequeueTimeout
 
@@ -345,7 +345,7 @@ func (r *RedKeyClusterReconciler) reconcileStatusError(ctx context.Context, redk
 		return requeue, requeueAfter
 	}
 
-	// Check and update RedKeyCluster status value accordingly to its configuration and status
+	// Check and update RedkeyCluster status value accordingly to its configuration and status
 	// -> Cluster needs to be scaled?
 	if redkeyCluster.Status.Status == redkeyv1.StatusError {
 		err := r.updateScalingStatus(ctx, redkeyCluster)
@@ -366,9 +366,9 @@ func (r *RedKeyClusterReconciler) reconcileStatusError(ctx context.Context, redk
 	return requeue, requeueAfter
 }
 
-func (r *RedKeyClusterReconciler) refreshClusterNodesInfo(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) error {
+func (r *RedkeyClusterReconciler) refreshClusterNodesInfo(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster) error {
 
-	// RedKey cluster must be in Configuring status (or greater) to be able to query Robin for nodes.
+	// Redkey cluster must be in Configuring status (or greater) to be able to query Robin for nodes.
 	if redkeyCluster.Status.Status == "" || redkeyCluster.Status.Status == redkeyv1.StatusInitializing {
 		return nil
 	}
@@ -397,9 +397,9 @@ func (r *RedKeyClusterReconciler) refreshClusterNodesInfo(ctx context.Context, r
 }
 
 // Checks storage configuration for inconsistencies.
-// If the parameter is set to true if a check fail the function returns issuing log info, generating an event and setting the RedKey cluster Status to Error.
+// If the parameter is set to true if a check fail the function returns issuing log info, generating an event and setting the Redkey cluster Status to Error.
 // Returns true if all checks pass or false if any checks fail.
-func (r *RedKeyClusterReconciler) checkStorageConfigConsistency(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster, updateRDCL bool) bool {
+func (r *RedkeyClusterReconciler) checkStorageConfigConsistency(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster, updateRDCL bool) bool {
 	var stsStorage, stsStorageClassName string
 
 	sts, err := r.FindExistingStatefulSet(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redkeyCluster.Name, Namespace: redkeyCluster.Namespace}})
@@ -501,7 +501,7 @@ func (r *RedKeyClusterReconciler) checkStorageConfigConsistency(ctx context.Cont
 	return true
 }
 
-func (r *RedKeyClusterReconciler) checkFinalizers(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) (bool, error) {
+func (r *RedkeyClusterReconciler) checkFinalizers(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster) (bool, error) {
 	var pvcFinalizer = (&finalizer.DeletePVCFinalizer{}).GetId()
 	if redkeyCluster.Spec.DeletePVC && !redkeyCluster.Spec.Ephemeral {
 		r.logInfo(redkeyCluster.NamespacedName(), "Delete PVCs feature enabled in cluster spec")
@@ -533,39 +533,39 @@ func (r *RedKeyClusterReconciler) checkFinalizers(ctx context.Context, redkeyClu
 	return false, nil
 }
 
-func (r *RedKeyClusterReconciler) FindExistingStatefulSet(ctx context.Context, req ctrl.Request) (*v1.StatefulSet, error) {
+func (r *RedkeyClusterReconciler) FindExistingStatefulSet(ctx context.Context, req ctrl.Request) (*v1.StatefulSet, error) {
 	return r.FindExistingStatefulSetFunc(ctx, req)
 }
 
-func (r *RedKeyClusterReconciler) DoFindExistingStatefulSet(ctx context.Context, req ctrl.Request) (*v1.StatefulSet, error) {
+func (r *RedkeyClusterReconciler) DoFindExistingStatefulSet(ctx context.Context, req ctrl.Request) (*v1.StatefulSet, error) {
 	return kubernetes.FindExistingStatefulSet(ctx, r.Client, req)
 }
 
-func (r *RedKeyClusterReconciler) FindExistingConfigMap(ctx context.Context, req ctrl.Request) (*corev1.ConfigMap, error) {
+func (r *RedkeyClusterReconciler) FindExistingConfigMap(ctx context.Context, req ctrl.Request) (*corev1.ConfigMap, error) {
 	return r.FindExistingConfigMapFunc(ctx, req)
 }
 
-func (r *RedKeyClusterReconciler) DoFindExistingConfigMap(ctx context.Context, req ctrl.Request) (*corev1.ConfigMap, error) {
+func (r *RedkeyClusterReconciler) DoFindExistingConfigMap(ctx context.Context, req ctrl.Request) (*corev1.ConfigMap, error) {
 	return kubernetes.FindExistingConfigMap(ctx, r.Client, req)
 }
 
-func (r *RedKeyClusterReconciler) FindExistingDeployment(ctx context.Context, req ctrl.Request) (*v1.Deployment, error) {
+func (r *RedkeyClusterReconciler) FindExistingDeployment(ctx context.Context, req ctrl.Request) (*v1.Deployment, error) {
 	return r.FindExistingDeploymentFunc(ctx, req)
 }
 
-func (r *RedKeyClusterReconciler) DoFindExistingDeployment(ctx context.Context, req ctrl.Request) (*v1.Deployment, error) {
+func (r *RedkeyClusterReconciler) DoFindExistingDeployment(ctx context.Context, req ctrl.Request) (*v1.Deployment, error) {
 	return kubernetes.FindExistingDeployment(ctx, r.Client, req)
 }
 
-func (r *RedKeyClusterReconciler) FindExistingPodDisruptionBudget(ctx context.Context, req ctrl.Request) (*pv1.PodDisruptionBudget, error) {
+func (r *RedkeyClusterReconciler) FindExistingPodDisruptionBudget(ctx context.Context, req ctrl.Request) (*pv1.PodDisruptionBudget, error) {
 	return r.FindExistingPodDisruptionBudgetFunc(ctx, req)
 }
 
-func (r *RedKeyClusterReconciler) DoFindExistingPodDisruptionBudget(ctx context.Context, req ctrl.Request) (*pv1.PodDisruptionBudget, error) {
+func (r *RedkeyClusterReconciler) DoFindExistingPodDisruptionBudget(ctx context.Context, req ctrl.Request) (*pv1.PodDisruptionBudget, error) {
 	return kubernetes.FindExistingPodDisruptionBudget(ctx, r.Client, req)
 }
 
-func (r *RedKeyClusterReconciler) FindExistingService(ctx context.Context, req ctrl.Request) (*corev1.Service, error) {
+func (r *RedkeyClusterReconciler) FindExistingService(ctx context.Context, req ctrl.Request) (*corev1.Service, error) {
 	svc := &corev1.Service{}
 	err := r.Client.Get(ctx, types.NamespacedName{Name: req.Name, Namespace: req.Namespace}, svc)
 	if err != nil {

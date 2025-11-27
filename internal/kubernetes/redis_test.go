@@ -108,7 +108,7 @@ func TestGetStatefulSetSelectorLabelReturnsCorrectLabels(t *testing.T) {
 	}{
 		"no-objects-exist": {
 			client:           fake.NewClientBuilder().Build(),
-			expectedLabelKey: redis.RedKeyClusterComponentLabel,
+			expectedLabelKey: redis.RedkeyClusterComponentLabel,
 		},
 		"objects-with-app-label": {
 			client: fake.NewClientBuilder().WithObjects(&appsv1.StatefulSet{
@@ -138,13 +138,13 @@ func TestGetStatefulSetSelectorLabelReturnsCorrectLabels(t *testing.T) {
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
-								redis.RedKeyClusterComponentLabel: common.ComponentLabelRedis,
+								redis.RedkeyClusterComponentLabel: common.ComponentLabelRedis,
 							},
 						},
 					},
 				},
 			}).Build(),
-			expectedLabelKey: redis.RedKeyClusterComponentLabel,
+			expectedLabelKey: redis.RedkeyClusterComponentLabel,
 		},
 		"objects-with-both-labels": {
 			client: fake.NewClientBuilder().WithObjects(&appsv1.StatefulSet{
@@ -156,18 +156,18 @@ func TestGetStatefulSetSelectorLabelReturnsCorrectLabels(t *testing.T) {
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
-								redis.RedKeyClusterComponentLabel: common.ComponentLabelRedis,
+								redis.RedkeyClusterComponentLabel: common.ComponentLabelRedis,
 								"app":                             "redis",
 							},
 						},
 					},
 				},
 			}).Build(),
-			expectedLabelKey: redis.RedKeyClusterComponentLabel,
+			expectedLabelKey: redis.RedkeyClusterComponentLabel,
 		},
 	}
 	for name, test := range testMap {
-		labelKey := GetStatefulSetSelectorLabel(context.TODO(), test.client, &redkeyv1.RedKeyCluster{
+		labelKey := GetStatefulSetSelectorLabel(context.TODO(), test.client, &redkeyv1.RedkeyCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "redis-cluster",
 				Namespace: "default",

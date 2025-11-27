@@ -12,19 +12,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-// StatusUpgrading: A RedKeyCluster enters this status when when:
+// StatusUpgrading: A RedkeyCluster enters this status when when:
 //   - there are differences between the existing configuration in the configmap
-//     and the configuration of the RedKeyCluster object merged with the default configuration set in the code.
-//   - there is a mismatch between the StatefulSet object labels and the RedKeyCluster Spec labels.
-//   - a mismatch exists between RedKeyCluster resources defined under spec and effective resources defined in the StatefulSet.
-//   - the images set in RedKeyCluster under spec and the image set in the StatefulSet object are not the same.
+//     and the configuration of the RedkeyCluster object merged with the default configuration set in the code.
+//   - there is a mismatch between the StatefulSet object labels and the RedkeyCluster Spec labels.
+//   - a mismatch exists between RedkeyCluster resources defined under spec and effective resources defined in the StatefulSet.
+//   - the images set in RedkeyCluster under spec and the image set in the StatefulSet object are not the same.
 //     The cluster is upgraded, reconfiguring the objects to solve these mismatches.
 //
-// StatusScalingDown: RedKeyCluster replicas > StatefulSet replicas
+// StatusScalingDown: RedkeyCluster replicas > StatefulSet replicas
 //
 //	The cluster enters in this status to remove excess nodes.
 //
-// StatusScalingUp: RedKeyCluster replicas < StatefulSet replicas
+// StatusScalingUp: RedkeyCluster replicas < StatefulSet replicas
 //
 //	The cluster enters in this status to create the needed nodes to equal the desired replicas with the current replicas.
 //
@@ -82,32 +82,32 @@ const (
 var ConditionUpgrading = metav1.Condition{
 	Type:               "Upgrading",
 	LastTransitionTime: metav1.Now(),
-	Message:            "RedKey cluster is upgrading",
-	Reason:             "RedKeyClusterUpgrading",
+	Message:            "Redkey cluster is upgrading",
+	Reason:             "RedkeyClusterUpgrading",
 	Status:             metav1.ConditionTrue,
 }
 
 var ConditionScalingUp = metav1.Condition{
 	Type:               "ScalingUp",
 	LastTransitionTime: metav1.Now(),
-	Message:            "RedKey cluster is scaling up",
-	Reason:             "RedKeyClusterScalingUp",
+	Message:            "Redkey cluster is scaling up",
+	Reason:             "RedkeyClusterScalingUp",
 	Status:             metav1.ConditionTrue,
 }
 var ConditionScalingDown = metav1.Condition{
 	Type:               "ScalingDown",
 	LastTransitionTime: metav1.Now(),
-	Message:            "RedKey cluster is scaling down",
-	Reason:             "RedKeyClusterScalingDown",
+	Message:            "Redkey cluster is scaling down",
+	Reason:             "RedkeyClusterScalingDown",
 	Status:             metav1.ConditionTrue,
 }
 
 var AllConditions = []metav1.Condition{ConditionUpgrading, ConditionScalingUp, ConditionScalingDown}
 
-// RedKeyClusterSpec defines the desired state of RedKeyCluster
+// RedkeyClusterSpec defines the desired state of RedkeyCluster
 // +kubebuilder:validation:XValidation:rule="self.ephemeral || has(self.storage)", message="Ephemeral or storage must be set"
 // +kubebuilder:validation:XValidation:rule="!(self.ephemeral && has(self.storage))", message="Ephemeral and storage cannot be combined"
-type RedKeyClusterSpec struct {
+type RedkeyClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	// RedisAuth
 	Auth RedisAuth `json:"auth,omitempty"`
@@ -131,15 +131,15 @@ type RedKeyClusterSpec struct {
 	Image string `json:"image,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// DeletePVC specifies if the PVC should be deleted when the RedKeyCluster is deleted.
+	// DeletePVC specifies if the PVC should be deleted when the RedkeyCluster is deleted.
 	DeletePVC bool `json:"deletePVC,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// Backup specifies if the RedKeyCluster should be backed up.
+	// Backup specifies if the RedkeyCluster should be backed up.
 	Backup bool `json:"backup,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// Robin specifies the robin configuration for the RedKeyCluster.
+	// Robin specifies the robin configuration for the RedkeyCluster.
 	Robin *RobinSpec `json:"robin,omitempty"`
 
 	// +kubebuilder:validation:Optional
@@ -151,19 +151,19 @@ type RedKeyClusterSpec struct {
 	Config string `json:"config,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// Resources is the resource requirements for the RedKeyCluster.
+	// Resources is the resource requirements for the RedkeyCluster.
 	Resources *v1.ResourceRequirements `json:"resources,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// Labels is the labels to add to the RedKeyCluster.
+	// Labels is the labels to add to the RedkeyCluster.
 	Labels *map[string]string `json:"labels,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// Pdb is the PodDisruptionBudget configuration for the RedKeyCluster.
+	// Pdb is the PodDisruptionBudget configuration for the RedkeyCluster.
 	Pdb Pdb `json:"pdb,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	Override *RedKeyClusterOverrideSpec `json:"override,omitempty"`
+	Override *RedkeyClusterOverrideSpec `json:"override,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=true
@@ -190,18 +190,18 @@ type RedKeyClusterSpec struct {
 	AccessModes []v1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
 }
 
-func (redkeyClusterSpec RedKeyClusterSpec) NodesNeeded() int {
+func (redkeyClusterSpec RedkeyClusterSpec) NodesNeeded() int {
 	return int(redkeyClusterSpec.Replicas + (redkeyClusterSpec.Replicas * redkeyClusterSpec.ReplicasPerMaster))
 }
 
 // Provides the ability to override the generated manifest of several child resources.
-type RedKeyClusterOverrideSpec struct {
+type RedkeyClusterOverrideSpec struct {
 	// +kubebuilder:validation:Optional
-	// Override configuration for the RedKeyCluster StatefulSet.
+	// Override configuration for the RedkeyCluster StatefulSet.
 	StatefulSet *appsv1.StatefulSet `json:"statefulSet,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// Override configuration for the RedKeyCluster Service.
+	// Override configuration for the RedkeyCluster Service.
 	Service *v1.Service `json:"service,omitempty"`
 }
 
@@ -210,17 +210,17 @@ type RobinSpec struct {
 	Config   *string             `json:"config,omitempty"`
 }
 
-// RedKeyClusterStatus defines the observed state of RedKeyCluster
-type RedKeyClusterStatus struct {
+// RedkeyClusterStatus defines the observed state of RedkeyCluster
+type RedkeyClusterStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make manifests" to regenerate code after modifying this file
 	Nodes      map[string]*RedisNode  `json:"nodes"`
 	Status     string                 `json:"status"`
 	Conditions []metav1.Condition     `json:"conditions,omitempty"`
-	Substatus  RedKeyClusterSubstatus `json:"substatus"`
+	Substatus  RedkeyClusterSubstatus `json:"substatus"`
 }
 
-type RedKeyClusterSubstatus struct {
+type RedkeyClusterSubstatus struct {
 	Status             string `json:"status,omitempty"`
 	UpgradingPartition string `json:"upgradingPartition,omitempty"`
 }
@@ -263,39 +263,39 @@ type Pdb struct {
 // +kubebuilder:printcolumn:name="Partition",type="string",priority=5,JSONPath=".status.substatus.upgradingPartition",description="Upgrading partition"
 // +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas,selectorpath=.status.selector
 // +kubebuilder:validation:XValidation:rule="self.spec.replicas == oldSelf.spec.replicas || !has(self.status) || self.status.status == 'Ready'", message="Changing the number of replicas is not allowed unless the cluster is in 'Ready' status"
-// RedKeyCluster is the Schema for the redkeyclusters API
-type RedKeyCluster struct {
+// RedkeyCluster is the Schema for the redkeyclusters API
+type RedkeyCluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              RedKeyClusterSpec   `json:"spec,omitempty"`
-	Status            RedKeyClusterStatus `json:"status,omitempty"`
+	Spec              RedkeyClusterSpec   `json:"spec,omitempty"`
+	Status            RedkeyClusterStatus `json:"status,omitempty"`
 }
 
-func (redkeyCluster RedKeyCluster) NodesNeeded() int {
+func (redkeyCluster RedkeyCluster) NodesNeeded() int {
 	return redkeyCluster.Spec.NodesNeeded()
 }
 
 //+kubebuilder:object:root=true
 
-// RedKeyClusterList contains a list of RedKeyCluster
-type RedKeyClusterList struct {
+// RedkeyClusterList contains a list of RedkeyCluster
+type RedkeyClusterList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []RedKeyCluster `json:"items"`
+	Items           []RedkeyCluster `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&RedKeyCluster{}, &RedKeyClusterList{})
+	SchemeBuilder.Register(&RedkeyCluster{}, &RedkeyClusterList{})
 }
 
-func (redkeyCluster RedKeyCluster) NamespacedName() types.NamespacedName {
+func (redkeyCluster RedkeyCluster) NamespacedName() types.NamespacedName {
 	return types.NamespacedName{
 		Namespace: redkeyCluster.GetNamespace(),
 		Name:      redkeyCluster.GetName(),
 	}
 }
 
-func CompareStatuses(a, b *RedKeyClusterStatus) bool {
+func CompareStatuses(a, b *RedkeyClusterStatus) bool {
 	if a.Status != b.Status {
 		return false
 	}
@@ -318,7 +318,7 @@ func CompareStatuses(a, b *RedKeyClusterStatus) bool {
 	return true
 }
 
-func IsFastOperationStatus(status RedKeyClusterSubstatus) bool {
+func IsFastOperationStatus(status RedkeyClusterSubstatus) bool {
 	return status.Status == SubstatusFastScaling || status.Status == SubstatusEndingFastScaling ||
 		status.Status == SubstatusFastUpgrading || status.Status == SubstatusEndingFastUpgrading
 }

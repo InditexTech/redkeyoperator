@@ -8,8 +8,8 @@ metadata:
 spec:
   group: redis.inditex.dev
   names:
-    kind: RedKeyCluster
-    listKind: RedKeyClusterList
+    kind: RedkeyCluster
+    listKind: RedkeyClusterList
     plural: redkeyclusters
     shortNames:
     - rkcl

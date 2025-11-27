@@ -4,7 +4,7 @@ kind: Kustomization
 patches:
 - path: ./robin-patch.yaml
   target:
-    kind: RedKeyCluster
+    kind: RedkeyCluster
     name: redis-cluster-ephemeral
 
 resources:

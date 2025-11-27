@@ -76,10 +76,10 @@ func createNamespace(ctx context.Context, c client.Client, prefix string) *corev
 }
 
 // deleteNamespace tears down everything in the namespace, including
-// RedKeyCluster CRs with finalizers, then deletes the namespace itself.
+// RedkeyCluster CRs with finalizers, then deletes the namespace itself.
 func deleteNamespace(ctx context.Context, c client.Client, ns *corev1.Namespace) {
-	// 1) Remove any RedKeyCluster CRs so their finalizers don't stall namespace deletion
-	var rcList redkeyv1.RedKeyClusterList
+	// 1) Remove any RedkeyCluster CRs so their finalizers don't stall namespace deletion
+	var rcList redkeyv1.RedkeyClusterList
 	Expect(c.List(ctx, &rcList, &client.ListOptions{Namespace: ns.Name})).To(Succeed())
 
 	for i := range rcList.Items {
@@ -88,7 +88,7 @@ func deleteNamespace(ctx context.Context, c client.Client, ns *corev1.Namespace)
 
 		// Strip finalizers with retry
 		Expect(retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			rc := &redkeyv1.RedKeyCluster{}
+			rc := &redkeyv1.RedkeyCluster{}
 			if err := c.Get(ctx, client.ObjectKey{Namespace: ns, Name: name}, rc); err != nil {
 				return err
 			}
@@ -97,9 +97,9 @@ func deleteNamespace(ctx context.Context, c client.Client, ns *corev1.Namespace)
 		})).To(Succeed(), "removing finalizers from %s/%s", ns, name)
 
 		// delete the CR immediately
-		Expect(c.Delete(ctx, &redkeyv1.RedKeyCluster{
+		Expect(c.Delete(ctx, &redkeyv1.RedkeyCluster{
 			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns},
-		})).To(Succeed(), "deleting RedKeyCluster %s/%s", ns, name)
+		})).To(Succeed(), "deleting RedkeyCluster %s/%s", ns, name)
 	}
 
 	// 2) Delete the namespace
@@ -112,13 +112,13 @@ func deleteNamespace(ctx context.Context, c client.Client, ns *corev1.Namespace)
 	}, defaultWait, defaultPoll).Should(BeTrue(), "namespace %s should be gone", ns.Name)
 }
 
-var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "cluster"), func() {
+var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "cluster"), func() {
 	var (
 		namespace *corev1.Namespace
 	)
 
 	// mustCreateAndReady creates a cluster and blocks until it's Ready
-	mustCreateAndReady := func(name string, replicas, replicasPerMaster int32, storage, image string, purgeKeys, ephemeral bool, pdb redkeyv1.Pdb, userOverride redkeyv1.RedKeyClusterOverrideSpec) *redkeyv1.RedKeyCluster {
+	mustCreateAndReady := func(name string, replicas, replicasPerMaster int32, storage, image string, purgeKeys, ephemeral bool, pdb redkeyv1.Pdb, userOverride redkeyv1.RedkeyClusterOverrideSpec) *redkeyv1.RedkeyCluster {
 		key := types.NamespacedName{Namespace: namespace.Name, Name: name}
 		Expect(framework.EnsureClusterExistsOrCreate(
 			ctx, k8sClient, key,
@@ -134,7 +134,7 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 		Expect(rc.Spec.Storage).To(Equal(storage))
 		Expect(rc.Spec.PurgeKeysOnRebalance).To(Equal(purgeKeys))
 		Expect(rc.Spec.Ephemeral).To(Equal(ephemeral))
-		Expect(rc.Kind).To(Equal("RedKeyCluster"))
+		Expect(rc.Kind).To(Equal("RedkeyCluster"))
 		Expect(rc.APIVersion).To(Equal("redis.inditex.com/v1"))
 		Expect(rc.Spec.Auth).To(Equal(redkeyv1.RedisAuth{}))
 		Expect(rc.Spec.Image).To(Equal(getRedisImage()))
@@ -179,12 +179,12 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 				name := fmt.Sprintf("%s-%d-%d", base, initial, target)
 				key := types.NamespacedName{Namespace: namespace.Name, Name: name}
 
-				mustCreateAndReady(name, initial, 0, "", getRedisImage(), true, true, redkeyv1.Pdb{}, redkeyv1.RedKeyClusterOverrideSpec{})
+				mustCreateAndReady(name, initial, 0, "", getRedisImage(), true, true, redkeyv1.Pdb{}, redkeyv1.RedkeyClusterOverrideSpec{})
 
 				// change replicas → wait Ready again
 				rc, trace, err := framework.ChangeCluster(ctx, k8sClient, key,
 					framework.ChangeClusterOptions{
-						Mutate: func(r *redkeyv1.RedKeyCluster) { r.Spec.Replicas = target },
+						Mutate: func(r *redkeyv1.RedkeyCluster) { r.Spec.Replicas = target },
 					})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(rc.Spec.Replicas).To(Equal(target))
@@ -217,15 +217,15 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 
 		type entry struct {
 			name        string
-			initial     *redkeyv1.RedKeyClusterOverrideSpec
-			update      *redkeyv1.RedKeyClusterOverrideSpec // nil → no update step
+			initial     *redkeyv1.RedkeyClusterOverrideSpec
+			update      *redkeyv1.RedkeyClusterOverrideSpec // nil → no update step
 			validateSTS func(*appsv1.StatefulSet) bool      // after last step
 		}
 
 		entries := []entry{
 			{
 				name: "apply-tolerations-topology",
-				initial: &redkeyv1.RedKeyClusterOverrideSpec{
+				initial: &redkeyv1.RedkeyClusterOverrideSpec{
 					StatefulSet: &appsv1.StatefulSet{Spec: appsv1.StatefulSetSpec{
 						Template: corev1.PodTemplateSpec{
 							ObjectMeta: metav1.ObjectMeta{
@@ -243,15 +243,15 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 				validateSTS: func(sts *appsv1.StatefulSet) bool {
 					return framework.RedisStsContainsOverride(
 						*sts,
-						redkeyv1.RedKeyClusterOverrideSpec{
+						redkeyv1.RedkeyClusterOverrideSpec{
 							StatefulSet: &appsv1.StatefulSet{Spec: sts.Spec}, // only care it’s present
 						})
 				},
 			},
 			{
 				name:    "add-side-car",
-				initial: &redkeyv1.RedKeyClusterOverrideSpec{}, // start clean
-				update: &redkeyv1.RedKeyClusterOverrideSpec{
+				initial: &redkeyv1.RedkeyClusterOverrideSpec{}, // start clean
+				update: &redkeyv1.RedkeyClusterOverrideSpec{
 					StatefulSet: &appsv1.StatefulSet{Spec: appsv1.StatefulSetSpec{
 						Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
 							Containers: []corev1.Container{{
@@ -266,7 +266,7 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 			},
 			{
 				name: "remove-side-car",
-				initial: &redkeyv1.RedKeyClusterOverrideSpec{
+				initial: &redkeyv1.RedkeyClusterOverrideSpec{
 					StatefulSet: &appsv1.StatefulSet{Spec: appsv1.StatefulSetSpec{
 						Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
 							Containers: []corev1.Container{{
@@ -277,7 +277,7 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 						}},
 					}},
 				},
-				update: &redkeyv1.RedKeyClusterOverrideSpec{
+				update: &redkeyv1.RedkeyClusterOverrideSpec{
 					StatefulSet: &appsv1.StatefulSet{Spec: appsv1.StatefulSetSpec{
 						Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: nil}},
 					}},
@@ -303,7 +303,7 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 				if e.update != nil {
 					_, trace, err := framework.ChangeCluster(ctx, k8sClient, key,
 						framework.ChangeClusterOptions{
-							Mutate: func(r *redkeyv1.RedKeyCluster) { r.Spec.Override = e.update },
+							Mutate: func(r *redkeyv1.RedkeyCluster) { r.Spec.Override = e.update },
 						})
 					Expect(err).NotTo(HaveOccurred())
 					Expect(trace).To(ContainElement(redkeyv1.StatusUpgrading))
@@ -329,7 +329,7 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 
 			// create cluster (3 replicas are enough)
 			mustCreateAndReady(baseName, 3, 0, "", getRedisImage(), true, true,
-				redkeyv1.Pdb{}, redkeyv1.RedKeyClusterOverrideSpec{})
+				redkeyv1.Pdb{}, redkeyv1.RedkeyClusterOverrideSpec{})
 
 			// helper to read *sorted* ports from the cluster-IP Service
 			getPorts = func() []int32 {
@@ -374,13 +374,13 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 				3, 0, // replicas / per-master
 				"", getRedisImage(), true, true, // storage / image / purgeKeys / ephemeral
 				redkeyv1.Pdb{},                       // no-PDB
-				redkeyv1.RedKeyClusterOverrideSpec{}, // no override
+				redkeyv1.RedkeyClusterOverrideSpec{}, // no override
 			)
 		})
 
 		//-------------------------------------------------------------------- helpers
 
-		checkRC := func(rc *redkeyv1.RedKeyCluster, applied map[string]string) {
+		checkRC := func(rc *redkeyv1.RedkeyCluster, applied map[string]string) {
 			Expect(rc).NotTo(BeNil())
 			Expect(rc.Status.Status).To(Equal(redkeyv1.StatusReady))
 			Expect(rc.Spec.Replicas).To(Equal(int32(3))) // never touched by this test
@@ -423,7 +423,7 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 			func(apply, want map[string]string) {
 				rc, phases, err := framework.ChangeCluster(ctx, k8sClient, key,
 					framework.ChangeClusterOptions{
-						Mutate: func(r *redkeyv1.RedKeyCluster) { r.Spec.Labels = &apply },
+						Mutate: func(r *redkeyv1.RedkeyCluster) { r.Spec.Labels = &apply },
 					})
 				Expect(err).NotTo(HaveOccurred())
 
@@ -467,11 +467,11 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 				true,  /* purgeKeys */
 				false, /* NOT ephemeral */
 				redkeyv1.Pdb{},
-				redkeyv1.RedKeyClusterOverrideSpec{},
+				redkeyv1.RedkeyClusterOverrideSpec{},
 			)
 		})
 
-		checkRC := func(rc *redkeyv1.RedKeyCluster, wantReplicas int32) {
+		checkRC := func(rc *redkeyv1.RedkeyCluster, wantReplicas int32) {
 			Expect(rc).NotTo(BeNil())
 			Expect(rc.Status.Status).To(Equal(redkeyv1.StatusReady))
 			Expect(rc.Spec.Storage).To(Equal(initialPVC))
@@ -482,7 +482,7 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 
 		type tc struct {
 			desc        string
-			mutate      func(*redkeyv1.RedKeyCluster)
+			mutate      func(*redkeyv1.RedkeyCluster)
 			wantRep     int32
 			wantPhases  []string
 			wantErrLike string
@@ -511,7 +511,7 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 			Entry("forbid storage resize",
 				tc{
 					desc: "resize PVC",
-					mutate: func(r *redkeyv1.RedKeyCluster) {
+					mutate: func(r *redkeyv1.RedkeyCluster) {
 						r.Spec.Storage = "1Gi"
 					},
 					wantRep:     initialRep,
@@ -523,7 +523,7 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 			Entry("scale up to 6 replicas",
 				tc{
 					desc: "scale-up",
-					mutate: func(r *redkeyv1.RedKeyCluster) {
+					mutate: func(r *redkeyv1.RedkeyCluster) {
 						r.Spec.Replicas = 6
 					},
 					wantRep:    6,
@@ -534,7 +534,7 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 			Entry("scale down to 1 replica",
 				tc{
 					desc: "scale-down",
-					mutate: func(r *redkeyv1.RedKeyCluster) {
+					mutate: func(r *redkeyv1.RedkeyCluster) {
 						r.Spec.Replicas = 1
 					},
 					wantRep:    1,
@@ -564,7 +564,7 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 				true, // purgeKeys
 				true, // ephemeral
 				redkeyv1.Pdb{},
-				redkeyv1.RedKeyClusterOverrideSpec{},
+				redkeyv1.RedkeyClusterOverrideSpec{},
 			)
 		})
 
@@ -572,14 +572,14 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 
 		checkLayout := func(rep, perMaster int32) {
 			Eventually(func() (bool, error) {
-				return framework.ValidateRedKeyClusterMasterSlave(
+				return framework.ValidateRedkeyClusterMasterSlave(
 					ctx, k8sClient, key, rep, perMaster)
 			}, defaultWait*2, defaultPoll).Should(BeTrue())
 		}
 
 		type tc struct {
 			desc          string
-			mutate        func(*redkeyv1.RedKeyCluster)
+			mutate        func(*redkeyv1.RedkeyCluster)
 			wantRep       int32
 			wantPerMaster int32
 			wantPhases    []string
@@ -617,7 +617,7 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 			Entry("scale up to 7/2",
 				tc{
 					desc: "scaleUp",
-					mutate: func(r *redkeyv1.RedKeyCluster) {
+					mutate: func(r *redkeyv1.RedkeyCluster) {
 						r.Spec.Replicas = 7
 						r.Spec.ReplicasPerMaster = 2
 					},
@@ -630,7 +630,7 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 			Entry("scale down to 3/1",
 				tc{
 					desc: "scaleDown",
-					mutate: func(r *redkeyv1.RedKeyCluster) {
+					mutate: func(r *redkeyv1.RedkeyCluster) {
 						r.Spec.Replicas = 3
 						r.Spec.ReplicasPerMaster = 1
 					},
@@ -647,14 +647,14 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 
 		var (
 			key types.NamespacedName
-			rc  *redkeyv1.RedKeyCluster
+			rc  *redkeyv1.RedkeyCluster
 		)
 
 		BeforeEach(func() {
 			key = types.NamespacedName{Namespace: namespace.Name, Name: base}
 			rc = mustCreateAndReady(base, 5, 0, "", getRedisImage(),
 				/*purge*/ false /*ephemeral*/, true,
-				redkeyv1.Pdb{}, redkeyv1.RedKeyClusterOverrideSpec{})
+				redkeyv1.Pdb{}, redkeyv1.RedkeyClusterOverrideSpec{})
 		})
 
 		insert := func() {
@@ -694,7 +694,7 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 					var err error
 					rc, trace, err = framework.ChangeCluster(ctx, k8sClient, key,
 						framework.ChangeClusterOptions{
-							Mutate: func(r *redkeyv1.RedKeyCluster) { r.Spec.Replicas = t.replicas },
+							Mutate: func(r *redkeyv1.RedkeyCluster) { r.Spec.Replicas = t.replicas },
 						})
 					Expect(err).NotTo(HaveOccurred())
 					Expect(rc.Spec.Replicas).To(Equal(t.replicas))
@@ -732,11 +732,11 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 		BeforeEach(func() {
 			key = types.NamespacedName{Namespace: namespace.Name, Name: name}
 			mustCreateAndReady(name, 1, 0, "", getRedisImage(),
-				true, true, redkeyv1.Pdb{}, redkeyv1.RedKeyClusterOverrideSpec{})
+				true, true, redkeyv1.Pdb{}, redkeyv1.RedkeyClusterOverrideSpec{})
 		})
 
 		type tc struct {
-			mutate     func(*redkeyv1.RedKeyCluster)
+			mutate     func(*redkeyv1.RedkeyCluster)
 			verify     func(*appsv1.StatefulSet)
 			wantPhases []string
 		}
@@ -755,7 +755,7 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 
 			Entry("change resources",
 				tc{
-					mutate: func(r *redkeyv1.RedKeyCluster) {
+					mutate: func(r *redkeyv1.RedkeyCluster) {
 						req := corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("51m"),
@@ -778,7 +778,7 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 
 			Entry("change image",
 				tc{
-					mutate: func(r *redkeyv1.RedKeyCluster) { r.Spec.Image = getChangedRedisImage() },
+					mutate: func(r *redkeyv1.RedkeyCluster) { r.Spec.Image = getChangedRedisImage() },
 					verify: func(sts *appsv1.StatefulSet) {
 						Expect(sts.Spec.Template.Spec.Containers[0].Image).To(Equal(getChangedRedisImage()))
 					},
@@ -793,9 +793,9 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 
 		type tc struct {
 			desc      string
-			mutate    func(*redkeyv1.RedKeyCluster)
+			mutate    func(*redkeyv1.RedkeyCluster)
 			expectErr gomegatypes.GomegaMatcher
-			verify    func(*redkeyv1.RedKeyCluster) // always run
+			verify    func(*redkeyv1.RedkeyCluster) // always run
 		}
 
 		DescribeTable("mutation attempts",
@@ -806,7 +806,7 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 
 				mustCreateAndReady(name, 1, 0, "", getRedisImage(),
 					/*purge=*/ true /*ephemeral=*/, true,
-					redkeyv1.Pdb{}, redkeyv1.RedKeyClusterOverrideSpec{})
+					redkeyv1.Pdb{}, redkeyv1.RedkeyClusterOverrideSpec{})
 
 				_, _, err := framework.ChangeCluster(
 					ctx, k8sClient, key,
@@ -823,12 +823,12 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 			Entry("deny: flip to PVC (Ephemeral=false + Storage)",
 				tc{
 					desc: "flip-to-PVC",
-					mutate: func(r *redkeyv1.RedKeyCluster) {
+					mutate: func(r *redkeyv1.RedkeyCluster) {
 						r.Spec.Ephemeral = false
 						r.Spec.Storage = "1Gi"
 					},
 					expectErr: MatchError(ContainSubstring("Changing the ephemeral field is not allowed")),
-					verify: func(rc *redkeyv1.RedKeyCluster) {
+					verify: func(rc *redkeyv1.RedkeyCluster) {
 						Expect(rc.Spec.Ephemeral).To(BeTrue())
 						Expect(rc.Spec.Storage).To(BeEmpty())
 					},
@@ -838,11 +838,11 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 			Entry("deny: add Storage while Ephemeral=true",
 				tc{
 					desc: "add-storage",
-					mutate: func(r *redkeyv1.RedKeyCluster) {
+					mutate: func(r *redkeyv1.RedkeyCluster) {
 						r.Spec.Storage = "500Mi"
 					},
 					expectErr: MatchError(ContainSubstring("Ephemeral and storage cannot be combined")),
-					verify: func(rc *redkeyv1.RedKeyCluster) {
+					verify: func(rc *redkeyv1.RedkeyCluster) {
 						Expect(rc.Spec.Ephemeral).To(BeTrue())
 						Expect(rc.Spec.Storage).To(BeEmpty())
 					},
@@ -856,7 +856,7 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 
 		type step struct {
 			desc       string
-			mutate     func(*redkeyv1.RedKeyCluster)
+			mutate     func(*redkeyv1.RedkeyCluster)
 			wantPDB    bool
 			wantPhases []string
 		}
@@ -883,7 +883,7 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 				pdbKey := types.NamespacedName{Namespace: namespace.Name, Name: name + "-pdb"}
 
 				mustCreateAndReady(name, 3, 0, "", getRedisImage(), true, true,
-					redkeyv1.Pdb{}, redkeyv1.RedKeyClusterOverrideSpec{})
+					redkeyv1.Pdb{}, redkeyv1.RedkeyClusterOverrideSpec{})
 
 				for i, s := range t.steps {
 					_, trace, err := framework.ChangeCluster(ctx, k8sClient, key,
@@ -903,7 +903,7 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 					steps: []step{
 						{
 							desc: "enable PDB",
-							mutate: func(r *redkeyv1.RedKeyCluster) {
+							mutate: func(r *redkeyv1.RedkeyCluster) {
 								r.Spec.Pdb = redkeyv1.Pdb{Enabled: true, PdbSizeAvailable: intstr.FromInt(1)}
 							},
 							wantPDB:    true,
@@ -911,13 +911,13 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 						},
 						{
 							desc:       "disable PDB",
-							mutate:     func(r *redkeyv1.RedKeyCluster) { r.Spec.Pdb.Enabled = false },
+							mutate:     func(r *redkeyv1.RedkeyCluster) { r.Spec.Pdb.Enabled = false },
 							wantPDB:    false,
 							wantPhases: []string{redkeyv1.StatusReady},
 						},
 						{
 							desc:       "re-enable PDB",
-							mutate:     func(r *redkeyv1.RedKeyCluster) { r.Spec.Pdb.Enabled = true },
+							mutate:     func(r *redkeyv1.RedkeyCluster) { r.Spec.Pdb.Enabled = true },
 							wantPDB:    true,
 							wantPhases: []string{redkeyv1.StatusReady},
 						},
@@ -931,7 +931,7 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 					steps: []step{
 						{
 							desc: "enable PDB",
-							mutate: func(r *redkeyv1.RedKeyCluster) {
+							mutate: func(r *redkeyv1.RedkeyCluster) {
 								r.Spec.Pdb = redkeyv1.Pdb{Enabled: true, PdbSizeAvailable: intstr.FromInt(1)}
 							},
 							wantPDB:    true,
@@ -939,13 +939,13 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 						},
 						{
 							desc:       "scale to zero (PDB removed)",
-							mutate:     func(r *redkeyv1.RedKeyCluster) { r.Spec.Replicas = 0 },
+							mutate:     func(r *redkeyv1.RedkeyCluster) { r.Spec.Replicas = 0 },
 							wantPDB:    false,
 							wantPhases: []string{redkeyv1.StatusReady},
 						},
 						{
 							desc:       "scale up (PDB recreated)",
-							mutate:     func(r *redkeyv1.RedKeyCluster) { r.Spec.Replicas = 3 },
+							mutate:     func(r *redkeyv1.RedkeyCluster) { r.Spec.Replicas = 3 },
 							wantPDB:    true,
 							wantPhases: []string{redkeyv1.StatusScalingUp, redkeyv1.StatusReady},
 						},
@@ -959,7 +959,7 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 					steps: []step{
 						{
 							desc: "enable PDB",
-							mutate: func(r *redkeyv1.RedKeyCluster) {
+							mutate: func(r *redkeyv1.RedkeyCluster) {
 								r.Spec.Pdb = redkeyv1.Pdb{Enabled: true, PdbSizeAvailable: intstr.FromInt(1)}
 							},
 							wantPDB:    true,
@@ -967,19 +967,19 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 						},
 						{
 							desc:       "scale to zero (PDB removed)",
-							mutate:     func(r *redkeyv1.RedKeyCluster) { r.Spec.Replicas = 0 },
+							mutate:     func(r *redkeyv1.RedkeyCluster) { r.Spec.Replicas = 0 },
 							wantPDB:    false,
 							wantPhases: []string{redkeyv1.StatusReady},
 						},
 						{
 							desc:       "scale up (PDB recreated)",
-							mutate:     func(r *redkeyv1.RedKeyCluster) { r.Spec.Replicas = 3 },
+							mutate:     func(r *redkeyv1.RedkeyCluster) { r.Spec.Replicas = 3 },
 							wantPDB:    true,
 							wantPhases: []string{redkeyv1.StatusScalingUp, redkeyv1.StatusReady},
 						},
 						{
 							desc:       "disable PDB again",
-							mutate:     func(r *redkeyv1.RedKeyCluster) { r.Spec.Pdb.Enabled = false },
+							mutate:     func(r *redkeyv1.RedkeyCluster) { r.Spec.Pdb.Enabled = false },
 							wantPDB:    false,
 							wantPhases: []string{redkeyv1.StatusReady},
 						},
@@ -1018,13 +1018,13 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 				if err != nil {
 					return false, err
 				}
-				return framework.CheckRedKeyCluster(k8sClient, ctx, rc)
+				return framework.CheckRedkeyCluster(k8sClient, ctx, rc)
 			}, defaultWait*3, defaultPoll).Should(BeTrue())
 		}
 
 		type tc struct {
 			desc     string                                 // human-readable
-			operate  func(rc *redkeyv1.RedKeyCluster) error // action that "breaks" the cluster
+			operate  func(rc *redkeyv1.RedkeyCluster) error // action that "breaks" the cluster
 			preHook  func()                                 // run before operate  (may be nil)
 			postHook func()                                 // run after  operate  (may be nil)
 		}
@@ -1040,7 +1040,7 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 				rc := mustCreateAndReady(name,
 					3 /*masters*/, 0, /*replicasPerMaster*/
 					"" /*storage*/, getRedisImage(), true /*purgeKeys*/, true, /*ephemeral*/
-					redkeyv1.Pdb{}, redkeyv1.RedKeyClusterOverrideSpec{})
+					redkeyv1.Pdb{}, redkeyv1.RedkeyClusterOverrideSpec{})
 
 				// optional scale operator
 				if t.preHook != nil {
@@ -1063,7 +1063,7 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 			Entry("forget one node - operator running",
 				tc{
 					desc: "forget-node",
-					operate: func(rc *redkeyv1.RedKeyCluster) error {
+					operate: func(rc *redkeyv1.RedkeyCluster) error {
 						return framework.ForgetANode(k8sClient, ctx, rc)
 					},
 				},
@@ -1074,7 +1074,7 @@ var _ = Describe("RedKey Operator & RedKeyCluster E2E", Label("operator", "clust
 				tc{
 					desc:    "forget-fix-meet-without-operator",
 					preHook: func() { scaleOperator(0) }, // stop the operator
-					operate: func(rc *redkeyv1.RedKeyCluster) error {
+					operate: func(rc *redkeyv1.RedkeyCluster) error {
 						return framework.ForgetANodeFixAndMeet(k8sClient, ctx, rc)
 					},
 					postHook: func() { scaleOperator(1) }, // start it again

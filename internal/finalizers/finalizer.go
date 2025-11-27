@@ -12,6 +12,6 @@ import (
 )
 
 type Finalizer interface {
-	DeleteMethod(context.Context, *redkeyv1.RedKeyCluster, client.Client) error
+	DeleteMethod(context.Context, *redkeyv1.RedkeyCluster, client.Client) error
 	GetId() string
 }

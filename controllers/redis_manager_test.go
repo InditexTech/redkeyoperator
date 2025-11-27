@@ -19,7 +19,7 @@ import (
 	"k8s.io/client-go/tools/record"
 )
 
-var rc = newRedKeyCluster()
+var rc = newRedkeyCluster()
 var recorder = newRecorder()
 var reconciler = newReconciler(rc, recorder)
 var configMap = newConfigMap()
@@ -285,7 +285,7 @@ func TestSetConditionTrue_recordEvent(t *testing.T) {
 
 	select {
 	case event := <-recorder.Events:
-		assert.Equal(t, "Normal RedKeyClusterUpgrading "+message, event)
+		assert.Equal(t, "Normal RedkeyClusterUpgrading "+message, event)
 	default:
 		t.Fail()
 		fmt.Println("expected event to be recorded because condition was changed")

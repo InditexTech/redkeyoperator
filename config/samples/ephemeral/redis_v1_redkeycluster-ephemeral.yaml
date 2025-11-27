@@ -1,5 +1,5 @@
 apiVersion: redis.inditex.dev/v1
-kind: RedKeyCluster
+kind: RedkeyCluster
 metadata:
   labels:
     app.kubernetes.io/name: redkey-cluster-operator

@@ -25,7 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (r *RedKeyClusterReconciler) checkAndCreateRobin(ctx context.Context, req ctrl.Request, redkeyCluster *redkeyv1.RedKeyCluster) error {
+func (r *RedkeyClusterReconciler) checkAndCreateRobin(ctx context.Context, req ctrl.Request, redkeyCluster *redkeyv1.RedkeyCluster) error {
 	// Populate robin spec if not provided. This to handle the case where the user removes the robin spec of an existing cluster. The robin objects will be deleted.
 	if redkeyCluster.Spec.Robin == nil {
 		redkeyCluster.Spec.Robin = &redkeyv1.RobinSpec{
@@ -45,7 +45,7 @@ func (r *RedKeyClusterReconciler) checkAndCreateRobin(ctx context.Context, req c
 	return nil
 }
 
-func (r *RedKeyClusterReconciler) handleRobinConfig(ctx context.Context, req ctrl.Request, redkeyCluster *redkeyv1.RedKeyCluster) error {
+func (r *RedkeyClusterReconciler) handleRobinConfig(ctx context.Context, req ctrl.Request, redkeyCluster *redkeyv1.RedkeyCluster) error {
 	// Get robin configmap
 	existingConfigMap, err := r.FindExistingConfigMapFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redkeyCluster.Name + "-robin", Namespace: redkeyCluster.Namespace}})
 
@@ -99,7 +99,7 @@ func (r *RedKeyClusterReconciler) handleRobinConfig(ctx context.Context, req ctr
 	return nil
 }
 
-func (r *RedKeyClusterReconciler) handleRobinDeployment(ctx context.Context, req ctrl.Request, redkeyCluster *redkeyv1.RedKeyCluster) {
+func (r *RedkeyClusterReconciler) handleRobinDeployment(ctx context.Context, req ctrl.Request, redkeyCluster *redkeyv1.RedkeyCluster) {
 	// Get robin deployment
 	deployment, err := r.FindExistingDeployment(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redkeyCluster.Name + "-robin", Namespace: redkeyCluster.Namespace}})
 
@@ -134,7 +134,7 @@ func (r *RedKeyClusterReconciler) handleRobinDeployment(ctx context.Context, req
 	r.updateRobinObject(ctx, deployment, redkeyCluster, "deployment")
 }
 
-func (r *RedKeyClusterReconciler) createRobinObject(ctx context.Context, obj client.Object, redkeyCluster *redkeyv1.RedKeyCluster, kind string) error {
+func (r *RedkeyClusterReconciler) createRobinObject(ctx context.Context, obj client.Object, redkeyCluster *redkeyv1.RedkeyCluster, kind string) error {
 	if obj.DeepCopyObject() == nil {
 		return nil
 	}
@@ -156,7 +156,7 @@ func (r *RedKeyClusterReconciler) createRobinObject(ctx context.Context, obj cli
 	return nil
 }
 
-func (r *RedKeyClusterReconciler) updateRobinObject(ctx context.Context, obj client.Object, redkeyCluster *redkeyv1.RedKeyCluster, kind string) error {
+func (r *RedkeyClusterReconciler) updateRobinObject(ctx context.Context, obj client.Object, redkeyCluster *redkeyv1.RedkeyCluster, kind string) error {
 	if obj.DeepCopyObject() == nil {
 		return nil
 	}
@@ -172,7 +172,7 @@ func (r *RedKeyClusterReconciler) updateRobinObject(ctx context.Context, obj cli
 	return nil
 }
 
-func (r *RedKeyClusterReconciler) deleteRobinObject(ctx context.Context, obj client.Object, redkeyCluster *redkeyv1.RedKeyCluster, kind string) error {
+func (r *RedkeyClusterReconciler) deleteRobinObject(ctx context.Context, obj client.Object, redkeyCluster *redkeyv1.RedkeyCluster, kind string) error {
 	if obj.DeepCopyObject() == nil {
 		return nil
 	}
@@ -188,7 +188,7 @@ func (r *RedKeyClusterReconciler) deleteRobinObject(ctx context.Context, obj cli
 	return nil
 }
 
-func (r *RedKeyClusterReconciler) overrideRobinDeployment(req ctrl.Request, redkeyCluster *redkeyv1.RedKeyCluster, podTemplateSpec corev1.PodTemplateSpec) (corev1.PodTemplateSpec, bool) {
+func (r *RedkeyClusterReconciler) overrideRobinDeployment(req ctrl.Request, redkeyCluster *redkeyv1.RedkeyCluster, podTemplateSpec corev1.PodTemplateSpec) (corev1.PodTemplateSpec, bool) {
 	// Apply the override
 	patchedPodTemplateSpec, err := redis.ApplyPodTemplateSpecOverride(podTemplateSpec, *redkeyCluster.Spec.Robin.Template)
 	if err != nil {
@@ -206,7 +206,7 @@ func (r *RedKeyClusterReconciler) overrideRobinDeployment(req ctrl.Request, redk
 	return *patchedPodTemplateSpec, changed
 }
 
-func (r *RedKeyClusterReconciler) createRobinDeployment(req ctrl.Request, redkeyCluster *redkeyv1.RedKeyCluster, labels map[string]string) *v1.Deployment {
+func (r *RedkeyClusterReconciler) createRobinDeployment(req ctrl.Request, redkeyCluster *redkeyv1.RedkeyCluster, labels map[string]string) *v1.Deployment {
 	var replicas = int32(1)
 	d := &v1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -217,17 +217,17 @@ func (r *RedKeyClusterReconciler) createRobinDeployment(req ctrl.Request, redkey
 		Spec: v1.DeploymentSpec{
 			Template: *redkeyCluster.Spec.Robin.Template,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{redis.RedKeyClusterLabel: req.Name, r.getStatefulSetSelectorLabel(redkeyCluster): "robin"},
+				MatchLabels: map[string]string{redis.RedkeyClusterLabel: req.Name, r.getStatefulSetSelectorLabel(redkeyCluster): "robin"},
 			},
 			Replicas: &replicas,
 		},
 	}
-	d.Labels[redis.RedKeyClusterLabel] = req.Name
-	d.Labels[redis.RedKeyClusterComponentLabel] = "robin"
+	d.Labels[redis.RedkeyClusterLabel] = req.Name
+	d.Labels[redis.RedkeyClusterComponentLabel] = "robin"
 	d.Spec.Template.Labels = make(map[string]string)
 	maps.Copy(d.Spec.Template.Labels, labels)
-	d.Spec.Template.Labels[redis.RedKeyClusterLabel] = req.Name
-	d.Spec.Template.Labels[redis.RedKeyClusterComponentLabel] = "robin"
+	d.Spec.Template.Labels[redis.RedkeyClusterLabel] = req.Name
+	d.Spec.Template.Labels[redis.RedkeyClusterComponentLabel] = "robin"
 	maps.Copy(d.Spec.Template.Labels, redkeyCluster.Spec.Robin.Template.Labels)
 
 	for i, container := range d.Spec.Template.Spec.Containers {
@@ -248,7 +248,7 @@ func (r *RedKeyClusterReconciler) createRobinDeployment(req ctrl.Request, redkey
 	return d
 }
 
-func (r *RedKeyClusterReconciler) createRobinConfigMap(req ctrl.Request, spec redkeyv1.RedKeyClusterSpec, labels map[string]string) *corev1.ConfigMap {
+func (r *RedkeyClusterReconciler) createRobinConfigMap(req ctrl.Request, spec redkeyv1.RedkeyClusterSpec, labels map[string]string) *corev1.ConfigMap {
 	cm := corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      req.Name + "-robin",
@@ -262,7 +262,7 @@ func (r *RedKeyClusterReconciler) createRobinConfigMap(req ctrl.Request, spec re
 	return &cm
 }
 
-func (r *RedKeyClusterReconciler) scaleDownRobin(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) {
+func (r *RedkeyClusterReconciler) scaleDownRobin(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster) {
 	if redkeyCluster.Spec.Robin != nil {
 		if redkeyCluster.Spec.Robin.Template != nil {
 			mdep, err := r.FindExistingDeployment(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redkeyCluster.Name + "-robin", Namespace: redkeyCluster.Namespace}})

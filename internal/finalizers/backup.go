@@ -14,7 +14,7 @@ import (
 type BackupFinalizer struct {
 }
 
-func (ef *BackupFinalizer) DeleteMethod(ctx context.Context, redis *redkeyv1.RedKeyCluster, client client.Client) error {
+func (ef *BackupFinalizer) DeleteMethod(ctx context.Context, redis *redkeyv1.RedkeyCluster, client client.Client) error {
 	// final backup before deletion
 	return nil
 }

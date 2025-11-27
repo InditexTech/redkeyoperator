@@ -61,7 +61,7 @@ type ClusterStatus struct {
 
 var version = "6.0.2"
 
-// EnsureClusterExistsOrCreate will create or update (upsert) a RedKeyCluster CR.
+// EnsureClusterExistsOrCreate will create or update (upsert) a RedkeyCluster CR.
 // It applies storage, replica count, PDB and optional overrides, then waits for reconciliation.
 func EnsureClusterExistsOrCreate(
 	ctx context.Context,
@@ -71,9 +71,9 @@ func EnsureClusterExistsOrCreate(
 	storage, image string,
 	purgeKeys, ephemeral bool,
 	pdb redkeyv1.Pdb,
-	userOverride redkeyv1.RedKeyClusterOverrideSpec,
+	userOverride redkeyv1.RedkeyClusterOverrideSpec,
 ) error {
-	rc := &redkeyv1.RedKeyCluster{
+	rc := &redkeyv1.RedkeyCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      key.Name,
 			Namespace: key.Namespace,
@@ -83,7 +83,7 @@ func EnsureClusterExistsOrCreate(
 
 	_, err := controllerutil.CreateOrUpdate(ctx, c, rc, func() error {
 		// Base spec
-		rc.Spec = redkeyv1.RedKeyClusterSpec{
+		rc.Spec = redkeyv1.RedkeyClusterSpec{
 			Auth:                 redkeyv1.RedisAuth{},
 			Version:              version,
 			Replicas:             replicas,
@@ -113,7 +113,7 @@ func EnsureClusterExistsOrCreate(
 		}
 
 		// Start with the user’s override (if any), or an empty one
-		var ov redkeyv1.RedKeyClusterOverrideSpec
+		var ov redkeyv1.RedkeyClusterOverrideSpec
 		if userOverride.StatefulSet != nil || userOverride.Service != nil {
 			ov = userOverride
 		}
@@ -142,7 +142,7 @@ func EnsureClusterExistsOrCreate(
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("upsert RedKeyCluster %s/%s: %w", key.Namespace, key.Name, err)
+		return fmt.Errorf("upsert RedkeyCluster %s/%s: %w", key.Namespace, key.Name, err)
 	}
 	return nil
 }
@@ -168,7 +168,7 @@ func WaitForStatus(
 	c client.Client,
 	key types.NamespacedName,
 	desired string,
-) (*redkeyv1.RedKeyCluster, error) {
+) (*redkeyv1.RedkeyCluster, error) {
 
 	const interval = 3 * time.Second
 	var last string
@@ -185,7 +185,7 @@ func WaitForStatus(
 	if err := wait.PollUntilContextTimeout(
 		ctx, interval, defaultTimeout, true,
 		func(ctx context.Context) (bool, error) {
-			rc := &redkeyv1.RedKeyCluster{}
+			rc := &redkeyv1.RedkeyCluster{}
 			if err := c.Get(ctx, key, rc); err != nil {
 				// keep polling if NotFound, abort on any other error
 				if errors.IsNotFound(err) {
@@ -204,20 +204,20 @@ func WaitForStatus(
 	}
 
 	// fetch the fresh object before returning
-	final := &redkeyv1.RedKeyCluster{}
+	final := &redkeyv1.RedkeyCluster{}
 	if err := c.Get(ctx, key, final); err != nil {
-		return nil, fmt.Errorf("fetch latest RedKeyCluster %s/%s: %w",
+		return nil, fmt.Errorf("fetch latest RedkeyCluster %s/%s: %w",
 			key.Namespace, key.Name, err)
 	}
 	return final, nil
 }
 
 // Convenience wrapper for waiting until “Ready”
-func WaitForReady(ctx context.Context, c client.Client, key types.NamespacedName) (*redkeyv1.RedKeyCluster, error) {
+func WaitForReady(ctx context.Context, c client.Client, key types.NamespacedName) (*redkeyv1.RedkeyCluster, error) {
 	return WaitForStatus(ctx, c, key, redkeyv1.StatusReady)
 }
 
-// ChangeCluster mutates the RedKeyCluster specified by key:
+// ChangeCluster mutates the RedkeyCluster specified by key:
 //
 //  1. wait until the cluster is Ready
 //  2. run opts.Mutate (wrapped in controller-runtime CreateOrUpdate +
@@ -229,7 +229,7 @@ func WaitForReady(ctx context.Context, c client.Client, key types.NamespacedName
 // were observed while waiting (useful for asserting “ScalingUp” / “Upgrading”
 // etc. occurred).
 type ChangeClusterOptions struct {
-	Mutate func(rc *redkeyv1.RedKeyCluster)
+	Mutate func(rc *redkeyv1.RedkeyCluster)
 }
 
 func ChangeCluster(
@@ -237,14 +237,14 @@ func ChangeCluster(
 	c client.Client,
 	key types.NamespacedName,
 	opts ChangeClusterOptions,
-) (*redkeyv1.RedKeyCluster, []string, error) {
+) (*redkeyv1.RedkeyCluster, []string, error) {
 	// 1) ensure initial Ready
 	if _, err := WaitForStatus(ctx, c, key, redkeyv1.StatusReady); err != nil {
 		return nil, nil, err
 	}
 
 	// 2) mutate (with retry-on-conflict)
-	rc := &redkeyv1.RedKeyCluster{ObjectMeta: metav1.ObjectMeta{Name: key.Name, Namespace: key.Namespace}}
+	rc := &redkeyv1.RedkeyCluster{ObjectMeta: metav1.ObjectMeta{Name: key.Name, Namespace: key.Namespace}}
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		_, err := controllerutil.CreateOrUpdate(ctx, c, rc, func() error {
 			opts.Mutate(rc)
@@ -253,7 +253,7 @@ func ChangeCluster(
 		})
 		return err
 	}); err != nil {
-		return nil, nil, fmt.Errorf("patch RedKeyCluster: %w", err)
+		return nil, nil, fmt.Errorf("patch RedkeyCluster: %w", err)
 	}
 
 	// 3) re-get to know the generation we just wrote
@@ -279,9 +279,9 @@ func WaitForReadyWithTrace(
 	cl client.Client,
 	key types.NamespacedName,
 	wantGen int64,
-) (*redkeyv1.RedKeyCluster, []string, error) {
+) (*redkeyv1.RedkeyCluster, []string, error) {
 	var (
-		rc        = &redkeyv1.RedKeyCluster{}
+		rc        = &redkeyv1.RedkeyCluster{}
 		trace     []string
 		readyHits int
 	)
@@ -337,7 +337,7 @@ func WaitForReadyWithTrace(
 // observed. prefer .status.observedGeneration; fall back to the
 // Ready condition; if both are zero, just return rc.Generation so
 // the waiter can still progress.
-func readyObservedGen(rc *redkeyv1.RedKeyCluster) int64 {
+func readyObservedGen(rc *redkeyv1.RedkeyCluster) int64 {
 	for _, c := range rc.Status.Conditions {
 		if c.Type == redkeyv1.StatusReady {
 			return c.ObservedGeneration // <- the only reliable place
@@ -346,7 +346,7 @@ func readyObservedGen(rc *redkeyv1.RedKeyCluster) int64 {
 	return rc.Generation // fallback
 }
 
-func CheckRedKeyCluster(k8Client client.Client, ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) (bool, error) {
+func CheckRedkeyCluster(k8Client client.Client, ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster) (bool, error) {
 	allPods := &corev1.PodList{}
 
 	labelSelector := labels.SelectorFromSet(
@@ -361,18 +361,18 @@ func CheckRedKeyCluster(k8Client client.Client, ctx context.Context, redkeyClust
 		LabelSelector: labelSelector,
 	})
 
-	rdclStatus, err := inspectRedKeyClusterStatus(allPods)
+	rdclStatus, err := inspectRedkeyClusterStatus(allPods)
 
 	if err != nil {
 		return false, err
 	}
 
-	isOkStatus := checkRedKeyClusterConditions(rdclStatus)
+	isOkStatus := checkRedkeyClusterConditions(rdclStatus)
 
 	return isOkStatus, nil
 }
 
-func GetPods(k8Client client.Client, ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) *corev1.PodList {
+func GetPods(k8Client client.Client, ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster) *corev1.PodList {
 	allPods := &corev1.PodList{}
 
 	labelSelector := labels.SelectorFromSet(
@@ -390,7 +390,7 @@ func GetPods(k8Client client.Client, ctx context.Context, redkeyCluster *redkeyv
 	return allPods
 }
 
-func RedisStsContainsOverride(sts appsv1.StatefulSet, override redkeyv1.RedKeyClusterOverrideSpec) bool {
+func RedisStsContainsOverride(sts appsv1.StatefulSet, override redkeyv1.RedkeyClusterOverrideSpec) bool {
 	// Labels and annotations in override must exist and have the same content in sts
 	for k, v := range override.StatefulSet.Spec.Template.Labels {
 		if sts.Spec.Template.Labels[k] != v {
@@ -532,7 +532,7 @@ func randomValue() string {
 	return randomNumber
 }
 
-func inspectRedKeyClusterStatus(pods *corev1.PodList) (ClusterStatus, error) {
+func inspectRedkeyClusterStatus(pods *corev1.PodList) (ClusterStatus, error) {
 	var cmd string
 	if len(pods.Items) == 0 {
 		return ClusterStatus{}, fmt.Errorf("no pods found")
@@ -549,7 +549,7 @@ func inspectRedKeyClusterStatus(pods *corev1.PodList) (ClusterStatus, error) {
 	return clusterStatus, nil
 }
 
-func checkRedKeyClusterConditions(clusterStatus ClusterStatus) bool {
+func checkRedkeyClusterConditions(clusterStatus ClusterStatus) bool {
 	statusOK := true
 
 	if strings.ToLower(clusterStatus.State) != "ok" {
@@ -608,10 +608,10 @@ func getNodeIPsFromStdOut(stdOut string) string {
 	return nodeIPs
 }
 
-// ValidateRedKeyClusterMasterSlave waits until Ready, then checks that
+// ValidateRedkeyClusterMasterSlave waits until Ready, then checks that
 // the number of masters & replicas-per-master match, and the StatefulSet
 // has the correct total replica count.
-func ValidateRedKeyClusterMasterSlave(
+func ValidateRedkeyClusterMasterSlave(
 	ctx context.Context,
 	c client.Client,
 	key types.NamespacedName,
@@ -659,7 +659,7 @@ func ValidateRedKeyClusterMasterSlave(
 	return true, nil
 }
 
-func InsertDataIntoCluster(ctx context.Context, k8sClient client.Client, nsName types.NamespacedName, redkeyCluster *redkeyv1.RedKeyCluster) (bool, error) {
+func InsertDataIntoCluster(ctx context.Context, k8sClient client.Client, nsName types.NamespacedName, redkeyCluster *redkeyv1.RedkeyCluster) (bool, error) {
 	selectedPods := &corev1.PodList{}
 	// Wait for ready status of redis-cluster
 	_, err := WaitForReady(ctx, k8sClient, nsName)
@@ -740,7 +740,7 @@ func updateService(
 	})
 }
 
-func ForgetANode(k8Client client.Client, ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) error {
+func ForgetANode(k8Client client.Client, ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster) error {
 	allPods := &corev1.PodList{}
 
 	labelSelector := labels.SelectorFromSet(
@@ -764,7 +764,7 @@ func ForgetANode(k8Client client.Client, ctx context.Context, redkeyCluster *red
 	return nil
 }
 
-func ForgetANodeFixAndMeet(k8Client client.Client, ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) error {
+func ForgetANodeFixAndMeet(k8Client client.Client, ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster) error {
 	allPods := &corev1.PodList{}
 
 	labelSelector := labels.SelectorFromSet(

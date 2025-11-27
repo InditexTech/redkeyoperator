@@ -64,18 +64,18 @@ type Configuration struct {
 type RedisConfig struct {
 	Standalone bool                  `yaml:"standalone"`
 	Reconciler RedisReconcilerConfig `yaml:"reconciler"`
-	Cluster    RedKeyClusterConfig   `yaml:"cluster"`
+	Cluster    RedkeyClusterConfig   `yaml:"cluster"`
 	Metrics    RedisMetricsConfig    `yaml:"metrics"`
 }
 
-// RedKeyOperatorConfig holds operator-level Redis configuration.
+// RedkeyOperatorConfig holds operator-level Redis configuration.
 type RedisReconcilerConfig struct {
 	IntervalSeconds                 int `yaml:"interval_seconds"`
 	OperationCleanupIntervalSeconds int `yaml:"operation_cleanup_interval_seconds"`
 }
 
-// RedKeyClusterConfig holds cluster-level Redis configuration.
-type RedKeyClusterConfig struct {
+// RedkeyClusterConfig holds cluster-level Redis configuration.
+type RedkeyClusterConfig struct {
 	Namespace                string        `yaml:"namespace"`
 	Name                     string        `yaml:"name"`
 	Replicas                 int           `yaml:"replicas"`
@@ -145,12 +145,12 @@ type Robin struct {
 	Logger logr.Logger
 }
 
-// Gets Robin initialized from a RedKeyCluster.
-func NewRobin(ctx context.Context, client ctrlClient.Client, redkeyCluster *redkeyv1.RedKeyCluster, logger logr.Logger) (Robin, error) {
+// Gets Robin initialized from a RedkeyCluster.
+func NewRobin(ctx context.Context, client ctrlClient.Client, redkeyCluster *redkeyv1.RedkeyCluster, logger logr.Logger) (Robin, error) {
 	componentLabel := kubernetes.GetStatefulSetSelectorLabel(ctx, client, redkeyCluster)
 	labelSelector := labels.SelectorFromSet(
 		map[string]string{
-			redis.RedKeyClusterLabel: redkeyCluster.Name,
+			redis.RedkeyClusterLabel: redkeyCluster.Name,
 			componentLabel:           common.ComponentLabelRobin,
 		},
 	)
@@ -215,7 +215,7 @@ func (r *Robin) SetStatus(status string) error {
 	return nil
 }
 
-func (r *Robin) SetAndPersistRobinStatus(ctx context.Context, client ctrlClient.Client, redkeyCluster *redkeyv1.RedKeyCluster, newStatus string) error {
+func (r *Robin) SetAndPersistRobinStatus(ctx context.Context, client ctrlClient.Client, redkeyCluster *redkeyv1.RedkeyCluster, newStatus string) error {
 	err := r.SetStatus(newStatus)
 	if err != nil {
 		return err
@@ -452,7 +452,7 @@ func (cn *ClusterNodes) GetReplicaNodes() []*Node {
 }
 
 // Updates configuration in Robin ConfigMap with the new status.
-func PersistRobinStatus(ctx context.Context, client ctrlClient.Client, redkeyCluster *redkeyv1.RedKeyCluster, newStatus string) error {
+func PersistRobinStatus(ctx context.Context, client ctrlClient.Client, redkeyCluster *redkeyv1.RedkeyCluster, newStatus string) error {
 	cmap := &corev1.ConfigMap{}
 	err := client.Get(ctx, types.NamespacedName{Name: redkeyCluster.Name + "-robin", Namespace: redkeyCluster.Namespace}, cmap)
 	if err != nil {
@@ -476,7 +476,7 @@ func PersistRobinStatus(ctx context.Context, client ctrlClient.Client, redkeyClu
 }
 
 // Updates configuration in Robin ConfigMap with the new replicas.
-func PersistRobinReplicas(ctx context.Context, client ctrlClient.Client, redkeyCluster *redkeyv1.RedKeyCluster, replicas int, replicasPerMaster int) error {
+func PersistRobinReplicas(ctx context.Context, client ctrlClient.Client, redkeyCluster *redkeyv1.RedkeyCluster, replicas int, replicasPerMaster int) error {
 	cmap := &corev1.ConfigMap{}
 	err := client.Get(ctx, types.NamespacedName{Name: redkeyCluster.Name + "-robin", Namespace: redkeyCluster.Namespace}, cmap)
 	if err != nil {

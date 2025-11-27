@@ -37,20 +37,20 @@ func FindExistingConfigMap(ctx context.Context, client client.Client, req ctrl.R
 	return cmap, nil
 }
 
-func GetStatefulSetSelectorLabel(ctx context.Context, client client.Client, redkeyCluster *redkeyv1.RedKeyCluster) string {
+func GetStatefulSetSelectorLabel(ctx context.Context, client client.Client, redkeyCluster *redkeyv1.RedkeyCluster) string {
 	statefulset, err := FindExistingStatefulSet(ctx, client, reconcile.Request{NamespacedName: types.NamespacedName{
 		Name:      redkeyCluster.Name,
 		Namespace: redkeyCluster.Namespace,
 	}})
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return redis.RedKeyClusterComponentLabel
+			return redis.RedkeyClusterComponentLabel
 		}
 		return ""
 	}
-	if statefulset.Spec.Template.Labels[redis.RedKeyClusterComponentLabel] != "" {
+	if statefulset.Spec.Template.Labels[redis.RedkeyClusterComponentLabel] != "" {
 		// new label
-		return redis.RedKeyClusterComponentLabel
+		return redis.RedkeyClusterComponentLabel
 	} else {
 		return "app"
 	}

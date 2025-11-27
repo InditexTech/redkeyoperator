@@ -17,7 +17,7 @@ import (
 type ConfigMapCleanupFinalizer struct {
 }
 
-func (ef *ConfigMapCleanupFinalizer) DeleteMethod(ctx context.Context, redis *redkeyv1.RedKeyCluster, client client.Client) error {
+func (ef *ConfigMapCleanupFinalizer) DeleteMethod(ctx context.Context, redis *redkeyv1.RedkeyCluster, client client.Client) error {
 	err := client.Delete(ctx, &corev1.ConfigMap{
 		ObjectMeta: v1.ObjectMeta{Name: redis.GetName(), Namespace: redis.GetNamespace()},
 	})

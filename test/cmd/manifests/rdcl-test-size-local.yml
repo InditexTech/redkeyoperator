@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 apiVersion: redis.inditex.com/v1
-kind: RedKeyCluster
+kind: RedkeyCluster
 metadata:
   annotations:
     amiga-admin: ""
