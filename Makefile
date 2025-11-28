@@ -252,12 +252,12 @@ process-manifests: kustomize process-manifests-crd ##		Generate the kustomized y
 		(cd config/deploy-profiles/${PROFILE} && \
 			$(KUSTOMIZE) edit set image redkey-operator=${IMG}); \
 		$(KUSTOMIZE) build config/deploy-profiles/dev > deployment/manager.yaml; \
-		$(SED) -i 's/watch-namespace/$(NAMESPACE)/' deployment/manager.yaml; \
+		$(SED) -i -e 's/watch-namespace/$(NAMESPACE)/' deployment/manager.yaml; \
 	elif [ ${PROFILE} == "debug" ]; then \
 		(cd config/deploy-profiles/${PROFILE} && \
 			$(KUSTOMIZE) edit set image redkey-operator=${IMG_DEBUG}); \
 		$(KUSTOMIZE) build config/deploy-profiles/debug > deployment/manager.yaml; \
-		$(SED) -i 's/watch-namespace/$(NAMESPACE)/' deployment/manager.yaml; \
+		$(SED) -i -e 's/watch-namespace/$(NAMESPACE)/' deployment/manager.yaml; \
 	fi
 	rm config/deploy-profiles/${PROFILE}/kustomization.yaml
 	mv config/deploy-profiles/${PROFILE}/kustomization.yaml.orig config/deploy-profiles/${PROFILE}/kustomization.yaml
