@@ -30,11 +30,12 @@ import (
 )
 
 const (
-	DefaultRequeueTimeout   time.Duration = 5
-	UpgradingDefaultTimeout time.Duration = 30
-	ScalingDefaultTimeout   time.Duration = 30
-	ReadyRequeueTimeout     time.Duration = 30
-	ErrorRequeueTimeout     time.Duration = 30
+	DefaultRequeueTimeout     time.Duration = 5
+	UpgradingDefaultTimeout   time.Duration = 30
+	ScalingDefaultTimeout     time.Duration = 30
+	ReadyRequeueTimeout       time.Duration = 30
+	ErrorRequeueTimeout       time.Duration = 30
+	MaintenanceRequeueTimeout time.Duration = 30
 )
 
 func NewRedkeyClusterReconciler(mgr ctrl.Manager, maxConcurrentReconciles int, concurrentMigrates int) *RedkeyClusterReconciler {
@@ -118,6 +119,8 @@ func (r *RedkeyClusterReconciler) ReconcileClusterObject(ctx context.Context, re
 		requeue, requeueAfter = r.reconcileStatusScalingUp(ctx, redkeyCluster)
 	case redkeyv1.StatusError:
 		requeue, requeueAfter = r.reconcileStatusError(ctx, redkeyCluster)
+	case redkeyv1.StatusMaintenance:
+		requeue, requeueAfter = r.reconcileStatusMaintenance(ctx, redkeyCluster)
 	default:
 		r.logError(redkeyCluster.NamespacedName(), nil, "Status not allowed", "status", redkeyCluster.Status.Status)
 		return ctrl.Result{}, nil
@@ -127,6 +130,7 @@ func (r *RedkeyClusterReconciler) ReconcileClusterObject(ctx context.Context, re
 		r.logError(redkeyCluster.NamespacedName(), err, "Error updating cluster nodes")
 	}
 
+	// Update RedkeyCluster status if it has changed during reconciliation.
 	var updateErr error
 	if !redkeyv1.IsFastOperationStatus(redkeyCluster.Status.Substatus) && !redkeyv1.CompareStatuses(&redkeyCluster.Status, &currentStatus) {
 		updateErr = r.updateClusterStatus(ctx, redkeyCluster)
@@ -256,8 +260,13 @@ func (r *RedkeyClusterReconciler) reconcileStatusReady(ctx context.Context, redk
 	var requeue = true
 	var requeueAfter time.Duration = ReadyRequeueTimeout
 
+	err := r.checkComingFromMaintenance(ctx, redkeyCluster)
+	if err != nil {
+		r.logError(redkeyCluster.NamespacedName(), err, "Error checking coming from maintenance mode")
+	}
+
 	// Reconcile PDB
-	err := r.checkAndUpdatePodDisruptionBudget(ctx, redkeyCluster)
+	err = r.checkAndUpdatePodDisruptionBudget(ctx, redkeyCluster)
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error checking PDB changes")
 	}
@@ -361,6 +370,35 @@ func (r *RedkeyClusterReconciler) reconcileStatusError(ctx context.Context, redk
 			r.logError(redkeyCluster.NamespacedName(), err, "Error when updating upgrading status")
 			r.Recorder.Event(redkeyCluster, "Warning", "ClusterError", err.Error())
 		}
+	}
+
+	return requeue, requeueAfter
+}
+
+func (r *RedkeyClusterReconciler) reconcileStatusMaintenance(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster) (bool, time.Duration) {
+	var requeue = true
+	var requeueAfter = MaintenanceRequeueTimeout
+
+	r.logInfo(redkeyCluster.NamespacedName(), "Redkey cluster in Maintenance mode")
+
+	logger := r.getHelperLogger((redkeyCluster.NamespacedName()))
+	robinRedis, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
+	if err != nil {
+		r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin to check the cluster readiness")
+		return true, DefaultRequeueTimeout
+	}
+	status, err := robinRedis.GetStatus()
+	if err != nil {
+		r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin status")
+		return true, DefaultRequeueTimeout
+	}
+	if status != redkeyv1.RobinStatusMaintenance {
+		err = robinRedis.SetStatus(redkeyv1.RobinStatusMaintenance)
+		if err != nil {
+			r.logError(redkeyCluster.NamespacedName(), err, "Error setting Robin status to Maintenance")
+			return true, DefaultRequeueTimeout
+		}
+		r.logInfo(redkeyCluster.NamespacedName(), "Robin status set to Maintenance", "originalStatus", status, "newStatus", redkeyv1.RobinStatusMaintenance)
 	}
 
 	return requeue, requeueAfter
@@ -531,6 +569,30 @@ func (r *RedkeyClusterReconciler) checkFinalizers(ctx context.Context, redkeyClu
 	}
 
 	return false, nil
+}
+
+func (r *RedkeyClusterReconciler) checkComingFromMaintenance(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster) error {
+	logger := r.getHelperLogger((redkeyCluster.NamespacedName()))
+	robinRedis, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
+	if err != nil {
+		r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin to check the cluster readiness")
+		return err
+	}
+	status, err := robinRedis.GetStatus()
+	if err != nil {
+		r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin status")
+		return err
+	}
+	if status == redkeyv1.RobinStatusMaintenance {
+		err = robinRedis.SetStatus(redkeyv1.RobinStatusReady)
+		if err != nil {
+			r.logError(redkeyCluster.NamespacedName(), err, "Error setting Robin status to Ready")
+			return err
+		}
+		r.logInfo(redkeyCluster.NamespacedName(), "Robin status set to Ready", "originalStatus", status, "newStatus", redkeyv1.RobinStatusReady)
+	}
+
+	return nil
 }
 
 func (r *RedkeyClusterReconciler) FindExistingStatefulSet(ctx context.Context, req ctrl.Request) (*v1.StatefulSet, error) {

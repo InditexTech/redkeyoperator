@@ -46,6 +46,8 @@ import (
 //   - Scaling up when in StatusScalingUp status goes wrong.
 //   - Scaling down when in StatusScalingDown status goes wrong.
 //     The operator tries to recover the cluster from error checking the configuration and/or scaling the cluster.
+//
+// Maintenance: The cluster is under maintenance mode, the operator won't perform any operations on it. Robin will be updated with this status too.
 const (
 	StatusUpgrading    = "Upgrading"
 	StatusScalingDown  = "ScalingDown"
@@ -54,6 +56,7 @@ const (
 	StatusConfiguring  = "Configuring"
 	StatusInitializing = "Initializing"
 	StatusError        = "Error"
+	StatusMaintenance  = "Maintenance"
 
 	RobinStatusNoReconciling = "NoReconciling"
 	RobinStatusUpgrading     = "Upgrading"
@@ -63,6 +66,7 @@ const (
 	RobinStatusConfiguring   = "Configuring"
 	RobinStatusInitializing  = "Initializing"
 	RobinStatusError         = "Error"
+	RobinStatusMaintenance   = "Maintenance"
 
 	SubstatusFastUpgrading        = "FastUpgrading"
 	SubstatusEndingFastUpgrading  = "EndingFastUpgrading"
@@ -339,6 +343,8 @@ func GetRobinStatusCodeEquivalence(redkeyClusterStatus string) string {
 		return RobinStatusInitializing
 	case StatusError:
 		return RobinStatusError
+	case StatusMaintenance:
+		return RobinStatusMaintenance
 	default:
 		return RobinStatusError
 	}
