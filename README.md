@@ -26,7 +26,7 @@ Redkey operator is built using [kubebuilder](https://github.com/kubernetes-sigs/
 
 Refer to [operator guide](./docs/operator-guide/toc.md) to have an overview of the main Redis configuration and management options, and a troubleshooting guide.
 
-If you are a developer, you'll find interesting information in the [developer guide](./docs/developer-guide.md).
+If you are a developer, you'll find interesting information in the [developer guide](./docs/developer-guide/toc.md).
 
 Learn about [Redkey Cluster Status and Substatus](./docs/redkey-cluster-status.md).
 

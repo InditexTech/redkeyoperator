@@ -132,4 +132,4 @@ spec:
 
 ## How to develop Robin
 
-Please refer to [Redkey Robin](../developer-guide.md#redkey-robin) section of the Developer Guide to know how to develop, build and deploy Robin for development and debugging purposes.
+Please refer to [Redkey Robin](../developer-guide/operator-development.md#redkey-robin) section of the Operador Development Guide to know how to develop, build and deploy Robin for development and debugging purposes.
