@@ -202,8 +202,8 @@ func (r *RedkeyClusterReconciler) updateUpgradingStatus(ctx context.Context, red
 		maps.Copy(desiredLabels, *redkeyCluster.Spec.Labels)
 
 		// Add labels from override
-		if redkeyCluster.Spec.Override != nil && redkeyCluster.Spec.Override.StatefulSet != nil && redkeyCluster.Spec.Override.StatefulSet.Spec.Template.Labels != nil {
-			for k2, v2 := range redkeyCluster.Spec.Override.StatefulSet.Spec.Template.Labels {
+		if redkeyCluster.Spec.Override != nil && redkeyCluster.Spec.Override.StatefulSet != nil && redkeyCluster.Spec.Override.StatefulSet.Spec != nil && redkeyCluster.Spec.Override.StatefulSet.Spec.Template != nil && redkeyCluster.Spec.Override.StatefulSet.Spec.Template.Metadata.Labels != nil {
+			for k2, v2 := range redkeyCluster.Spec.Override.StatefulSet.Spec.Template.Metadata.Labels {
 				desiredLabels[k2] = v2
 			}
 		}

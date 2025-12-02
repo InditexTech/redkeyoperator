@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
 	"github.com/inditextech/redkeyoperator/internal/common"
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
@@ -344,24 +345,24 @@ func Test_ApplyStsOverride(t *testing.T) {
 	tests := []struct {
 		name        string
 		original    *appsv1.StatefulSet
-		patch       *appsv1.StatefulSet
+		patch       *redkeyv1.PartialStatefulSet
 		expected    *appsv1.StatefulSet
 		expectedErr error
 	}{
 		{
 			name:        "Patch empty",
 			original:    redisStatefulSet,
-			patch:       &appsv1.StatefulSet{},
+			patch:       &redkeyv1.PartialStatefulSet{},
 			expected:    redisStatefulSet,
 			expectedErr: nil,
 		},
 		{
 			name:     "Sidecar container",
 			original: redisStatefulSet,
-			patch: &appsv1.StatefulSet{
-				Spec: appsv1.StatefulSetSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
+			patch: &redkeyv1.PartialStatefulSet{
+				Spec: &redkeyv1.PartialStatefulSetSpec{
+					Template: &redkeyv1.PartialPodTemplateSpec{
+						Spec: redkeyv1.PartialPodSpec{
 							Containers: []corev1.Container{
 								{
 									Name:  "sidecar",
@@ -552,17 +553,17 @@ func Test_ApplyStsOverride(t *testing.T) {
 					ReadyReplicas: 3,
 				},
 			},
-			patch:       &appsv1.StatefulSet{},
+			patch:       &redkeyv1.PartialStatefulSet{},
 			expected:    redisStatefulSet,
 			expectedErr: nil,
 		},
 		{
 			name:     "Add volume and init container",
 			original: redisStatefulSet,
-			patch: &appsv1.StatefulSet{
-				Spec: appsv1.StatefulSetSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
+			patch: &redkeyv1.PartialStatefulSet{
+				Spec: &redkeyv1.PartialStatefulSetSpec{
+					Template: &redkeyv1.PartialPodTemplateSpec{
+						Spec: redkeyv1.PartialPodSpec{
 							Volumes: []corev1.Volume{
 								{
 									Name: "data-override",
@@ -762,17 +763,17 @@ func Test_ApplyStsOverride(t *testing.T) {
 					ReadyReplicas: 3,
 				},
 			},
-			patch:       &appsv1.StatefulSet{},
+			patch:       &redkeyv1.PartialStatefulSet{},
 			expected:    redisStatefulSet,
 			expectedErr: nil,
 		},
 		{
 			name:     "Add tolerations, topology constraint and affinity",
 			original: redisStatefulSet,
-			patch: &appsv1.StatefulSet{
-				Spec: appsv1.StatefulSetSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
+			patch: &redkeyv1.PartialStatefulSet{
+				Spec: &redkeyv1.PartialStatefulSetSpec{
+					Template: &redkeyv1.PartialPodTemplateSpec{
+						Spec: redkeyv1.PartialPodSpec{
 							Tolerations: []corev1.Toleration{
 								{
 									Key:      "key",
@@ -1030,7 +1031,7 @@ func Test_ApplyStsOverride(t *testing.T) {
 					ReadyReplicas: 3,
 				},
 			},
-			patch:       &appsv1.StatefulSet{},
+			patch:       &redkeyv1.PartialStatefulSet{},
 			expected:    redisStatefulSet,
 			expectedErr: nil,
 		},
@@ -1053,22 +1054,22 @@ func Test_ApplyServiceOverride(t *testing.T) {
 	tests := []struct {
 		name        string
 		original    *corev1.Service
-		patch       *corev1.Service
+		patch       *redkeyv1.PartialService
 		expected    *corev1.Service
 		expectedErr error
 	}{
 		{
 			name:        "Patch empty",
 			original:    redisService,
-			patch:       &corev1.Service{},
+			patch:       &redkeyv1.PartialService{},
 			expected:    redisService,
 			expectedErr: nil,
 		},
 		{
 			name:     "Add labels and annotations",
 			original: redisService,
-			patch: &corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
+			patch: &redkeyv1.PartialService{
+				Metadata: metav1.ObjectMeta{
 					Labels:      map[string]string{"new-label": "new-value"},
 					Annotations: map[string]string{"new-annotation": "new-value"},
 				},
@@ -1103,8 +1104,8 @@ func Test_ApplyServiceOverride(t *testing.T) {
 		{
 			name:     "Add selector",
 			original: redisService,
-			patch: &corev1.Service{
-				Spec: corev1.ServiceSpec{
+			patch: &redkeyv1.PartialService{
+				Spec: &redkeyv1.PartialServiceSpec{
 					Selector: map[string]string{"new-selector": "new-value"},
 				},
 			},
@@ -1160,15 +1161,15 @@ func Test_ApplyServiceOverride(t *testing.T) {
 					ClusterIP: "None",
 				},
 			},
-			patch:       &corev1.Service{},
+			patch:       &redkeyv1.PartialService{},
 			expected:    redisService,
 			expectedErr: nil,
 		},
 		{
 			name:     "Add port",
 			original: redisService,
-			patch: &corev1.Service{
-				Spec: corev1.ServiceSpec{
+			patch: &redkeyv1.PartialService{
+				Spec: &redkeyv1.PartialServiceSpec{
 					Ports: []corev1.ServicePort{
 						{
 							Name:     "prometheus",
@@ -1249,7 +1250,7 @@ func Test_ApplyServiceOverride(t *testing.T) {
 					ClusterIP: "None",
 				},
 			},
-			patch:       &corev1.Service{},
+			patch:       &redkeyv1.PartialService{},
 			expected:    redisService,
 			expectedErr: nil,
 		},

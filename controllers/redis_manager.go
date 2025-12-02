@@ -167,7 +167,7 @@ func (r *RedkeyClusterReconciler) doFastUpgrade(ctx context.Context, redkeyClust
 		// Fast upgrade start: If purgeKeysOnRebalance property is set to 'true' and we have no primaries. No need to iterate over the partitions.
 		// If fast upgrade is not allowed but we have no primaries, the cluster must be scaled up adding one extra
 		// node to be able to move slots and keys in order to ensure keys are preserved.
-		if redkeyCluster.Spec.PurgeKeysOnRebalance && redkeyCluster.Spec.ReplicasPerPrimary == 0 {
+		if redkeyCluster.Spec.PurgeKeysOnRebalance != nil && *redkeyCluster.Spec.PurgeKeysOnRebalance && redkeyCluster.Spec.ReplicasPerPrimary == 0 {
 			r.logInfo(redkeyCluster.NamespacedName(), "Fast upgrade will be performed")
 
 			err := r.updateClusterSubStatus(ctx, redkeyCluster, redkeyv1.SubstatusFastUpgrading, "")
@@ -742,8 +742,8 @@ func (r *RedkeyClusterReconciler) upgradeClusterConfigurationUpdate(ctx context.
 	existingStatefulSet.Labels = mergedLabels
 
 	// Add labels from override
-	if redkeyCluster.Spec.Override.StatefulSet != nil && redkeyCluster.Spec.Override.StatefulSet.Spec.Template.Labels != nil {
-		maps.Copy(mergedLabels, redkeyCluster.Spec.Override.StatefulSet.Spec.Template.Labels)
+	if redkeyCluster.Spec.Override.StatefulSet != nil && redkeyCluster.Spec.Override.StatefulSet.Spec != nil && redkeyCluster.Spec.Override.StatefulSet.Spec.Template != nil && redkeyCluster.Spec.Override.StatefulSet.Spec.Template.Metadata.Labels != nil {
+		maps.Copy(mergedLabels, redkeyCluster.Spec.Override.StatefulSet.Spec.Template.Metadata.Labels)
 	}
 
 	existingStatefulSet.Spec.Template.ObjectMeta.Labels = mergedLabels
@@ -846,7 +846,7 @@ func (r *RedkeyClusterReconciler) doFastScaling(ctx context.Context, redkeyClust
 		return true, nil
 	default:
 		// Fast scaling start: If purgeKeysOnRebalance property is set to 'true' and we have no replicasPerPrimary set. No need to iterate over the partitions.
-		if redkeyCluster.Spec.PurgeKeysOnRebalance && redkeyCluster.Spec.ReplicasPerPrimary == 0 {
+		if redkeyCluster.Spec.PurgeKeysOnRebalance != nil && *redkeyCluster.Spec.PurgeKeysOnRebalance && redkeyCluster.Spec.ReplicasPerPrimary == 0 {
 			r.logInfo(redkeyCluster.NamespacedName(), "Fast upgrading will be performed")
 
 			err := r.updateClusterSubStatus(ctx, redkeyCluster, redkeyv1.SubstatusFastScaling, "")
@@ -1050,7 +1050,7 @@ func (r *RedkeyClusterReconciler) completeClusterScaleDown(ctx context.Context, 
 			return true, err
 		}
 
-		if redkeyCluster.Spec.DeletePVC && !redkeyCluster.Spec.Ephemeral {
+		if redkeyCluster.Spec.DeletePVC != nil && *redkeyCluster.Spec.DeletePVC && !redkeyCluster.Spec.Ephemeral {
 			culledNodes, err := r.getCulledNodes(ctx, redkeyCluster)
 			if err != nil {
 				r.logError(redkeyCluster.NamespacedName(), err, "Error getting culled nodes")

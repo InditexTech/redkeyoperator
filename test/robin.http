@@ -1,5 +1,5 @@
 # Robin base URL. Update the IP before launching any of the requests.
-@robinBaseUrl = http://10.244.0.150:8080
+@robinBaseUrl = http://10.244.0.32:8080
 
 # Metrics
 

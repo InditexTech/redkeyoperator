@@ -226,12 +226,12 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 			{
 				name: "apply-tolerations-topology",
 				initial: &redkeyv1.RedkeyClusterOverrideSpec{
-					StatefulSet: &appsv1.StatefulSet{Spec: appsv1.StatefulSetSpec{
-						Template: corev1.PodTemplateSpec{
-							ObjectMeta: metav1.ObjectMeta{
+					StatefulSet: &redkeyv1.PartialStatefulSet{Spec: &redkeyv1.PartialStatefulSetSpec{
+						Template: &redkeyv1.PartialPodTemplateSpec{
+							Metadata: metav1.ObjectMeta{
 								Labels: map[string]string{"testLabel": "true"},
 							},
-							Spec: corev1.PodSpec{
+							Spec: redkeyv1.PartialPodSpec{
 								Tolerations: []corev1.Toleration{{
 									Key: "testToleration", Operator: corev1.TolerationOpExists,
 									Effect: corev1.TaintEffectNoSchedule,
@@ -244,7 +244,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 					return framework.RedisStsContainsOverride(
 						*sts,
 						redkeyv1.RedkeyClusterOverrideSpec{
-							StatefulSet: &appsv1.StatefulSet{Spec: sts.Spec}, // only care it’s present
+							StatefulSet: &redkeyv1.PartialStatefulSet{Spec: &redkeyv1.PartialStatefulSetSpec{}}, // only care it’s present
 						})
 				},
 			},
@@ -252,8 +252,8 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				name:    "add-side-car",
 				initial: &redkeyv1.RedkeyClusterOverrideSpec{}, // start clean
 				update: &redkeyv1.RedkeyClusterOverrideSpec{
-					StatefulSet: &appsv1.StatefulSet{Spec: appsv1.StatefulSetSpec{
-						Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+					StatefulSet: &redkeyv1.PartialStatefulSet{Spec: &redkeyv1.PartialStatefulSetSpec{
+						Template: &redkeyv1.PartialPodTemplateSpec{Spec: redkeyv1.PartialPodSpec{
 							Containers: []corev1.Container{{
 								Name:    "test-sidecar",
 								Image:   getSidecarImage(),
@@ -267,8 +267,8 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 			{
 				name: "remove-side-car",
 				initial: &redkeyv1.RedkeyClusterOverrideSpec{
-					StatefulSet: &appsv1.StatefulSet{Spec: appsv1.StatefulSetSpec{
-						Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+					StatefulSet: &redkeyv1.PartialStatefulSet{Spec: &redkeyv1.PartialStatefulSetSpec{
+						Template: &redkeyv1.PartialPodTemplateSpec{Spec: redkeyv1.PartialPodSpec{
 							Containers: []corev1.Container{{
 								Name:    "test-sidecar",
 								Image:   getSidecarImage(),
@@ -278,8 +278,8 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 					}},
 				},
 				update: &redkeyv1.RedkeyClusterOverrideSpec{
-					StatefulSet: &appsv1.StatefulSet{Spec: appsv1.StatefulSetSpec{
-						Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: nil}},
+					StatefulSet: &redkeyv1.PartialStatefulSet{Spec: &redkeyv1.PartialStatefulSetSpec{
+						Template: &redkeyv1.PartialPodTemplateSpec{Spec: redkeyv1.PartialPodSpec{Containers: nil}},
 					}},
 				},
 				validateSTS: wantContainers(1),

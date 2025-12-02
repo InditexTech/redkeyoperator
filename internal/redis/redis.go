@@ -134,26 +134,51 @@ func CreateStatefulSet(ctx context.Context, req ctrl.Request, spec redkeyv1.Redk
 	return redisStatefulSet, err
 }
 
-func ApplyStsOverride(sts, override *v1.StatefulSet) (*v1.StatefulSet, error) {
+func ApplyStsOverride(sts *v1.StatefulSet, override *redkeyv1.PartialStatefulSet) (*v1.StatefulSet, error) {
+	// Use override.Spec directly; since it's a pointer, can be nil
+	var overrideSpec *redkeyv1.PartialStatefulSetSpec
+	if override != nil {
+		overrideSpec = override.Spec
+	}
+
 	// Set an empty selector if override does not set it. This is because a merge with nil removes the field in the merged result
-	if override.Spec.Selector == nil {
-		override.Spec.Selector = &metav1.LabelSelector{}
+	if overrideSpec == nil || overrideSpec.Selector == nil {
+		if overrideSpec == nil {
+			overrideSpec = &redkeyv1.PartialStatefulSetSpec{}
+		}
+		overrideSpec.Selector = &metav1.LabelSelector{}
 	}
 
 	// Copy the original serviceName. This is because if not, merged.Spec.ServiceName will be "" (override content)
-	override.Spec.ServiceName = sts.Spec.ServiceName
+	if overrideSpec != nil {
+		overrideSpec.ServiceName = sts.Spec.ServiceName
+	}
 
-	// Copy the original creationTimestamp and status
-	override.ObjectMeta.CreationTimestamp = sts.ObjectMeta.CreationTimestamp
-	override.Status = sts.Status
+	// Copy the original creationTimestamp
+	if override != nil {
+		override.Metadata.CreationTimestamp = sts.ObjectMeta.CreationTimestamp
+	}
 
-	// Marshal the original and the override to json
+	// Marshal the original and the override (built from typed spec + metadata) to json
 	original, err := json.Marshal(sts)
 	if err != nil {
 		return nil, err
 	}
 
-	patch, err := json.Marshal(override)
+	// Build a temporary object to marshal as patch: include metadata and the partial spec
+	patchObj := struct {
+		APIVersion string                           `json:"apiVersion,omitempty"`
+		Kind       string                           `json:"kind,omitempty"`
+		Metadata   metav1.ObjectMeta                `json:"metadata,omitempty"`
+		Spec       *redkeyv1.PartialStatefulSetSpec `json:"spec,omitempty"`
+	}{
+		APIVersion: override.APIVersion,
+		Kind:       override.Kind,
+		Metadata:   override.Metadata,
+		Spec:       overrideSpec,
+	}
+
+	patch, err := json.Marshal(patchObj)
 	if err != nil {
 		return nil, err
 	}
@@ -171,17 +196,17 @@ func ApplyStsOverride(sts, override *v1.StatefulSet) (*v1.StatefulSet, error) {
 		return nil, err
 	}
 
-	// Clean result
-	cleanStatefulSetResult(result, sts, override)
+	// Clean result; pass the partial override spec
+	cleanStatefulSetResult(result, sts, overrideSpec)
 
 	return result, nil
 }
 
-func cleanStatefulSetResult(result, original, override *v1.StatefulSet) {
+func cleanStatefulSetResult(result *v1.StatefulSet, original *v1.StatefulSet, overrideSpec *redkeyv1.PartialStatefulSetSpec) {
 	// Include the original redis container if the override does not set it. This can happen when the override containers is empty.
 	// This could also be handled before the strategic merge patch, initializing the override containers with the original one or an empty array if it is empty.
 	// However, that way the container deletion is not correctly handled, keeping the original container if the override container is empty.
-	if result.Spec.Template.Spec.Containers == nil {
+	if overrideSpec.Template == nil || overrideSpec.Template.Spec.Containers == nil {
 		result.Spec.Template.Spec.Containers = []corev1.Container{original.Spec.Template.Spec.Containers[0]}
 	}
 
@@ -217,7 +242,7 @@ func cleanStatefulSetResult(result, original, override *v1.StatefulSet) {
 	}
 
 	// Assure to clean volumes if override does not set them
-	if len(override.Spec.Template.Spec.Volumes) == 0 {
+	if overrideSpec == nil || overrideSpec.Template == nil || len(overrideSpec.Template.Spec.Volumes) == 0 {
 		result.Spec.Template.Spec.Volumes = []corev1.Volume{}
 
 		// Mantain the config and data volumes (if exists)
@@ -229,22 +254,22 @@ func cleanStatefulSetResult(result, original, override *v1.StatefulSet) {
 	}
 
 	// Assure to clean tolerations if override does not set them
-	if len(override.Spec.Template.Spec.Tolerations) == 0 {
+	if overrideSpec == nil || overrideSpec.Template == nil || len(overrideSpec.Template.Spec.Tolerations) == 0 {
 		result.Spec.Template.Spec.Tolerations = nil
 	}
 
 	// Assure to clean TopologySpreadConstraints if override does not set them
-	if len(override.Spec.Template.Spec.TopologySpreadConstraints) == 0 {
+	if overrideSpec == nil || overrideSpec.Template == nil || len(overrideSpec.Template.Spec.TopologySpreadConstraints) == 0 {
 		result.Spec.Template.Spec.TopologySpreadConstraints = nil
 	}
 
 	// Assure to clean Affinity if override does not set them
-	if override.Spec.Template.Spec.Affinity == nil {
+	if overrideSpec == nil || overrideSpec.Template == nil || overrideSpec.Template.Spec.Affinity == nil {
 		result.Spec.Template.Spec.Affinity = nil
 	}
 
 	// Assure to clean InitContainers if override does not set them
-	if len(override.Spec.Template.Spec.InitContainers) == 0 {
+	if overrideSpec == nil || overrideSpec.Template == nil || len(overrideSpec.Template.Spec.InitContainers) == 0 {
 		result.Spec.Template.Spec.InitContainers = nil
 	}
 }
@@ -337,17 +362,38 @@ func CreateService(Namespace, Name string, labels map[string]string) *corev1.Ser
 	}
 }
 
-func ApplyServiceOverride(service, override *corev1.Service) (*corev1.Service, error) {
-	// Assure to copy the original ClusterIP to not allow overriding it
-	override.Spec.ClusterIP = service.Spec.ClusterIP
+func ApplyServiceOverride(service *corev1.Service, override *redkeyv1.PartialService) (*corev1.Service, error) {
+	// Use override.Spec directly; since it's a pointer, can be nil
+	var overrideSpec *redkeyv1.PartialServiceSpec
+	if override != nil {
+		overrideSpec = override.Spec
+	}
 
-	// Marshal the original and the override to json
+	// Assure to copy the original ClusterIP to not allow overriding it
+	if overrideSpec == nil {
+		overrideSpec = &redkeyv1.PartialServiceSpec{}
+	}
+	overrideSpec.ClusterIP = service.Spec.ClusterIP
+
+	// Marshal original and a patch built from metadata + typed spec
 	original, err := json.Marshal(service)
 	if err != nil {
 		return nil, err
 	}
 
-	patch, err := json.Marshal(override)
+	patchObj := struct {
+		APIVersion string                       `json:"apiVersion,omitempty"`
+		Kind       string                       `json:"kind,omitempty"`
+		Metadata   metav1.ObjectMeta            `json:"metadata,omitempty"`
+		Spec       *redkeyv1.PartialServiceSpec `json:"spec,omitempty"`
+	}{
+		APIVersion: override.APIVersion,
+		Kind:       override.Kind,
+		Metadata:   override.Metadata,
+		Spec:       overrideSpec,
+	}
+
+	patch, err := json.Marshal(patchObj)
 	if err != nil {
 		return nil, err
 	}
@@ -365,15 +411,15 @@ func ApplyServiceOverride(service, override *corev1.Service) (*corev1.Service, e
 		return nil, err
 	}
 
-	// Clean result
-	cleanServiceResult(result, service, override)
+	// Clean result using the partial override spec
+	cleanServiceResult(result, service, overrideSpec, override)
 
 	return result, nil
 }
 
-func cleanServiceResult(result, original, override *corev1.Service) {
+func cleanServiceResult(result *corev1.Service, original *corev1.Service, overrideSpec *redkeyv1.PartialServiceSpec, override *redkeyv1.PartialService) {
 	// Assure to clean ports if override does not set them
-	if len(override.Spec.Ports) == 0 {
+	if overrideSpec == nil || len(overrideSpec.Ports) == 0 {
 		result.Spec.Ports = []corev1.ServicePort{}
 	}
 
@@ -391,7 +437,7 @@ func cleanServiceResult(result, original, override *corev1.Service) {
 	}
 
 	// Assure to clean selector if override does not set them
-	if len(override.Spec.Selector) == 0 {
+	if overrideSpec == nil || len(overrideSpec.Selector) == 0 {
 		result.Spec.Selector = map[string]string{RedkeyClusterLabel: original.Name, RedkeyClusterComponentLabel: common.ComponentLabelRedis}
 	}
 }

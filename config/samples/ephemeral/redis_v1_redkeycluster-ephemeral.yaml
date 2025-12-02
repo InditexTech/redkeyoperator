@@ -7,16 +7,15 @@ metadata:
   name: redis-cluster-ephemeral
 spec:
   primaries: 3
-  replicasPerPrimary: 0
+  # replicasPerPrimary: 0
   ephemeral: true
   accessModes: 
   - ReadWriteOnce
-  deletePVC: false
   image: redis:8-bookworm
   purgeKeysOnRebalance: true
   labels:
-    team: team-a
-    custom: labels
+    team: a-team
+    custom: custom-label
   config: |
     maxmemory 90mb
     maxmemory-samples 5
@@ -98,7 +97,7 @@ spec:
   #   service:
   #     metadata:
   #       annotations:
-  #         traffic.inditex.dev/weight: "101"
+  #         traffic.inditex.dev/weight: "80"
   #       labels:
   #         inditex.dev/test: "test"
   #     spec:
@@ -107,12 +106,12 @@ spec:
   #         port: 9090
   #         targetPort: 9090
   #         protocol: TCP
-  #       selector:
-  #         inditex.dev/test: "test"
-  #   statefulSet:
-  #     metadata:
-  #       annotations:
-  #         traffic.inditex.dev/weight: "10"
+  #  statefulSet:
+  #    metadata:
+  #      annotations:
+  #        traffic.inditex.dev/weight: "10"
+  #      labels:
+  #        inditex.dev/test: "test"
   #     spec:
   #       template:
   #         metadata:

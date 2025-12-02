@@ -239,14 +239,7 @@ func (r *RedkeyClusterReconciler) createStatefulSet(ctx context.Context, req ctr
 		}
 	}
 
-	// Set resources if provided
 	inferResources := true
-	if spec.Resources != nil {
-		inferResources = false
-		for k := range statefulSet.Spec.Template.Spec.Containers {
-			statefulSet.Spec.Template.Spec.Containers[k].Resources = *spec.Resources
-		}
-	}
 
 	// Override the statefulset with the provided override
 	if spec.Override != nil && spec.Override.StatefulSet != nil {
@@ -257,8 +250,20 @@ func (r *RedkeyClusterReconciler) createStatefulSet(ctx context.Context, req ctr
 		statefulSet = patchedStatefulSet
 
 		// Check if the override has resources
-		if len(spec.Override.StatefulSet.Spec.Template.Spec.Containers) > 0 && (spec.Override.StatefulSet.Spec.Template.Spec.Containers[0].Resources.Requests != nil || spec.Override.StatefulSet.Spec.Template.Spec.Containers[0].Resources.Limits != nil) {
+		if spec.Override.StatefulSet.Spec != nil &&
+			spec.Override.StatefulSet.Spec.Template != nil &&
+			spec.Override.StatefulSet.Spec.Template.Spec.Containers != nil &&
+			(len(spec.Override.StatefulSet.Spec.Template.Spec.Containers) > 0 && (spec.Override.StatefulSet.Spec.Template.Spec.Containers[0].Resources.Requests != nil ||
+				spec.Override.StatefulSet.Spec.Template.Spec.Containers[0].Resources.Limits != nil)) {
 			inferResources = false
+		}
+	}
+
+	// Set resources if provided
+	if spec.Resources != nil {
+		inferResources = false
+		for k := range statefulSet.Spec.Template.Spec.Containers {
+			statefulSet.Spec.Template.Spec.Containers[k].Resources = *spec.Resources
 		}
 	}
 
@@ -318,11 +323,11 @@ func (r *RedkeyClusterReconciler) overrideStatefulSet(req ctrl.Request, redkeyCl
 	// Create a default override if it doesn't exist. This is to handle the case where the user removes the override of an existing cluster.
 	if redkeyCluster.Spec.Override == nil {
 		redkeyCluster.Spec.Override = &redkeyv1.RedkeyClusterOverrideSpec{
-			StatefulSet: &v1.StatefulSet{},
-			Service:     &corev1.Service{},
+			StatefulSet: &redkeyv1.PartialStatefulSet{},
+			Service:     &redkeyv1.PartialService{},
 		}
 	} else if redkeyCluster.Spec.Override.StatefulSet == nil {
-		redkeyCluster.Spec.Override.StatefulSet = &v1.StatefulSet{}
+		redkeyCluster.Spec.Override.StatefulSet = &redkeyv1.PartialStatefulSet{}
 	}
 
 	// Apply the override
@@ -419,11 +424,11 @@ func (r *RedkeyClusterReconciler) overrideService(req ctrl.Request, redkeyCluste
 	// Create a default override if it doesn't exist. This is to handle the case where the user removes the override of an existing cluster.
 	if redkeyCluster.Spec.Override == nil {
 		redkeyCluster.Spec.Override = &redkeyv1.RedkeyClusterOverrideSpec{
-			StatefulSet: &v1.StatefulSet{},
-			Service:     &corev1.Service{},
+			StatefulSet: &redkeyv1.PartialStatefulSet{},
+			Service:     &redkeyv1.PartialService{},
 		}
 	} else if redkeyCluster.Spec.Override.Service == nil {
-		redkeyCluster.Spec.Override.Service = &corev1.Service{}
+		redkeyCluster.Spec.Override.Service = &redkeyv1.PartialService{}
 	}
 
 	// Apply the override

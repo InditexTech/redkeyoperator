@@ -91,12 +91,12 @@ func EnsureClusterExistsOrCreate(
 			Image:                image,
 			Config:               defaultConfig,
 			Resources:            buildResources(),
-			PurgeKeysOnRebalance: purgeKeys,
+			PurgeKeysOnRebalance: &purgeKeys,
 		}
 
 		// Storage override
 		if storage != "" {
-			rc.Spec.DeletePVC = true
+			rc.Spec.DeletePVC = ptr.To(true)
 			rc.Spec.Ephemeral = false
 			rc.Spec.Storage = storage
 			rc.Spec.AccessModes = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
@@ -120,13 +120,21 @@ func EnsureClusterExistsOrCreate(
 
 		// Now ensure the non‑root security context is present on the StatefulSet template:
 		if ov.StatefulSet == nil {
-			ov.StatefulSet = &appsv1.StatefulSet{
-				Spec: appsv1.StatefulSetSpec{
-					Template: corev1.PodTemplateSpec{},
+			ov.StatefulSet = &redkeyv1.PartialStatefulSet{
+				Spec: &redkeyv1.PartialStatefulSetSpec{
+					Template: &redkeyv1.PartialPodTemplateSpec{},
 				},
 			}
 		}
 		// Merge in SecurityContext
+		if ov.StatefulSet.Spec == nil {
+			ov.StatefulSet.Spec = &redkeyv1.PartialStatefulSetSpec{
+				Template: &redkeyv1.PartialPodTemplateSpec{},
+			}
+		}
+		if ov.StatefulSet.Spec.Template == nil {
+			ov.StatefulSet.Spec.Template = &redkeyv1.PartialPodTemplateSpec{}
+		}
 		podSpec := &ov.StatefulSet.Spec.Template.Spec
 		if podSpec.SecurityContext == nil {
 			podSpec.SecurityContext = &corev1.PodSecurityContext{}
@@ -392,14 +400,18 @@ func GetPods(k8Client client.Client, ctx context.Context, redkeyCluster *redkeyv
 
 func RedisStsContainsOverride(sts appsv1.StatefulSet, override redkeyv1.RedkeyClusterOverrideSpec) bool {
 	// Labels and annotations in override must exist and have the same content in sts
-	for k, v := range override.StatefulSet.Spec.Template.Labels {
+	if override.StatefulSet == nil || override.StatefulSet.Spec == nil || override.StatefulSet.Spec.Template == nil {
+		return true // No override specs to check
+	}
+
+	for k, v := range override.StatefulSet.Spec.Template.Metadata.Labels {
 		if sts.Spec.Template.Labels[k] != v {
 			ctrl.Log.Error(fmt.Errorf("label %v not equal in sts: %v and override: %v", k, sts.Spec.Template.Labels[k], v), "Error")
 			return false
 		}
 	}
 
-	for k, v := range override.StatefulSet.Spec.Template.Annotations {
+	for k, v := range override.StatefulSet.Spec.Template.Metadata.Annotations {
 		if sts.Spec.Template.Annotations[k] != v {
 			ctrl.Log.Error(fmt.Errorf("annotation %v not equal in sts: %v and override: %v", k, sts.Spec.Template.Annotations[k], v), "Error")
 			return false

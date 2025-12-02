@@ -541,7 +541,7 @@ func (r *RedkeyClusterReconciler) checkStorageConfigConsistency(ctx context.Cont
 
 func (r *RedkeyClusterReconciler) checkFinalizers(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster) (bool, error) {
 	var pvcFinalizer = (&finalizer.DeletePVCFinalizer{}).GetId()
-	if redkeyCluster.Spec.DeletePVC && !redkeyCluster.Spec.Ephemeral {
+	if redkeyCluster.Spec.DeletePVC != nil && *redkeyCluster.Spec.DeletePVC && !redkeyCluster.Spec.Ephemeral {
 		r.logInfo(redkeyCluster.NamespacedName(), "Delete PVCs feature enabled in cluster spec")
 		if !controllerutil.ContainsFinalizer(redkeyCluster, pvcFinalizer) {
 			controllerutil.AddFinalizer(redkeyCluster, pvcFinalizer)
