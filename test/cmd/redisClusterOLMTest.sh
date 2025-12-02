@@ -61,7 +61,7 @@ EOF
     fi
 
     # build and apply cluster in the cluster
-    make dev-apply-rdcl
+    make dev-apply-rkcl
 
     echo 'INFO::waiting for Initializing status in redkeyCluster'
     ./test/cmd/waitforstatus.sh $namespace $name Initializing 20
@@ -209,20 +209,20 @@ validateRedisMasterSlave() {
     local totalSlaves=0
     local resultMessage="0"
     # get replicas for RedkeyCluster
-    local rdclReplicas=$(kubectl -n $namespace get rkcl $name -o custom-columns=':spec.replicas' | sed 's/ *$//g' | tr -d $'\r')
+    local rkclReplicas=$(kubectl -n $namespace get rkcl $name -o custom-columns=':spec.replicas' | sed 's/ *$//g' | tr -d $'\r')
     # get replicas per primary for RedkeyCluster
-    local rdclReplicasPerMaster=$(kubectl -n $namespace get rkcl $name -o custom-columns=':spec.replicasPerMaster' | sed 's/ *$//g' | tr -d $'\r')
+    local rkclReplicasPerMaster=$(kubectl -n $namespace get rkcl $name -o custom-columns=':spec.replicasPerMaster' | sed 's/ *$//g' | tr -d $'\r')
     # get replicas for statefulset associate to RedkeyCluster
     local stsReplicas=$(kubectl -n $namespace get sts $name -o custom-columns=':spec.replicas' | sed 's/ *$//g' | tr -d $'\r')
     # get minimum replicas calculate for StateFulSet
-    minRdclRepSlaves=$((rdclReplicas * rdclReplicasPerMaster))
-    minRepStatefulSet=$((rdclReplicas + minRdclRepSlaves))
+    minRkclRepSlaves=$((rkclReplicas * rkclReplicasPerMaster))
+    minRepStatefulSet=$((rkclReplicas + minRkclRepSlaves))
 
     # validate if rediscluster has the minimum replicas
-    if [[ $rdclReplicas -lt $minReplicas ]]; then
+    if [[ $rkclReplicas -lt $minReplicas ]]; then
         resultMessage="ERROR:: Minimum configuration required RedisCluster minReplicas"
     # validate if rediscluster has the minimum replicas per primary
-    elif [[ $rdclReplicasPerMaster -lt $minReplicasPerMaster ]]; then
+    elif [[ $rkclReplicasPerMaster -lt $minReplicasPerMaster ]]; then
         resultMessage="ERROR:: Minimum configuration required RedisCluster minReplicasPerMaster"
     # validate if statefulset creates the minimum replicas per replicas per primary (redisCluster.spec.replicas + (redisCluster.spec.replicas*replicasPerMaster))
     elif [[ $minRepStatefulSet -lt $stsReplicas ]]; then
@@ -251,11 +251,11 @@ validateRedisMasterSlave() {
             fi
         done
         # validate if exists the minimum pods primary configured
-        if (($rdclReplicas != $totalMasters)); then
+        if (($rkclReplicas != $totalMasters)); then
             resultMessage="ERROR:: Minimum configuration required - pods primaries"
         fi
         # validate if exists the minimum pods slave configured
-        if (($minRdclRepSlaves != $totalSlaves)); then
+        if (($minRkclRepSlaves != $totalSlaves)); then
             resultMessage="ERROR:: Minimum configuration required - pods slaves"
         fi
     fi

@@ -574,7 +574,7 @@ validateLabels() {
     local defaultRedisClusterNameLabel="redkey-cluster-name"
     local defaultRedisClusterOperatorLabel="redis.redkeycluster.operator/component"
     # get RedkeyCluster labels
-    local rdclLabels=$(getLabels "kubectl get rkcl redis-cluster -o custom-columns=':spec.labels' -n $namespace")
+    local rkclLabels=$(getLabels "kubectl get rkcl redis-cluster -o custom-columns=':spec.labels' -n $namespace")
     # get ConfigMap labels
     local cmLabels=$(getLabels "kubectl get cm redis-cluster -o custom-columns=':metadata.labels' -n $namespace")
     # get Service labels
@@ -586,11 +586,11 @@ validateLabels() {
     local result=0
 
     # validate when was added a new label
-    for rdclLabel in $rdclLabels; do
+    for rkclLabel in $rkclLabels; do
         existLabel=0
         # validate differences with configmap
         for cmLabel in $cmLabels; do
-            if [[ "$rdclLabel" == "$cmLabel" ]]; then
+            if [[ "$rkclLabel" == "$cmLabel" ]]; then
                 existLabel=1
                 break
             fi
@@ -602,7 +602,7 @@ validateLabels() {
         fi
         # validate differences with service
         for svsLabel in $svcLabels; do
-            if [[ "$rdclLabel" == "$svsLabel" ]]; then
+            if [[ "$rkclLabel" == "$svsLabel" ]]; then
                 existLabel=1
                 break
             fi
@@ -614,7 +614,7 @@ validateLabels() {
         fi
         # validate differences with StateFulSet
         for stsLabel in $stsLabels; do
-            if [[ "$rdclLabel" == "$stsLabel" ]]; then
+            if [[ "$rkclLabel" == "$stsLabel" ]]; then
                 existLabel=1
                 break
             fi
@@ -639,8 +639,8 @@ validateLabels() {
             elif [[ "${array[0]}" == "$defaultRedisClusterOperatorLabel" ]]; then
                 existLabel=1
             else
-                for rdclLabel in $rdclLabels; do
-                    if [[ "$stsLabel" == "$rdclLabel" ]]; then
+                for rkclLabel in $rkclLabels; do
+                    if [[ "$stsLabel" == "$rkclLabel" ]]; then
                         existLabel=1
                         break
                     fi
@@ -666,8 +666,8 @@ validateLabels() {
             elif [[ "${array[0]}" == "$defaultRedisClusterOperatorLabel" ]]; then
                 existLabel=1
             else
-                for rdclLabel in $rdclLabels; do
-                    if [[ "$svsLabel" == "$rdclLabel" ]]; then
+                for rkclLabel in $rkclLabels; do
+                    if [[ "$svsLabel" == "$rkclLabel" ]]; then
                         existLabel=1
                         break
                     fi
@@ -693,8 +693,8 @@ validateLabels() {
             elif [[ "${array[0]}" == "$defaultRedisClusterOperatorLabel" ]]; then
                 existLabel=1
             else
-                for rdclLabel in $rdclLabels; do
-                    if [[ "$cmLabel" == "$rdclLabel" ]]; then
+                for rkclLabel in $rkclLabels; do
+                    if [[ "$cmLabel" == "$rkclLabel" ]]; then
                         existLabel=1
                         break
                     fi
@@ -754,10 +754,10 @@ deleteRedisCluster() {
     echo '##########################################'
     echo 'INFO:: getting data and objects to delete in the current cluster'
     pvcsToDelete=$(kubectl get pvc -l='redkey-cluster-name=redis-cluster' -o custom-columns=':metadata.name' -n $namespace)
-    rdclPersistent=$(kubectl get rkcl -l='app=redis' -o custom-columns=':metadata.name' -n $namespace)
-    rdclEphemeral=$(kubectl get rkcl -l='tier=redis-cluster' -o custom-columns=':metadata.name' -n $namespace)
+    rkclPersistent=$(kubectl get rkcl -l='app=redis' -o custom-columns=':metadata.name' -n $namespace)
+    rkclEphemeral=$(kubectl get rkcl -l='tier=redis-cluster' -o custom-columns=':metadata.name' -n $namespace)
 
-    if [ -z "$rdclPersistent" ] && [ -z "$rdclEphemeral" ]; then
+    if [ -z "$rkclPersistent" ] && [ -z "$rkclEphemeral" ]; then
         echo "INFO:: No rkcl to delete."
     else
         kubectl delete rkcl redis-cluster
@@ -1097,20 +1097,20 @@ validateRedisMasterSlave() {
     local totalSlaves=0
     local resultMessage="0"
     # get primaries for RedkeyCluster
-    local rdclReplicas=$(kubectl -n $namespace get rkcl $name -o custom-columns=':spec.primaries' | sed 's/ *$//g' | tr -d $'\r')
+    local rkclReplicas=$(kubectl -n $namespace get rkcl $name -o custom-columns=':spec.primaries' | sed 's/ *$//g' | tr -d $'\r')
     # get replicas per primary for RedkeyCluster
-    local rdclReplicasPerMaster=$(kubectl -n $namespace get rkcl $name -o custom-columns=':spec.replicasPerPrimary' | sed 's/ *$//g' | tr -d $'\r')
+    local rkclReplicasPerMaster=$(kubectl -n $namespace get rkcl $name -o custom-columns=':spec.replicasPerPrimary' | sed 's/ *$//g' | tr -d $'\r')
     # get replicas for statefulset associate to RedkeyCluster
     local stsReplicas=$(kubectl -n $namespace get sts $name -o custom-columns=':spec.primaries' | sed 's/ *$//g' | tr -d $'\r')
     # get minimum replicas calculate for StateFulSet
-    minRdclRepSlaves=$((rdclReplicas * rdclReplicasPerPrimary))
-    minRepStatefulSet=$((rdclReplicas + minRdclRepSlaves))
+    minRkclRepSlaves=$((rkclReplicas * rkclReplicasPerPrimary))
+    minRepStatefulSet=$((rkclReplicas + minRkclRepSlaves))
 
     # validate if redkeycluster has the minimum replicas
-    if [[ $rdclReplicas -lt $minReplicas ]]; then
+    if [[ $rkclReplicas -lt $minReplicas ]]; then
         resultMessage="ERROR:: Minimum configuration required RedisCluster minReplicas"
     # validate if redkeycluster has the minimum replicas per primary
-    elif [[ $rdclReplicasPerMaster -lt $minReplicasPerMaster ]]; then
+    elif [[ $rkclReplicasPerMaster -lt $minReplicasPerMaster ]]; then
         resultMessage="ERROR:: Minimum configuration required RedkeyCluster minReplicasPerPrimary"
     # validate if statefulset creates the minimum replicas per replicas per primary (redkeyCluster.spec.primaries + (redkeyCluster.spec.primaries*replicasPerPrimary))
     elif [[ $minRepStatefulSet -lt $stsReplicas ]]; then
@@ -1139,11 +1139,11 @@ validateRedisMasterSlave() {
             fi
         done
         # validate if exists the minimum pods primary configured
-        if (($rdclReplicas != $totalMasters)); then
+        if (($rkclReplicas != $totalMasters)); then
             resultMessage="ERROR:: Minimum configuration required - pods primary"
         fi
         # validate if exists the minimum pods slave configured
-        if (($minRdclRepSlaves != $totalSlaves)); then
+        if (($minRkclRepSlaves != $totalSlaves)); then
             resultMessage="ERROR:: Minimum configuration required - pods replica"
         fi
     fi

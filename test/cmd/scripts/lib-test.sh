@@ -267,7 +267,7 @@ function log_warning {
 }
 
 # Function to create a clean RedisCluster
-function create_clean_rdcl {
+function create_clean_rkcl {
     local namespace="$1"
     local is_local="${2:-false}"
 
@@ -275,9 +275,9 @@ function create_clean_rdcl {
 
     # Select the appropriate manifest file based on the environment.
     if [[ "$is_local" == "true" ]]; then
-        manifest="hack/tests/manifests/rdcl-test-local.yml"
+        manifest="hack/tests/manifests/rkcl-test-local.yml"
     else
-        manifest="hack/tests/manifests/rdcl-test.yml"
+        manifest="hack/tests/manifests/rkcl-test.yml"
     fi
 
     # Delete the resource using --ignore-not-found for clarity.

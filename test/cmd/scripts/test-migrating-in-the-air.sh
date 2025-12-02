@@ -29,7 +29,7 @@ log_info "Starting cluster test for cluster '$REDIS_CLUSTER_NAME' in namespace '
 # fi
 
 # Create a clean RedisCluster
-if ! create_clean_rdcl "$NAMESPACE" "$LOCAL"; then
+if ! create_clean_rkcl "$NAMESPACE" "$LOCAL"; then
     log_error "Error: Failed to create RedisCluster in namespace $NAMESPACE"
     exit 1
 fi
