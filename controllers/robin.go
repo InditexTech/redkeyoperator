@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"maps"
 	"reflect"
+	"time"
 
 	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
 	redis "github.com/inditextech/redkeyoperator/internal/redis"
@@ -75,17 +76,22 @@ func (r *RedkeyClusterReconciler) handleRobinConfig(ctx context.Context, req ctr
 		r.logError(redkeyCluster.NamespacedName(), err, "Error parsing existing Robin configuration")
 		return err
 	}
-	if err := yaml.Unmarshal([]byte(*redkeyCluster.Spec.Robin.Config), &declaredConfig); err != nil {
-		r.logError(redkeyCluster.NamespacedName(), err, "Error parsing declared Robin configuration")
-		return err
-	}
+
+	declaredConfig = r.getRobinConfiguration(req, redkeyCluster.Spec)
 
 	if robin.CompareConfigurations(&declaredConfig, &existingConfig) {
-		return nil
+		return nil // No changes detected, no more to do here
 	}
 
 	// Robin configmap changed: update configmap
-	existingConfigMap.Data["application-configmap.yml"] = *redkeyCluster.Spec.Robin.Config
+
+	// Serialize robin configuration to YAML
+	configYAML, err := yaml.Marshal(declaredConfig)
+	if err != nil {
+		r.logError(req.NamespacedName, err, "Error generating robin configuration YAML")
+		return err
+	}
+	existingConfigMap.Data["application-configmap.yml"] = string(configYAML)
 	r.updateRobinObject(ctx, existingConfigMap, redkeyCluster, "configmap")
 
 	// Add checksum to the deployment annotations to force the deployment rollout
@@ -93,7 +99,7 @@ func (r *RedkeyClusterReconciler) handleRobinConfig(ctx context.Context, req ctr
 		if redkeyCluster.Spec.Robin.Template.Annotations == nil {
 			redkeyCluster.Spec.Robin.Template.Annotations = make(map[string]string)
 		}
-		redkeyCluster.Spec.Robin.Template.Annotations["checksum/config"] = fmt.Sprintf("%x", md5.Sum([]byte(*redkeyCluster.Spec.Robin.Config)))
+		redkeyCluster.Spec.Robin.Template.Annotations["checksum/config"] = fmt.Sprintf("%x", md5.Sum([]byte(string(configYAML))))
 	}
 
 	return nil
@@ -248,17 +254,62 @@ func (r *RedkeyClusterReconciler) createRobinDeployment(req ctrl.Request, redkey
 	return d
 }
 
+func (r *RedkeyClusterReconciler) getRobinConfiguration(req ctrl.Request, spec redkeyv1.RedkeyClusterSpec) robin.Configuration {
+	config := robin.Configuration{
+		Metadata: map[string]string{
+			"namespace": req.Namespace,
+		},
+		Redis: robin.RedisConfig{
+			Standalone: false,
+			Reconciler: robin.RedisReconcilerConfig{
+				IntervalSeconds:                 *spec.Robin.Config.Reconciler.IntervalSeconds,
+				OperationCleanupIntervalSeconds: *spec.Robin.Config.Reconciler.OperationCleanUpIntervalSeconds,
+			},
+			Cluster: robin.RedkeyClusterConfig{
+				Namespace:                req.Namespace,
+				Name:                     req.Name,
+				Replicas:                 int(spec.Primaries),
+				ReplicasPerMaster:        int(spec.ReplicasPerPrimary),
+				Status:                   redkeyv1.RobinStatusUnknown,
+				Ephemeral:                spec.Ephemeral,
+				HealthProbePeriodSeconds: *spec.Robin.Config.Cluster.HealthProbePeriodSeconds,
+				HealingTimeSeconds:       *spec.Robin.Config.Cluster.HealingTimeSeconds,
+				MaxRetries:               *spec.Robin.Config.Cluster.MaxRetries,
+				BackOff:                  time.Duration(*spec.Robin.Config.Cluster.BackOff) * time.Second,
+			},
+			Metrics: robin.RedisMetricsConfig{
+				IntervalSeconds: *spec.Robin.Config.Metrics.IntervalSeconds,
+				RedisInfoKeys:   spec.Robin.Config.Metrics.RedisInfoKeys,
+			},
+		},
+	}
+
+	return config
+}
+
 func (r *RedkeyClusterReconciler) createRobinConfigMap(req ctrl.Request, spec redkeyv1.RedkeyClusterSpec, labels map[string]string) *corev1.ConfigMap {
+
+	// Get robin configuration from RedkeyCluster spec
+	config := r.getRobinConfiguration(req, spec)
+
+	// Serialize robin configuration to YAML
+	configYAML, err := yaml.Marshal(config)
+	if err != nil {
+		r.logError(req.NamespacedName, err, "Error generating robin configuration YAML")
+		return nil
+	}
+
+	// Create configmap object
 	cm := corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      req.Name + "-robin",
 			Namespace: req.Namespace,
 			Labels:    labels,
 		},
-		Data: map[string]string{"application-configmap.yml": *spec.Robin.Config},
+		Data: map[string]string{"application-configmap.yml": string(configYAML)},
 	}
 
-	r.logInfo(req.NamespacedName, "Generated robin configmap")
+	r.logInfo(req.NamespacedName, "Robin ConfigMap created")
 	return &cm
 }
 

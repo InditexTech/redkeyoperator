@@ -465,7 +465,7 @@ func (in *RobinSpec) DeepCopyInto(out *RobinSpec) {
 	}
 	if in.Config != nil {
 		in, out := &in.Config, &out.Config
-		*out = new(string)
+		*out = new(RobinConfig)
 		**out = **in
 	}
 }
@@ -515,6 +515,16 @@ func (redkeyClusterSpec *RedkeyClusterSpec) DeepCopyInto(out *RedkeyClusterSpec)
 		in, out := &redkeyClusterSpec.Override, &out.Override
 		*out = new(RedkeyClusterOverrideSpec)
 		(*in).DeepCopyInto(*out)
+	}
+	if redkeyClusterSpec.DeletePVC != nil {
+		in, out := &redkeyClusterSpec.DeletePVC, &out.DeletePVC
+		*out = new(bool)
+		**out = **in
+	}
+	if redkeyClusterSpec.PurgeKeysOnRebalance != nil {
+		in, out := &redkeyClusterSpec.PurgeKeysOnRebalance, &out.PurgeKeysOnRebalance
+		*out = new(bool)
+		**out = **in
 	}
 }
 

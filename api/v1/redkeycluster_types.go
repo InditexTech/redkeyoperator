@@ -67,6 +67,7 @@ const (
 	RobinStatusInitializing  = "Initializing"
 	RobinStatusError         = "Error"
 	RobinStatusMaintenance   = "Maintenance"
+	RobinStatusUnknown       = "Unknown"
 
 	SubstatusFastUpgrading        = "FastUpgrading"
 	SubstatusEndingFastUpgrading  = "EndingFastUpgrading"
@@ -240,7 +241,30 @@ type RedkeyClusterSpec struct {
 // RobinSpec defines the desired state of Robin configuration for RedkeyCluster.
 type RobinSpec struct {
 	Template *v1.PodTemplateSpec `json:"template,omitempty"`
-	Config   *string             `json:"config,omitempty"`
+	Config   *RobinConfig        `json:"config,omitempty"`
+}
+
+type RobinConfig struct {
+	Reconciler *RobinConfigReconciler `json:"reconciler,omitempty"`
+	Cluster    *RobinConfigCluster    `json:"cluster,omitempty"`
+	Metrics    *RobinConfigMetrics    `json:"metrics,omitempty"`
+}
+
+type RobinConfigReconciler struct {
+	IntervalSeconds                 *int `json:"intervalSeconds,omitempty"`
+	OperationCleanUpIntervalSeconds *int `json:"operationCleanUpIntervalSeconds,omitempty"`
+}
+
+type RobinConfigCluster struct {
+	HealthProbePeriodSeconds *int `json:"healthProbePeriodSeconds,omitempty"`
+	HealingTimeSeconds       *int `json:"healingTimeSeconds,omitempty"`
+	MaxRetries               *int `json:"maxRetries,omitempty"`
+	BackOff                  *int `json:"backOff,omitempty"`
+}
+
+type RobinConfigMetrics struct {
+	IntervalSeconds *int     `json:"intervalSeconds,omitempty"`
+	RedisInfoKeys   []string `json:"redisInfoKeys,omitempty"`
 }
 
 // RedisAuth defines the authentication configuration for Redis.

@@ -4076,7 +4076,36 @@ spec:
               robin:
                 properties:
                   config:
-                    type: string
+                    properties:
+                      cluster:
+                        properties:
+                          backOff:
+                            format: int64
+                            type: integer
+                          healingTimeSeconds:
+                            type: integer
+                          healthProbePeriodSeconds:
+                            type: integer
+                          maxRetries:
+                            type: integer
+                        type: object
+                      metrics:
+                        properties:
+                          intervalSeconds:
+                            type: integer
+                          redisInfoKeys:
+                            items:
+                              type: string
+                            type: array
+                        type: object
+                      reconciler:
+                        properties:
+                          intervalSeconds:
+                            type: integer
+                          operationCleanUpIntervalSeconds:
+                            type: integer
+                        type: object
+                    type: object
                   template:
                     properties:
                       metadata:
