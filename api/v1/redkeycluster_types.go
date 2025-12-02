@@ -108,7 +108,7 @@ var ConditionScalingDown = metav1.Condition{
 
 var AllConditions = []metav1.Condition{ConditionUpgrading, ConditionScalingUp, ConditionScalingDown}
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 // RedkeyClusterList contains a list of RedkeyCluster
 type RedkeyClusterList struct {
 	metav1.TypeMeta `json:",inline"`
