@@ -18,13 +18,13 @@ See [this thread](https://github.com/operator-framework/operator-lifecycle-manag
 
 To summarize, downgrading is not supported as of October 2020. OLM is designed to upgrade to the next version and downgrading is a form of upgrading. One issue that can come up is that CRs may have to migrated first before you can downgrade a CDR. If there are breaking changes downgrading may not be possible. The solution again is to upgrade to a newer version.
 
-### A failing master node did not rejoin the cluster
+### A failing primary node did not rejoin the cluster
 
-Run the [forget command](#forget-a-node) so all nodes forget about this failing master. Now run the [check command](#check-the-cluster) to see if the new master has rejoined correctly and then run the [fix command](#fixing-the-cluster) to fix the slot allocation.
+Run the [forget command](#forget-a-node) so all nodes forget about this failing primary. Now run the [check command](#check-the-cluster) to see if the new primary has rejoined correctly and then run the [fix command](#fixing-the-cluster) to fix the slot allocation.
 
 ### The cluster has slave node
 
-If a slave node is present in a master-only cluster, ix this by running the [reset command](#reset-a-node) on the slave to reset its configuration, so it will become a master. Now run the [check command](#check-the-cluster) to see if the new master has rejoined correctly and then run the [fix command](#fixing-the-cluster) to fix the slot allocation.
+If a slave node is present in a primaries-only cluster, ix this by running the [reset command](#reset-a-node) on the slave to reset its configuration, so it will become a primary. Now run the [check command](#check-the-cluster) to see if the new primary has rejoined correctly and then run the [fix command](#fixing-the-cluster) to fix the slot allocation.
 
 ### Nodes IPs are inconsistent
 
@@ -120,7 +120,7 @@ M: 11d23d3c2cbac49201825415b38015c862313ec9 10.244.0.57:6379
 
 ### Gathering nodes information
 
-For each pod list the status of each node: its role, master or slave, whether it is failing, and which slots are allocated to it.
+For each pod list the status of each node: its role, primary or slave, whether it is failing, and which slots are allocated to it.
 
 ```
 for pod in $(kubectl get pods -l redkey-cluster-name=[redkey-cluster-name] -o json | jq -r '.items[] | .metadata.name'); do echo "POD ${pod} NODES"; kubectl exec -it ${pod} -- redis-cli CLUSTER NODES  | sort; done

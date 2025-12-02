@@ -160,7 +160,7 @@ redis-cluster-ephemeral   3           0          true        true        redis:8
 
 These SubStatus have been defined:
 
-* **ScalingUp**: The Operator add one pod that is added as a Master node to the Redkey Cluster. This node will be used to move slots from the existing nodes before recreating them.
+* **ScalingUp**: The Operator add one pod that is added as a Primary node to the Redkey Cluster. This node will be used to move slots from the existing nodes before recreating them.
 * **SlowUpgrading**: A node is being empty, moving all its slots (and keys) to another node.
 * **RollingConfig**: The empty node is being recreated, recreating its pod and asking to Robin to refresh the cluster.
 * **EndingSlowUpgrading**: Move the slots (and keys) from the extra node.
