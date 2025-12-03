@@ -1,8 +1,8 @@
-# End to End Test for Kubernetes RedKey Operator
+# End to End Test for Kubernetes Redkey Operator
 
 ## Purpose
 
-End to End tests for provision RedKey cluster environments in Kubernetes or Openshift.
+End to End tests for provision Redkey cluster environments in Kubernetes or Openshift.
 
 ## How to run the test
 
@@ -30,7 +30,7 @@ In the terminal execute this make command
 make test-e2e-cov
 ```
 
-The command creates a new instance for the RedKey operator and continues to run the available test
+The command creates a new instance for the Redkey operator and continues to run the available test
 
 ## Clean environment
 

@@ -48,9 +48,6 @@ bundle.Dockerfile
 # Certificates
 certs/
 
-# Secret files
-config/webhook/bases/secret.yaml
-
 # OSS Review Toolkit (ORT) temporary files
 ort/
 

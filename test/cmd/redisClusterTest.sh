@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Allows to execute differents funtional test for RedisCluster deployments.
+# Allows to execute differents funtional test for RedkeyCluster deployments.
 # Arguments:
 #   namespace=$1
 #   image=$2
@@ -19,7 +19,7 @@ typeRedisCluster=$5
 readonly name="redis-cluster"
 
 #######################################
-# Initialize a new RedisCluster validating if exist one installed in the k8 cluster.
+# Initialize a new RedkeyCluster validating if exist one installed in the k8 cluster.
 # Globals:
 #   namespace=$1
 #   image=$2
@@ -31,7 +31,7 @@ readonly name="redis-cluster"
 #######################################
 initializeRedisCluster() {
     REDIS_POD=$(kubectl get po -n $namespace -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name' --no-headers | head)
-    # validate if exists an instance of redisCluster installed
+    # validate if exists an instance of redkeyCluster installed
     if [ -z "$REDIS_POD" ]; then
         installRedisCluster
     else
@@ -45,7 +45,7 @@ initializeRedisCluster() {
 }
 
 #######################################
-# Allows to install RedisCluster.
+# Allows to install RedkeyCluster.
 # Globals:
 #   namespace=$1
 #   image=$2
@@ -57,7 +57,7 @@ initializeRedisCluster() {
 #######################################
 installRedisCluster() {
     local result=0
-    local resultMessage="INFO:: RedisCluster created and run correctly"
+    local resultMessage="INFO:: RedkeyCluster created and run correctly"
     rm -f config/samples/kustomization.yaml
     cat <<EOF >config/samples/kustomization.yaml
 resources:
@@ -72,14 +72,14 @@ EOF
     fi
 
     make IMG=$image NAMESPACE=$namespace int-test
-    echo 'INFO::waiting for Initializing status in redisCluster'
+    echo 'INFO::waiting for Initializing status in redkeyCluster'
     ./test/cmd/waitforstatus.sh $namespace $name Initializing 20
     result=$?
     if [[ "$result" != "0" ]]; then
         resultMessage="ERROR::Failure: Script failed"
         result=1
     else
-        echo 'INFO::waiting for Ready status in redisCluster'
+        echo 'INFO::waiting for Ready status in redkeyCluster'
         ./test/cmd/waitforstatus.sh $namespace $name Ready 60
         result=$?
         if [[ "$result" != "0" ]]; then
@@ -96,7 +96,7 @@ EOF
 }
 
 #######################################
-# Test for Scale up RedisCluster with patch command.
+# Test for Scale up RedkeyCluster with patch command.
 # Globals:
 #   namespace=$1
 #   image=$2
@@ -112,18 +112,18 @@ scaleUpClusterPatch() {
     if [[ "$newRedisCluster" == "true" ]]; then
         initializeRedisCluster
     fi
-    kubectl get all,rdcl -n $namespace
+    kubectl get all,rkcl -n $namespace
     echo '##########################################'
-    echo 'INFO::patch cluster with {"spec":{"replicas":6}}'
-    kubectl patch rdcl -n $namespace $name -p '{"spec":{"replicas":6}}' --type=merge
-    echo 'INFO::waiting for ScalingUp status in redisCluster'
+    echo 'INFO::patch cluster with {"spec":{"primaries":6}}'
+    kubectl patch rkcl -n $namespace $name -p '{"spec":{"primaries":6}}' --type=merge
+    echo 'INFO::waiting for ScalingUp status in redkeyCluster'
     ./test/cmd/waitforstatus.sh $namespace $name ScalingUp 60
     result=$?
     if [[ "$result" != "0" ]]; then
         resultMessage="ERROR::Failure: Script failed"
         result=1
     else
-        echo 'INFO::waiting for Ready status in redisCluster'
+        echo 'INFO::waiting for Ready status in redkeyCluster'
         ./test/cmd/waitforstatus.sh $namespace $name Ready 540
         result=$?
         if [[ "$result" != "0" ]]; then
@@ -132,7 +132,7 @@ scaleUpClusterPatch() {
         fi
     fi
     echo '##########################################'
-    kubectl get all,rdcl -n $namespace
+    kubectl get all,rkcl -n $namespace
     echo $resultMessage
     if [[ "$test" != "All" ]]; then
         exit $result
@@ -140,7 +140,7 @@ scaleUpClusterPatch() {
 }
 
 #######################################
-# Test for Scale Down RedisCluster with patch command.
+# Test for Scale Down RedkeyCluster with patch command.
 # Globals:
 #   namespace=$1
 #   image=$2
@@ -156,11 +156,11 @@ scaleDownClusterPatch() {
     if [[ "$newRedisCluster" == "true" ]]; then
         initializeRedisCluster
     fi
-    kubectl get all,rdcl -n $namespace
+    kubectl get all,rkcl -n $namespace
     echo '##########################################'
-    echo 'INFO:: patch cluster with {"spec":{"replicas":6}}'
-    kubectl patch rdcl -n $namespace $name -p '{"spec":{"replicas":6}}' --type=merge
-    echo 'INFO:: waiting for ScalingUp status in redisCluster'
+    echo 'INFO:: patch cluster with {"spec":{"primaries":6}}'
+    kubectl patch rkcl -n $namespace $name -p '{"spec":{"primaries":6}}' --type=merge
+    echo 'INFO:: waiting for ScalingUp status in redkeyCluster'
     ./test/cmd/waitforstatus.sh $namespace $name ScalingUp 180
     result=$?
     if [[ "$result" != "0" ]]; then
@@ -168,18 +168,18 @@ scaleDownClusterPatch() {
         result=1
     else
         echo '##########################################'
-        echo 'INFO:: waiting for Ready status in redisCluster'
+        echo 'INFO:: waiting for Ready status in redkeyCluster'
         ./test/cmd/waitforstatus.sh $namespace $name Ready 540
         result=$?
         if [[ "$result" != "0" ]]; then
             resultMessage="Failure: Script failed"
             result=1
         else
-            kubectl get all,rdcl -n $namespace
+            kubectl get all,rkcl -n $namespace
             echo '##########################################'
-            echo 'INFO:: patch cluster with {"spec":{"replicas":3}}'
-            kubectl patch rdcl -n $namespace $name -p '{"spec":{"replicas":3}}' --type=merge
-            echo 'INFO:: waiting for ScalingDown status in redisCluster'
+            echo 'INFO:: patch cluster with {"spec":{"primaries":3}}'
+            kubectl patch rkcl -n $namespace $name -p '{"spec":{"primaries":3}}' --type=merge
+            echo 'INFO:: waiting for ScalingDown status in redkeyCluster'
             ./test/cmd/waitforstatus.sh $namespace $name ScalingDown 180
             result=$?
             if [[ "$result" != "0" ]]; then
@@ -187,7 +187,7 @@ scaleDownClusterPatch() {
                 result=1
             else
                 echo '##########################################'
-                echo 'INFO:: waiting for Ready status in redisCluster'
+                echo 'INFO:: waiting for Ready status in redkeyCluster'
                 ./test/cmd/waitforstatus.sh $namespace $name Ready 540
                 result=$?
                 if [[ "$result" != "0" ]]; then
@@ -197,7 +197,7 @@ scaleDownClusterPatch() {
             fi
         fi
     fi
-    kubectl get all,rdcl -n $namespace
+    kubectl get all,rkcl -n $namespace
     echo $resultMessage
     if [[ "$test" != "All" ]]; then
         exit $result
@@ -205,7 +205,7 @@ scaleDownClusterPatch() {
 }
 
 #######################################
-# Test for Scale up RedisCluster.
+# Test for Scale up RedkeyCluster.
 # Globals:
 #   namespace=$1
 #   image=$2
@@ -221,18 +221,18 @@ scaleUpCluster() {
     if [[ "$newRedisCluster" == "true" ]]; then
         initializeRedisCluster
     fi
-    kubectl get all,rdcl -n $namespace
+    kubectl get all,rkcl -n $namespace
     echo '##########################################'
     echo 'INFO:: Scale cluster with scale --replicas=6'
-    kubectl scale rdcl -n $namespace $name --replicas=6
-    echo 'INFO::waiting for ScalingUp status in redisCluster'
+    kubectl scale rkcl -n $namespace $name --replicas=6
+    echo 'INFO::waiting for ScalingUp status in redkeyCluster'
     ./test/cmd/waitforstatus.sh $namespace $name ScalingUp 60
     result=$?
     if [[ "$result" != "0" ]]; then
         resultMessage="ERROR::Failure: Script failed"
         result=1
     else
-        echo 'INFO::waiting for Ready status in redisCluster'
+        echo 'INFO::waiting for Ready status in redkeyCluster'
         ./test/cmd/waitforstatus.sh $namespace $name Ready 540
         result=$?
         if [[ "$result" != "0" ]]; then
@@ -241,7 +241,7 @@ scaleUpCluster() {
         fi
     fi
     echo '##########################################'
-    kubectl get all,rdcl -n $namespace
+    kubectl get all,rkcl -n $namespace
     echo $resultMessage
     if [[ "$test" != "All" ]]; then
         exit $result
@@ -249,7 +249,7 @@ scaleUpCluster() {
 }
 
 #######################################
-# Test for Scale Down RedisCluster.
+# Test for Scale Down RedkeyCluster.
 # Globals:
 #   namespace=$1
 #   image=$2
@@ -265,11 +265,11 @@ scaleDownCluster() {
     if [[ "$newRedisCluster" == "true" ]]; then
         initializeRedisCluster
     fi
-    kubectl get all,rdcl -n $namespace
+    kubectl get all,rkcl -n $namespace
     echo '##########################################'
     echo 'INFO:: Scale cluster with scale --replicas=6'
-    kubectl scale rdcl -n $namespace $name --replicas=6
-    echo 'INFO:: waiting for ScalingUp status in redisCluster'
+    kubectl scale rkcl -n $namespace $name --replicas=6
+    echo 'INFO:: waiting for ScalingUp status in redkeyCluster'
     ./test/cmd/waitforstatus.sh $namespace $name ScalingUp 180
     result=$?
     if [[ "$result" != "0" ]]; then
@@ -277,18 +277,18 @@ scaleDownCluster() {
         result=1
     else
         echo '##########################################'
-        echo 'INFO:: waiting for Ready status in redisCluster'
+        echo 'INFO:: waiting for Ready status in redkeyCluster'
         ./test/cmd/waitforstatus.sh $namespace $name Ready 540
         result=$?
         if [[ "$result" != "0" ]]; then
             resultMessage="Failure: Script failed"
             result=1
         else
-            kubectl get all,rdcl -n $namespace
+            kubectl get all,rkcl -n $namespace
             echo '##########################################'
             echo 'INFO:: Scale down cluster with scale --replicas=3'
-            kubectl scale rdcl -n $namespace $name --replicas=3
-            echo 'INFO:: waiting for ScalingDown status in redisCluster'
+            kubectl scale rkcl -n $namespace $name --replicas=3
+            echo 'INFO:: waiting for ScalingDown status in redkeyCluster'
             ./test/cmd/waitforstatus.sh $namespace $name ScalingDown 180
             result=$?
             if [[ "$result" != "0" ]]; then
@@ -296,7 +296,7 @@ scaleDownCluster() {
                 result=1
             else
                 echo '##########################################'
-                echo 'INFO:: waiting for Ready status in redisCluster'
+                echo 'INFO:: waiting for Ready status in redkeyCluster'
                 ./test/cmd/waitforstatus.sh $namespace $name Ready 540
                 result=$?
                 if [[ "$result" != "0" ]]; then
@@ -306,7 +306,7 @@ scaleDownCluster() {
             fi
         fi
     fi
-    kubectl get all,rdcl -n $namespace
+    kubectl get all,rkcl -n $namespace
     echo $resultMessage
     if [[ "$test" != "All" ]]; then
         exit $result
@@ -314,7 +314,7 @@ scaleDownCluster() {
 }
 
 #######################################
-# Test for change the storage in the RedisCluster.
+# Test for change the storage in the RedkeyCluster.
 # Globals:
 #   namespace=$1
 #   image=$2
@@ -332,22 +332,22 @@ changeStorage() {
         if [[ "$newRedisCluster" == "true" ]]; then
             initializeRedisCluster
         fi
-        kubectl get all,rdcl -n $namespace
+        kubectl get all,rkcl -n $namespace
         echo '##########################################'
         echo 'INFO:: patch cluster with {"spec":{"storage":"1Gi"}}'
-        kubectl patch rdcl -n $namespace $name -p '{"spec":{"storage":"1Gi"}}' --type=merge
-        echo 'INFO:: waiting for Error status in redisCluster'
+        kubectl patch rkcl -n $namespace $name -p '{"spec":{"storage":"1Gi"}}' --type=merge
+        echo 'INFO:: waiting for Error status in redkeyCluster'
         ./test/cmd/waitforstatus.sh $namespace $name Error 60
         result=$?
         if [[ "$result" != "0" ]]; then
             resultMessage="Failure: Script failed"
             result=1
         else
-            kubectl get all,rdcl -n $namespace
+            kubectl get all,rkcl -n $namespace
             echo '##########################################'
             echo 'INFO:: patch cluster with {"spec":{"storage":"500Mi"}}'
-            kubectl patch rdcl -n $namespace $name -p '{"spec":{"storage":"500Mi"}}' --type=merge
-            echo 'INFO:: waiting for Ready status in redisCluster'
+            kubectl patch rkcl -n $namespace $name -p '{"spec":{"storage":"500Mi"}}' --type=merge
+            echo 'INFO:: waiting for Ready status in redkeyCluster'
             ./test/cmd/waitforstatus.sh $namespace $name Ready 540
             result=$?
             if [[ "$result" != "0" ]]; then
@@ -355,9 +355,9 @@ changeStorage() {
                 result=1
             fi
         fi
-        kubectl get all,rdcl -n $namespace
+        kubectl get all,rkcl -n $namespace
     else
-        resultMessage='INFO:: this test is for RedisCluster with Storage enabled'
+        resultMessage='INFO:: this test is for RedkeyCluster with Storage enabled'
         result=0
     fi
     echo $resultMessage
@@ -367,7 +367,7 @@ changeStorage() {
 }
 
 #######################################
-# Test for change the storage and replicas in the RedisCluster.
+# Test for change the storage and replicas in the RedkeyCluster.
 # Globals:
 #   namespace=$1
 #   image=$2
@@ -384,29 +384,29 @@ changeStorageAndReplicas() {
         if [[ "$newRedisCluster" == "true" ]]; then
             initializeRedisCluster
         fi
-        kubectl get all,rdcl -n $namespace
+        kubectl get all,rkcl -n $namespace
         echo '##########################################'
-        echo 'INFO:: patch cluster with {"spec":{"storage":"1Gi","replicas":6}}'
-        kubectl patch rdcl -n $namespace $name -p '{"spec":{"storage":"1Gi","replicas":6}}' --type=merge
-        echo 'INFO:: waiting for Error status in redisCluster'
+        echo 'INFO:: patch cluster with {"spec":{"storage":"1Gi","primaries":6}}'
+        kubectl patch rkcl -n $namespace $name -p '{"spec":{"storage":"1Gi","primaries":6}}' --type=merge
+        echo 'INFO:: waiting for Error status in redkeyCluster'
         ./test/cmd/waitforstatus.sh $namespace $name Error 60
         result=$?
         if [[ "$result" != "0" ]]; then
             resultMessage="Failure: Script failed"
             result=1
         else
-            kubectl get all,rdcl -n $namespace
+            kubectl get all,rkcl -n $namespace
             echo '##########################################'
             echo 'INFO:: patch cluster solving the error with {"spec":{"storage":"500Mi"}}'
-            kubectl patch rdcl -n $namespace $name -p '{"spec":{"storage":"500Mi"}}' --type=merge
-            echo 'INFO:: waiting for ScalingUp status in redisCluster'
+            kubectl patch rkcl -n $namespace $name -p '{"spec":{"storage":"500Mi"}}' --type=merge
+            echo 'INFO:: waiting for ScalingUp status in redkeyCluster'
             ./test/cmd/waitforstatus.sh $namespace $name ScalingUp 60
             result=$?
             if [[ "$result" != "0" ]]; then
                 resultMessage="Failure: Script failed"
                 result=1
             else
-                echo 'INFO:: waiting for Ready status in redisCluster'
+                echo 'INFO:: waiting for Ready status in redkeyCluster'
                 ./test/cmd/waitforstatus.sh $namespace $name Ready 540
                 if [[ "$result" != "0" ]]; then
                     resultMessage="Failure: Script failed"
@@ -414,9 +414,9 @@ changeStorageAndReplicas() {
                 fi
             fi
         fi
-        kubectl get all,rdcl -n $namespace
+        kubectl get all,rkcl -n $namespace
     else
-        echo 'INFO:: this test is for RedisCluster with Storage enabled'
+        echo 'INFO:: this test is for RedkeyCluster with Storage enabled'
     fi
     echo $resultMessage
     if [[ "$test" != "All" ]]; then
@@ -425,7 +425,7 @@ changeStorageAndReplicas() {
 }
 
 #######################################
-# Test for Add a new label in the RedisCluster.
+# Test for Add a new label in the RedkeyCluster.
 # Globals:
 #   namespace=$1
 #   image=$2
@@ -442,7 +442,7 @@ addLabel() {
         initializeRedisCluster
     fi
     echo '############ RedisCluster ############'
-    kubectl get rdcl $name -n $namespace -o custom-columns=':spec.labels'
+    kubectl get rkcl $name -n $namespace -o custom-columns=':spec.labels'
     echo '############ StateFulSet ############'
     kubectl get sts $name -n $namespace -o custom-columns=':metadata.labels'
     echo '############ Service ############'
@@ -451,21 +451,21 @@ addLabel() {
     kubectl get cm $name -n $namespace -o custom-columns=':metadata.labels'
     echo '##########################################'
     echo 'INFO:: patch cluster with {"op": "add", "path": "/spec/labels/change", "value": "test"}'
-    kubectl patch rdcl -n $namespace $name --type=json -p='[{"op": "add", "path": "/spec/labels/change", "value": "test"}]'
-    echo 'INFO:: waiting for Upgrading status in redisCluster'
+    kubectl patch rkcl -n $namespace $name --type=json -p='[{"op": "add", "path": "/spec/labels/change", "value": "test"}]'
+    echo 'INFO:: waiting for Upgrading status in redkeyCluster'
     ./test/cmd/waitforstatus.sh $namespace $name Upgrading 60
     # ./test/cmd/waitforstatus.sh $namespace $name Ready 60
     result=$?
     if [[ "$result" != "0" ]]; then
-        resultMessage="Error:: Script failed validating the proper status in RedisCluster [Upgrading]"
+        resultMessage="Error:: Script failed validating the proper status in RedkeyCluster [Upgrading]"
         result=1
     else
         echo '##########################################'
-        echo 'INFO:: waiting for Ready status in redisCluster'
+        echo 'INFO:: waiting for Ready status in redkeyCluster'
         ./test/cmd/waitforstatus.sh $namespace $name Ready 540
         result=$?
         if [[ "$result" != "0" ]]; then
-            resultMessage="Error:: Script failed validating the proper status in RedisCluster [Ready]"
+            resultMessage="Error:: Script failed validating the proper status in RedkeyCluster [Ready]"
             result=1
         else
             echo '##########################################'
@@ -475,8 +475,8 @@ addLabel() {
                 resultMessage="Error:: Script failed found differences in labels"
                 result=1
             else
-                echo '############ RedisCluster ############'
-                kubectl get rdcl $name -n $namespace -o custom-columns=':spec.labels'
+                echo '############ RedkeyCluster ############'
+                kubectl get rkcl $name -n $namespace -o custom-columns=':spec.labels'
                 echo '############ StateFulSet ############'
                 kubectl get sts $name -n $namespace -o custom-columns=':metadata.labels'
                 echo '############ Service ############'
@@ -493,7 +493,7 @@ addLabel() {
 }
 
 #######################################
-# Test for Delete a existing label in the RedisCluster.
+# Test for Delete a existing label in the RedkeyCluster.
 # Globals:
 #   namespace=$1
 #   image=$2
@@ -509,8 +509,8 @@ deleteLabel() {
     if [[ "$newRedisCluster" == "true" ]]; then
         initializeRedisCluster
     fi
-    echo '############ RedisCluster ############'
-    kubectl get rdcl $name -n $namespace -o custom-columns=':spec.labels'
+    echo '############ RedkeyCluster ############'
+    kubectl get rkcl $name -n $namespace -o custom-columns=':spec.labels'
     echo '############ StateFulSet ############'
     kubectl get sts $name -n $namespace -o custom-columns=':metadata.labels'
     echo '############ Service ############'
@@ -519,20 +519,20 @@ deleteLabel() {
     kubectl get cm $name -n $namespace -o custom-columns=':metadata.labels'
     echo '##########################################'
     echo 'INFO:: patch cluster with {"op": "remove", "path": "/spec/labels/team"}'
-    kubectl patch rdcl -n $namespace $name --type=json -p='[{"op": "remove", "path": "/spec/labels/team"}]'
-    echo 'INFO:: waiting for Upgrading status in redisCluster'
+    kubectl patch rkcl -n $namespace $name --type=json -p='[{"op": "remove", "path": "/spec/labels/team"}]'
+    echo 'INFO:: waiting for Upgrading status in redkeyCluster'
     ./test/cmd/waitforstatus.sh $namespace $name Upgrading 60
     result=$?
     if [[ "$result" != "0" ]]; then
-        resultMessage="Error:: Script failed validating the proper status in RedisCluster [Upgrading]"
+        resultMessage="Error:: Script failed validating the proper status in RedkeyCluster [Upgrading]"
         result=1
     else
         echo '##########################################'
-        echo 'INFO:: waiting for Ready status in redisCluster'
+        echo 'INFO:: waiting for Ready status in redkeyCluster'
         ./test/cmd/waitforstatus.sh $namespace $name Ready 540
         result=$?
         if [[ "$result" != "0" ]]; then
-            resultMessage="Error:: Script failed validating the proper status in RedisCluster [Ready]"
+            resultMessage="Error:: Script failed validating the proper status in RedkeyCluster [Ready]"
             result=1
         else
             echo '##########################################'
@@ -542,8 +542,8 @@ deleteLabel() {
                 resultMessage="Error:: Script failed found differences in labels"
                 result=1
             else
-                echo '############ RedisCluster ############'
-                kubectl get rdcl $name -n $namespace -o custom-columns=':spec.labels'
+                echo '############ RedkeyCluster ############'
+                kubectl get rkcl $name -n $namespace -o custom-columns=':spec.labels'
                 echo '############ StateFulSet ############'
                 kubectl get sts $name -n $namespace -o custom-columns=':metadata.labels'
                 echo '############ Service ############'
@@ -573,8 +573,8 @@ deleteLabel() {
 validateLabels() {
     local defaultRedisClusterNameLabel="redkey-cluster-name"
     local defaultRedisClusterOperatorLabel="redis.redkeycluster.operator/component"
-    # get RedisCluster labels
-    local rdclLabels=$(getLabels "kubectl get rdcl redis-cluster -o custom-columns=':spec.labels' -n $namespace")
+    # get RedkeyCluster labels
+    local rkclLabels=$(getLabels "kubectl get rkcl redis-cluster -o custom-columns=':spec.labels' -n $namespace")
     # get ConfigMap labels
     local cmLabels=$(getLabels "kubectl get cm redis-cluster -o custom-columns=':metadata.labels' -n $namespace")
     # get Service labels
@@ -586,11 +586,11 @@ validateLabels() {
     local result=0
 
     # validate when was added a new label
-    for rdclLabel in $rdclLabels; do
+    for rkclLabel in $rkclLabels; do
         existLabel=0
         # validate differences with configmap
         for cmLabel in $cmLabels; do
-            if [[ "$rdclLabel" == "$cmLabel" ]]; then
+            if [[ "$rkclLabel" == "$cmLabel" ]]; then
                 existLabel=1
                 break
             fi
@@ -602,7 +602,7 @@ validateLabels() {
         fi
         # validate differences with service
         for svsLabel in $svcLabels; do
-            if [[ "$rdclLabel" == "$svsLabel" ]]; then
+            if [[ "$rkclLabel" == "$svsLabel" ]]; then
                 existLabel=1
                 break
             fi
@@ -614,7 +614,7 @@ validateLabels() {
         fi
         # validate differences with StateFulSet
         for stsLabel in $stsLabels; do
-            if [[ "$rdclLabel" == "$stsLabel" ]]; then
+            if [[ "$rkclLabel" == "$stsLabel" ]]; then
                 existLabel=1
                 break
             fi
@@ -639,8 +639,8 @@ validateLabels() {
             elif [[ "${array[0]}" == "$defaultRedisClusterOperatorLabel" ]]; then
                 existLabel=1
             else
-                for rdclLabel in $rdclLabels; do
-                    if [[ "$stsLabel" == "$rdclLabel" ]]; then
+                for rkclLabel in $rkclLabels; do
+                    if [[ "$stsLabel" == "$rkclLabel" ]]; then
                         existLabel=1
                         break
                     fi
@@ -666,8 +666,8 @@ validateLabels() {
             elif [[ "${array[0]}" == "$defaultRedisClusterOperatorLabel" ]]; then
                 existLabel=1
             else
-                for rdclLabel in $rdclLabels; do
-                    if [[ "$svsLabel" == "$rdclLabel" ]]; then
+                for rkclLabel in $rkclLabels; do
+                    if [[ "$svsLabel" == "$rkclLabel" ]]; then
                         existLabel=1
                         break
                     fi
@@ -693,8 +693,8 @@ validateLabels() {
             elif [[ "${array[0]}" == "$defaultRedisClusterOperatorLabel" ]]; then
                 existLabel=1
             else
-                for rdclLabel in $rdclLabels; do
-                    if [[ "$cmLabel" == "$rdclLabel" ]]; then
+                for rkclLabel in $rkclLabels; do
+                    if [[ "$cmLabel" == "$rkclLabel" ]]; then
                         existLabel=1
                         break
                     fi
@@ -738,7 +738,7 @@ cleanAllEnvironment() {
 }
 
 #######################################
-# Remove a existing RedisCluster
+# Remove a existing RedkeyCluster
 # Globals:
 #   namespace=$1
 #   image=$2
@@ -750,17 +750,17 @@ cleanAllEnvironment() {
 #######################################
 deleteRedisCluster() {
     local result=0
-    local resultMessage="INFO:: RedisCluster was deleted correctly"
+    local resultMessage="INFO:: RedkeyCluster was deleted correctly"
     echo '##########################################'
     echo 'INFO:: getting data and objects to delete in the current cluster'
     pvcsToDelete=$(kubectl get pvc -l='redkey-cluster-name=redis-cluster' -o custom-columns=':metadata.name' -n $namespace)
-    rdclPersistent=$(kubectl get rdcl -l='app=redis' -o custom-columns=':metadata.name' -n $namespace)
-    rdclEphemeral=$(kubectl get rdcl -l='tier=redis-cluster' -o custom-columns=':metadata.name' -n $namespace)
+    rkclPersistent=$(kubectl get rkcl -l='app=redis' -o custom-columns=':metadata.name' -n $namespace)
+    rkclEphemeral=$(kubectl get rkcl -l='tier=redis-cluster' -o custom-columns=':metadata.name' -n $namespace)
 
-    if [ -z "$rdclPersistent" ] && [ -z "$rdclEphemeral" ]; then
-        echo "INFO:: No rdcl to delete."
+    if [ -z "$rkclPersistent" ] && [ -z "$rkclEphemeral" ]; then
+        echo "INFO:: No rkcl to delete."
     else
-        kubectl delete rdcl redis-cluster
+        kubectl delete rkcl redis-cluster
         result=$?
         if [[ "$result" != "0" ]]; then
             resultMessage="Failure: Script failed"
@@ -798,7 +798,7 @@ deleteRedisCluster() {
 insertData() {
     # make redis-insert
     local result=0
-    local resultMessage="INFO:: RedisCluster insert data correctly"
+    local resultMessage="INFO:: RedkeyCluster insert data correctly"
     if [[ "$newRedisCluster" == "true" ]]; then
         initializeRedisCluster
     fi
@@ -834,19 +834,19 @@ insertDataWhileScaling() {
     local keysByLoop=10
     local totalKeysInPods=0
     local totalKeys=0
-    local resultMessage="INFO:: RedisCluster insert data correctly"
+    local resultMessage="INFO:: RedkeyCluster insert data correctly"
     if [[ "$newRedisCluster" == "true" ]]; then
         initializeRedisCluster
     fi
-    kubectl get all,rdcl -n $namespace
-    echo 'INFO::patch cluster with {"spec":{"replicas":3}}'
-    kubectl patch rdcl -n $namespace $name -p '{"spec":{"replicas":3}}' --type=merge
+    kubectl get all,rkcl -n $namespace
+    echo 'INFO::patch cluster with {"spec":{"primaries":3}}'
+    kubectl patch rkcl -n $namespace $name -p '{"spec":{"primaries":3}}' --type=merge
     sleep 3s
     for ((i = 1; i <= 560; i++)); do
         ((inserts = inserts + 1))
         echo '##########################################'
         echo $inserts
-        status=$(kubectl get rediscluster -n $namespace $name --template='{{.status.status}}')
+        status=$(kubectl get redkeycluster -n $namespace $name --template='{{.status.status}}')
         REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name' --no-headers | head)
         if [ -z "$REDIS_POD" ]; then
             result=1
@@ -866,7 +866,7 @@ insertDataWhileScaling() {
         sleep 2s
     done
     if [[ "$result" == "0" ]]; then
-        kubectl get all,rdcl -n $namespace
+        kubectl get all,rkcl -n $namespace
         echo '##########################################'
         totalKeys=$((inserts * keysByLoop))
         echo "INFO:: total keys inserted while the scale up process was executed $totalKeys"
@@ -885,8 +885,8 @@ insertDataWhileScaling() {
                 echo "INFO:: summary redis dbsize $totalKeysInPods"
             done
             echo '##########################################'
-            echo "INFO:: total keys inserted in RedisCluster: $totalKeys"
-            echo "INFO:: total keys in pods RedisCluster: $totalKeysInPods"
+            echo "INFO:: total keys inserted in RedkeyCluster: $totalKeys"
+            echo "INFO:: total keys in pods RedkeyCluster: $totalKeysInPods"
             if [[ "$totalKeys" != "$totalKeysInPods" ]]; then
                 resultMessage="ERROR:: the insert keys process don't work properly REDIS-CHECK"
                 result=1
@@ -916,15 +916,15 @@ insertDataWhileScalingDown() {
     local inserts=0
     local totalKeysInPods=0
     local totalKeys=0
-    local resultMessage="INFO:: RedisCluster insert data correctly"
+    local resultMessage="INFO:: RedkeyCluster insert data correctly"
     if [[ "$newRedisCluster" == "true" ]]; then
         initializeRedisCluster
     fi
-    kubectl get all,rdcl -n $namespace
+    kubectl get all,rkcl -n $namespace
     echo '##########################################'
-    echo 'INFO:: patch cluster with {"spec":{"replicas":6}}'
-    kubectl patch rdcl -n $namespace $name -p '{"spec":{"replicas":6}}' --type=merge
-    echo 'INFO:: waiting for ScalingUp status in redisCluster'
+    echo 'INFO:: patch cluster with {"spec":{"primaries":6}}'
+    kubectl patch rkcl -n $namespace $name -p '{"spec":{"primaries":6}}' --type=merge
+    echo 'INFO:: waiting for ScalingUp status in redkeyCluster'
     ./test/cmd/waitforstatus.sh $namespace $name ScalingUp 180
     result=$?
     if [[ "$result" != "0" ]]; then
@@ -932,23 +932,23 @@ insertDataWhileScalingDown() {
         result=1
     else
         echo '##########################################'
-        echo 'INFO:: waiting for Ready status in redisCluster'
+        echo 'INFO:: waiting for Ready status in redkeyCluster'
         ./test/cmd/waitforstatus.sh $namespace $name Ready 540
         result=$?
         if [[ "$result" != "0" ]]; then
             resultMessage="Failure: Script failed"
             result=1
         else
-            kubectl get all,rdcl -n $namespace
+            kubectl get all,rkcl -n $namespace
             echo '##########################################'
-            echo 'INFO:: patch cluster with {"spec":{"replicas":2}}'
-            kubectl patch rdcl -n $namespace $name -p '{"spec":{"replicas":2}}' --type=merge
+            echo 'INFO:: patch cluster with {"spec":{"primaries":2}}'
+            kubectl patch rkcl -n $namespace $name -p '{"spec":{"primaries":2}}' --type=merge
             sleep 3s
             for ((i = 1; i <= 560; i++)); do
                 ((inserts = inserts + 1))
                 echo '##########################################'
                 echo $inserts
-                status=$(kubectl get rediscluster -n $namespace $name --template='{{.status.status}}')
+                status=$(kubectl get redkeycluster -n $namespace $name --template='{{.status.status}}')
                 REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name' --no-headers | head)
                 if [ -z "$REDIS_POD" ]; then
                     result=1
@@ -971,7 +971,7 @@ insertDataWhileScalingDown() {
     fi
 
     if [[ "$result" == "0" ]]; then
-        kubectl get all,rdcl -n $namespace
+        kubectl get all,rkcl -n $namespace
         echo '##########################################'
         totalKeys=$((inserts * keysByLoop))
         echo "INFO:: total keys inserted while the scale up process was executed $totalKeys"
@@ -989,8 +989,8 @@ insertDataWhileScalingDown() {
                 echo "INFO:: summary redis dbsize $totalKeysInPods"
             done
             echo '##########################################'
-            echo "INFO:: total keys inserted in RedisCluster: $totalKeys"
-            echo "INFO:: total keys in pods RedisCluster: $totalKeysInPods"
+            echo "INFO:: total keys inserted in RedkeyCluster: $totalKeys"
+            echo "INFO:: total keys in pods RedkeyCluster: $totalKeysInPods"
             if [[ "$totalKeys" != "$totalKeysInPods" ]]; then
                 resultMessage="ERROR:: the insert keys process don't work properly REDIS-CHECK"
                 result=1
@@ -1023,7 +1023,7 @@ getSpecificKey() {
     if [[ "$newRedisCluster" == "true" ]]; then
         initializeRedisCluster
     fi
-    kubectl get all,rdcl -n $namespace
+    kubectl get all,rkcl -n $namespace
     REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name' --no-headers | head)
     if [ -z "$REDIS_POD" ]; then
         result=1
@@ -1078,7 +1078,7 @@ getLabels() {
 }
 
 #######################################
-# Allow to validate if RedisCluster master-slave works properly
+# Allow to validate if RedkeyCluster primary-replica works properly
 # Globals:
 #   namespace=$1
 #   image=$2
@@ -1096,23 +1096,23 @@ validateRedisMasterSlave() {
     local totalMasters=0
     local totalSlaves=0
     local resultMessage="0"
-    # get replicas for RedisCluster
-    local rdclReplicas=$(kubectl -n $namespace get rdcl $name -o custom-columns=':spec.replicas' | sed 's/ *$//g' | tr -d $'\r')
-    # get replicas per master for RedisCluster
-    local rdclReplicasPerMaster=$(kubectl -n $namespace get rdcl $name -o custom-columns=':spec.replicasPerMaster' | sed 's/ *$//g' | tr -d $'\r')
-    # get replicas for statefulset associate to RedisCluster
-    local stsReplicas=$(kubectl -n $namespace get sts $name -o custom-columns=':spec.replicas' | sed 's/ *$//g' | tr -d $'\r')
+    # get primaries for RedkeyCluster
+    local rkclReplicas=$(kubectl -n $namespace get rkcl $name -o custom-columns=':spec.primaries' | sed 's/ *$//g' | tr -d $'\r')
+    # get replicas per primary for RedkeyCluster
+    local rkclReplicasPerMaster=$(kubectl -n $namespace get rkcl $name -o custom-columns=':spec.replicasPerPrimary' | sed 's/ *$//g' | tr -d $'\r')
+    # get replicas for statefulset associate to RedkeyCluster
+    local stsReplicas=$(kubectl -n $namespace get sts $name -o custom-columns=':spec.primaries' | sed 's/ *$//g' | tr -d $'\r')
     # get minimum replicas calculate for StateFulSet
-    minRdclRepSlaves=$((rdclReplicas * rdclReplicasPerMaster))
-    minRepStatefulSet=$((rdclReplicas + minRdclRepSlaves))
+    minRkclRepSlaves=$((rkclReplicas * rkclReplicasPerPrimary))
+    minRepStatefulSet=$((rkclReplicas + minRkclRepSlaves))
 
-    # validate if rediscluster has the minimum replicas
-    if [[ $rdclReplicas -lt $minReplicas ]]; then
+    # validate if redkeycluster has the minimum replicas
+    if [[ $rkclReplicas -lt $minReplicas ]]; then
         resultMessage="ERROR:: Minimum configuration required RedisCluster minReplicas"
-    # validate if rediscluster has the minimum replicas per master
-    elif [[ $rdclReplicasPerMaster -lt $minReplicasPerMaster ]]; then
-        resultMessage="ERROR:: Minimum configuration required RedisCluster minReplicasPerMaster"
-    # validate if statefulset creates the minimum replicas per replicas per master (redisCluster.spec.replicas + (redisCluster.spec.replicas*replicasPerMaster))
+    # validate if redkeycluster has the minimum replicas per primary
+    elif [[ $rkclReplicasPerMaster -lt $minReplicasPerMaster ]]; then
+        resultMessage="ERROR:: Minimum configuration required RedkeyCluster minReplicasPerPrimary"
+    # validate if statefulset creates the minimum replicas per replicas per primary (redkeyCluster.spec.primaries + (redkeyCluster.spec.primaries*replicasPerPrimary))
     elif [[ $minRepStatefulSet -lt $stsReplicas ]]; then
         resultMessage="ERROR:: Minimum configuration required StateFulSet minRepStatefulSet"
     else
@@ -1129,7 +1129,7 @@ validateRedisMasterSlave() {
             set -f                 # avoid globbing (expansion of *).
             array=(${node//"&"/ }) # convert to array the specific info about the node
             podType="${array[2]}"  # get the position that have the info about the pod type
-            # validate if the pod is master
+            # validate if the pod is primary
             if [[ "$podType" == *"master"* ]]; then
                 ((totalMasters = totalMasters + 1))
             fi
@@ -1138,21 +1138,21 @@ validateRedisMasterSlave() {
                 ((totalSlaves = totalSlaves + 1))
             fi
         done
-        # validate if exists the minimum pods master configured
-        if (($rdclReplicas != $totalMasters)); then
-            resultMessage="ERROR:: Minimum configuration required - pods master"
+        # validate if exists the minimum pods primary configured
+        if (($rkclReplicas != $totalMasters)); then
+            resultMessage="ERROR:: Minimum configuration required - pods primary"
         fi
         # validate if exists the minimum pods slave configured
-        if (($minRdclRepSlaves != $totalSlaves)); then
-            resultMessage="ERROR:: Minimum configuration required - pods slaves"
+        if (($minRkclRepSlaves != $totalSlaves)); then
+            resultMessage="ERROR:: Minimum configuration required - pods replica"
         fi
     fi
     echo $resultMessage
 }
 
 #######################################
-# Allow to validate if  the basic configuration of RedisCluster
-# master-slave works properly
+# Allow to validate if  the basic configuration of RedkeyCluster
+# primary-replica works properly
 # Globals:
 #   namespace=$1
 #   image=$2
@@ -1164,13 +1164,13 @@ validateRedisMasterSlave() {
 #######################################
 validateBasicRedisMasterSlave() {
     local result=0
-    local resultMessage="INFO:: RedisCluster configured correctly for Redis master slave configuration"
+    local resultMessage="INFO:: RedkeyCluster configured correctly for Redis primary replica configuration"
     if [[ "$newRedisCluster" == "true" ]]; then
         initializeRedisCluster
     fi
-    kubectl get all,rdcl -n $namespace
+    kubectl get all,rkcl -n $namespace
     echo '##########################################'
-    echo "INFO:: Validating basic configuration in Cluster with master-slave configuration"
+    echo "INFO:: Validating basic configuration in Cluster with primary-replica configuration"
     message=$(validateRedisMasterSlave)
     if [[ "$message" != "0" ]]; then
         resultMessage=$message
@@ -1191,7 +1191,7 @@ validateBasicRedisMasterSlave() {
 }
 
 #######################################
-# Allow to validate if the configuration of RedisCluster master-slave works properly,
+# Allow to validate if the configuration of RedkeyCluster primary-replica works properly,
 # while this one is Scaling Up
 # Globals:
 #   namespace=$1
@@ -1208,27 +1208,27 @@ scalingUpRedisMasterSlave() {
     if [[ "$newRedisCluster" == "true" ]]; then
         initializeRedisCluster
     fi
-    kubectl get all,rdcl -n $namespace
+    kubectl get all,rkcl -n $namespace
     echo '##########################################'
-    echo 'INFO:: patch cluster with {"spec":{"replicas":4,"replicasPerMaster":2}}'
-    kubectl patch rdcl -n $namespace $name -p '{"spec":{"replicas":4,"replicasPerMaster":2}}' --type=merge
-    echo 'INFO::waiting for ScalingUp status in redisCluster'
+    echo 'INFO:: patch cluster with {"spec":{"primaries":4,"replicasPerPrimary":2}}'
+    kubectl patch rkcl -n $namespace $name -p '{"spec":{"primaries":4,"replicasPerPrimary":2}}' --type=merge
+    echo 'INFO::waiting for ScalingUp status in redkeyCluster'
     ./test/cmd/waitforstatus.sh $namespace $name ScalingUp 60
     result=$?
     if [[ "$result" != "0" ]]; then
-        resultMessage="ERROR:: Failure process the scaling up of the RedisCluster"
+        resultMessage="ERROR:: Failure process the scaling up of the RedkeyCluster"
         result=1
     else
-        echo 'INFO::waiting for Ready status in redisCluster'
+        echo 'INFO::waiting for Ready status in redkeyCluster'
         ./test/cmd/waitforstatus.sh $namespace $name Ready 540
         result=$?
         if [[ "$result" != "0" ]]; then
-            resultMessage="ERROR::Failure process the wait for RedisCluster Ready"
+            resultMessage="ERROR::Failure process the wait for RedkeyCluster Ready"
             result=1
         else
-            kubectl get all,rdcl -n $namespace
+            kubectl get all,rkcl -n $namespace
             echo '##########################################'
-            echo "INFO:: Validating configuration in Cluster with master-slave configuration"
+            echo "INFO:: Validating configuration in Cluster with primary-replica configuration"
             message=$(validateRedisMasterSlave)
             if [[ "$message" != "0" ]]; then
                 resultMessage=$message
@@ -1252,7 +1252,7 @@ scalingUpRedisMasterSlave() {
 }
 
 #######################################
-# Allow to validate if the configuration of RedisCluster master-slave works properly,
+# Allow to validate if the configuration of RedkeyCluster primary-replica works properly,
 # while this one is Scaling Down
 # Globals:
 #   namespace=$1
@@ -1269,11 +1269,11 @@ scalingDownRedisMasterSlave() {
     if [[ "$newRedisCluster" == "true" ]]; then
         initializeRedisCluster
     fi
-    kubectl get all,rdcl -n $namespace
+    kubectl get all,rkcl -n $namespace
     echo '##########################################'
-    echo 'INFO:: patch cluster with {"spec":{"replicas":4,"replicasPerMaster":2}}'
-    kubectl patch rdcl -n $namespace $name -p '{"spec":{"replicas":4,"replicasPerMaster":2}}' --type=merge
-    echo 'INFO:: waiting for ScalingUp status in redisCluster'
+    echo 'INFO:: patch cluster with {"spec":{"primaries":4,"replicasPerPrimary":2}}'
+    kubectl patch rkcl -n $namespace $name -p '{"spec":{"primaries":4,"replicasPerPrimary":2}}' --type=merge
+    echo 'INFO:: waiting for ScalingUp status in redkeyCluster'
     ./test/cmd/waitforstatus.sh $namespace $name ScalingUp 180
     result=$?
     if [[ "$result" != "0" ]]; then
@@ -1281,18 +1281,18 @@ scalingDownRedisMasterSlave() {
         result=1
     else
         echo '##########################################'
-        echo 'INFO:: waiting for Ready status in redisCluster'
+        echo 'INFO:: waiting for Ready status in redkeyCluster'
         ./test/cmd/waitforstatus.sh $namespace $name Ready 540
         result=$?
         if [[ "$result" != "0" ]]; then
             resultMessage="Failure: Script failed"
             result=1
         else
-            kubectl get all,rdcl -n $namespace
+            kubectl get all,rkcl -n $namespace
             echo '##########################################'
-            echo 'INFO:: patch cluster with {"spec":{"replicas":3},"replicasPerMaster":1}'
-            kubectl patch rdcl -n $namespace $name -p '{"spec":{"replicas":3,"replicasPerMaster":1}}' --type=merge
-            echo 'INFO:: waiting for ScalingDown status in redisCluster'
+            echo 'INFO:: patch cluster with {"spec":{"primaries":3},"replicasPerPrimary":1}'
+            kubectl patch rkcl -n $namespace $name -p '{"spec":{"primaries":3,"replicasPerPrimary":1}}' --type=merge
+            echo 'INFO:: waiting for ScalingDown status in redkeyCluster'
             ./test/cmd/waitforstatus.sh $namespace $name ScalingDown 180
             result=$?
             if [[ "$result" != "0" ]]; then
@@ -1300,16 +1300,16 @@ scalingDownRedisMasterSlave() {
                 result=1
             else
                 echo '##########################################'
-                echo 'INFO:: waiting for Ready status in redisCluster'
+                echo 'INFO:: waiting for Ready status in redkeyCluster'
                 ./test/cmd/waitforstatus.sh $namespace $name Ready 540
                 result=$?
                 if [[ "$result" != "0" ]]; then
                     resultMessage="Failure: Script failed"
                     result=1
                 else
-                    kubectl get all,rdcl -n $namespace
+                    kubectl get all,rkcl -n $namespace
                     echo '##########################################'
-                    echo "INFO:: Validating configuration in Cluster with master-slave configuration"
+                    echo "INFO:: Validating configuration in Cluster with primary-replica configuration"
                     sleep 50
                     message=$(validateRedisMasterSlave)
                     if [[ "$message" != "0" ]]; then
@@ -1336,7 +1336,7 @@ scalingDownRedisMasterSlave() {
 }
 
 #######################################
-# Allow to validate if RedisCluster master-slave works properly,
+# Allow to validate if RedkeyCluster primary-replica works properly,
 # while a pod is not working well
 # Globals:
 #   namespace=$1
@@ -1354,29 +1354,29 @@ killPodRedisMasterSlave() {
     if [[ "$newRedisCluster" == "true" ]]; then
         initializeRedisCluster
     fi
-    kubectl get all,rdcl -n $namespace
+    kubectl get all,rkcl -n $namespace
     echo '##########################################'
     REDIS_POD=$(kubectl get po -n $namespace --field-selector=status.phase=Running -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name')
     for POD in $REDIS_POD; do
         set +e
-        # kill one pod that is allocated to RedisCluster
+        # kill one pod that is allocated to RedkeyCluster
         echo 'INFO:: Killing one pod'
         error=$(kubectl -n $namespace exec -i $POD -- redis-cli debug segfault 30)
         set -e
         break
     done
-    kubectl get all,rdcl -n $namespace
+    kubectl get all,rkcl -n $namespace
     echo '##########################################'
-    echo 'INFO:: waiting for Ready status in redisCluster'
+    echo 'INFO:: waiting for Ready status in redkeyCluster'
     ./test/cmd/waitforstatus.sh $namespace $name Ready 540
     result=$?
     if [[ "$result" != "0" ]]; then
         resultMessage="Failure: Script failed"
         result=1
     else
-        echo "INFO:: Validating configuration in Cluster with master-slave configuration"
+        echo "INFO:: Validating configuration in Cluster with primary-replica configuration"
         sleep 40
-        kubectl get all,rdcl -n $namespace
+        kubectl get all,rkcl -n $namespace
         echo '##########################################'
         message=$(validateRedisMasterSlave)
         if [[ "$message" != "0" ]]; then
@@ -1414,7 +1414,7 @@ allTest() {
 }
 
 #######################################
-# Initialize a new RedKey operator in local environment.
+# Initialize a new Redkey operator in local environment.
 # Globals:
 #   namespace=$1
 #   image=$2

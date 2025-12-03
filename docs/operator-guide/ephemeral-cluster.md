@@ -17,6 +17,6 @@ spec:
   ephemeral: true
 ```
 
-## Limitation: Ephemeral mode only works on new RedKey clusters
+## Limitation: Ephemeral mode only works on new Redkey clusters
 
 Currently, it is not possible to change a Redkey cluster from persistent to ephemeral. The reason why is that the existing statefulset of a persistent cluster has `VolumeClaimTemplates` configured. These templates cannot be removed at runtime via a patch command. See [this Kubernetes issue](https://github.com/kubernetes/kubernetes/issues/65870).

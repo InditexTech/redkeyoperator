@@ -25,7 +25,7 @@ log_info "Starting Redis resource assertions test for cluster '$REDIS_CLUSTER_NA
 #     exit 1
 # fi
 
-if ! create_clean_rdcl "$NAMESPACE" "$LOCAL"; then
+if ! create_clean_rkcl "$NAMESPACE" "$LOCAL"; then
     log_error "Error: Failed to create RedisCluster in namespace '$NAMESPACE'."
     exit 1
 fi
@@ -54,13 +54,13 @@ assert_maxmemory "1677721600" "${REDIS_CLUSTER_NAME}" "${NAMESPACE}"
 log_info "Applying updated resource settings manifest..."
 
 if [[ "$LOCAL" == "true" ]]; then
-    if ! kubectl apply -n "$NAMESPACE" -f hack/tests/manifests/rdcl-test-size-local.yml; then
+    if ! kubectl apply -n "$NAMESPACE" -f hack/tests/manifests/rkcl-test-size-local.yml; then
         log_error "Error: Failed to apply updated resource settings manifest."
         exit 1
     fi
 else
     # Apply Loki logging configuration
-    if ! kubectl apply -n "$NAMESPACE" -f hack/tests/manifests/rdcl-test-size.yml; then
+    if ! kubectl apply -n "$NAMESPACE" -f hack/tests/manifests/rkcl-test-size.yml; then
         log_error "Error: Failed to apply updated resource settings manifest."
         exit 1
     fi

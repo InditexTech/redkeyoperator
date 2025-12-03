@@ -30,8 +30,8 @@ import (
 	finalizer "github.com/inditextech/redkeyoperator/internal/finalizers"
 )
 
-// RedKeyClusterReconciler reconciles a RedKeyCluster object
-type RedKeyClusterReconciler struct {
+// RedkeyClusterReconciler reconciles a RedkeyCluster object
+type RedkeyClusterReconciler struct {
 	client.Client
 	Log                                 logr.Logger
 	Scheme                              *runtime.Scheme
@@ -39,7 +39,7 @@ type RedKeyClusterReconciler struct {
 	Finalizers                          []finalizer.Finalizer
 	MaxConcurrentReconciles             int
 	ConcurrentMigrate                   int
-	GetReadyNodesFunc                   func(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) (map[string]*redkeyv1.RedisNode, error)
+	GetReadyNodesFunc                   func(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster) (map[string]*redkeyv1.RedisNode, error)
 	FindExistingStatefulSetFunc         func(ctx context.Context, req ctrl.Request) (*v1.StatefulSet, error)
 	FindExistingConfigMapFunc           func(ctx context.Context, req ctrl.Request) (*corev1.ConfigMap, error)
 	FindExistingDeploymentFunc          func(ctx context.Context, req ctrl.Request) (*v1.Deployment, error)
@@ -55,31 +55,31 @@ type RedKeyClusterReconciler struct {
 // +kubebuilder:rbac:groups="",resources=configmap;services;pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=configmaps;services,verbs=get;list;create;delete
 // +kubebuilder:rbac:groups=apps,resources=statefulsets;deployments,verbs=create;delete;patch;update
-func (r *RedKeyClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	r.Log.Info("RedKeyCluster reconciler called", "redis-cluster", req.NamespacedName, "name", req.Name, "ns", req.Namespace)
-	redkeyCluster := &redkeyv1.RedKeyCluster{}
+func (r *RedkeyClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	r.Log.Info("RedkeyCluster reconciler called", "redis-cluster", req.NamespacedName, "name", req.Name, "ns", req.Namespace)
+	redkeyCluster := &redkeyv1.RedkeyCluster{}
 	err := r.Client.Get(ctx, req.NamespacedName, redkeyCluster)
 	if err == nil {
-		r.Log.Info("Found RedKeyCluster", "redis-cluster", req.NamespacedName, "name", redkeyCluster.GetName(), "GVK", redkeyCluster.GroupVersionKind().String(), "status", redkeyCluster.Status.Status)
+		r.Log.Info("Found RedkeyCluster", "redis-cluster", req.NamespacedName, "name", redkeyCluster.GetName(), "GVK", redkeyCluster.GroupVersionKind().String(), "status", redkeyCluster.Status.Status)
 		return r.ReconcileClusterObject(ctx, req, redkeyCluster)
 	} else {
 		// cluster deleted
-		r.Log.Info("Can't find RedKeyCluster, probably deleted", "redis-cluster", req.NamespacedName)
+		r.Log.Info("Can't find RedkeyCluster, probably deleted", "redis-cluster", req.NamespacedName)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *RedKeyClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *RedkeyClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&redkeyv1.RedKeyCluster{}).
+		For(&redkeyv1.RedkeyCluster{}).
 		Watches(&corev1.ConfigMap{}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(r.PreFilter())).
 		Owns(&v1.StatefulSet{}).
 		WithOptions(controller.Options{MaxConcurrentReconciles: 10}).
 		Complete(r)
 }
 
-func (r *RedKeyClusterReconciler) PreFilter() predicate.Predicate {
+func (r *RedkeyClusterReconciler) PreFilter() predicate.Predicate {
 	return predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			return r.isOwnedByUs(e.ObjectNew)
@@ -93,16 +93,16 @@ func (r *RedKeyClusterReconciler) PreFilter() predicate.Predicate {
 	}
 }
 
-func (r *RedKeyClusterReconciler) logInfo(RCNamespacedName types.NamespacedName, msg string, keysAndValues ...any) {
+func (r *RedkeyClusterReconciler) logInfo(RCNamespacedName types.NamespacedName, msg string, keysAndValues ...any) {
 	redkeyClusterInfo := []any{"redkey-cluster", RCNamespacedName}
 	r.Log.Info(msg, append(redkeyClusterInfo, keysAndValues...)...)
 }
 
-func (r *RedKeyClusterReconciler) logError(RCNamespacedName types.NamespacedName, err error, msg string, keysAndValues ...any) {
+func (r *RedkeyClusterReconciler) logError(RCNamespacedName types.NamespacedName, err error, msg string, keysAndValues ...any) {
 	redkeyClusterInfo := []any{"redkey-cluster", RCNamespacedName}
 	r.Log.Error(err, msg, append(redkeyClusterInfo, keysAndValues...)...)
 }
 
-func (r *RedKeyClusterReconciler) getHelperLogger(RCNamespacedName types.NamespacedName) logr.Logger {
+func (r *RedkeyClusterReconciler) getHelperLogger(RCNamespacedName types.NamespacedName) logr.Logger {
 	return r.Log.WithValues("redkey-cluster", RCNamespacedName)
 }

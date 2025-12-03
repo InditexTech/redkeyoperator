@@ -13,11 +13,7 @@ package        := github.com/inditextech/$(name)
 
 # Image URL to use for building/pushing image targets when using `pro` deployment profile.
 IMG ?= redkey-operator:$(version)
-IMG_WEBHOOK ?= redkey-operator-webhook:$(version)
 IMG_ROBIN ?= redkey-robin:$(version)
-
-# CN for the webhook certificate
-CN ?= inditex.dev
 
 # .............................................................................
 # DONT TOUCH THIS SECTION
@@ -95,9 +91,6 @@ IMAGE_REF ?= $(IMG)
 
 # Namespace in which the manager will be deployed.
 NAMESPACE ?= redkey-operator
-
-# Namespace in which the webhook will be deployed.
-WEBHOOK_NAMESPACE := redkey-operator-webhook
 
 # Allowed deploying profiles.
 PROFILES := dev debug pro
@@ -192,9 +185,9 @@ clean: ## Clean the build artifacts and Go cache
 	$(GO) clean --modcache
 
 ##@ Development
-manifests: controller-gen ##	Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+manifests: controller-gen ##	Generate ClusterRole and CustomResourceDefinition objects.
 	$(info $(M) generating config CRD base manifest files from code)
-	$(CONTROLLER_GEN) rbac:roleName=redkey-operator-role crd:maxDescLen=0 webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) rbac:roleName=redkey-operator-role crd:maxDescLen=0 paths="./..." output:crd:artifacts:config=config/crd/bases
 
 generate: controller-gen ##	Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
@@ -241,18 +234,6 @@ debug-docker-push: ##	Push docker image for debugging from debug.Dockerfile (use
 	$(info $(M) building debug docker image)
 	docker push ${IMG_DEBUG}
 
-build-webhook: ##	Build webhook binary.
-	$(info $(M) building Webhook executable)
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -C webhook -o ../bin/webhook  main.go
-
-docker-build-webhook: test ##	Build docker image with the webhook (uses `${IMG_WEBHOOK}` image name).
-	$(info $(M) building Webhook docker image)
-	docker build -t ${IMG_WEBHOOK} -f webhook/Dockerfile .
-
-docker-push-webhook: ##	Push docker image with the webhook (uses `${IMG_WEBHOOK}` image name).
-	$(info $(M) pushing Webhook docker image)
-	docker push ${IMG_WEBHOOK}
-
 ##@ Deployment
 install: process-manifests-crd ##		Install CRD into the K8s cluster specified by kubectl default context (Kustomize is installed if not present).
 	$(info $(M) applying CRD manifest file)
@@ -271,12 +252,12 @@ process-manifests: kustomize process-manifests-crd ##		Generate the kustomized y
 		(cd config/deploy-profiles/${PROFILE} && \
 			$(KUSTOMIZE) edit set image redkey-operator=${IMG}); \
 		$(KUSTOMIZE) build config/deploy-profiles/dev > deployment/manager.yaml; \
-		$(SED) -i 's/watch-namespace/$(NAMESPACE)/' deployment/manager.yaml; \
+		$(SED) -i -e 's/watch-namespace/$(NAMESPACE)/' deployment/manager.yaml; \
 	elif [ ${PROFILE} == "debug" ]; then \
 		(cd config/deploy-profiles/${PROFILE} && \
 			$(KUSTOMIZE) edit set image redkey-operator=${IMG_DEBUG}); \
 		$(KUSTOMIZE) build config/deploy-profiles/debug > deployment/manager.yaml; \
-		$(SED) -i 's/watch-namespace/$(NAMESPACE)/' deployment/manager.yaml; \
+		$(SED) -i -e 's/watch-namespace/$(NAMESPACE)/' deployment/manager.yaml; \
 	fi
 	rm config/deploy-profiles/${PROFILE}/kustomization.yaml
 	mv config/deploy-profiles/${PROFILE}/kustomization.yaml.orig config/deploy-profiles/${PROFILE}/kustomization.yaml
@@ -285,59 +266,8 @@ process-manifests: kustomize process-manifests-crd ##		Generate the kustomized y
 process-manifests-crd: kustomize manifests ##	Generate the kustomized yamls into the `deployment` directory to deploy the CRD.
 	$(info $(M) generating CRD deploying manifest files)
 	mkdir -p deployment
-#	 if [ ! -f certs/ca.crt ]; then make generate-ca-cert; fi
-#	$(eval CA_CERT := $(shell cat certs/ca.crt | base64 -w 0))
-#	cp ./config/crd/patches/webhook_in_redkeyclusters.yaml ./config/crd/patches/webhook_in_redkeyclusters.yaml.orig
-#	cat ./config/crd/patches/webhook_in_redkeyclusters.yaml.tpl | sed "s|WEBHOOK_CA_CERT|${CA_CERT}|g" > ./config/crd/patches/webhook_in_redkeyclusters.yaml
 	$(KUSTOMIZE) build config/crd > deployment/redis.inditex.dev_redkeyclusters.yaml
-#	mv ./config/crd/patches/webhook_in_redkeyclusters.yaml.orig ./config/crd/patches/webhook_in_redkeyclusters.yaml
 	@echo "CRD manifest generated successfully"
-
-process-manifests-webhook: kustomize ##	Generate the kustomized yamls into the `deployment` directory to deploy the webhook.
-	$(info $(M) generating webhook deploying manifest files using ${PROFILE} profile)
-	mkdir -p deployment
-	if [ ! -f certs/ca.crt ]; then make generate-ca-cert; fi
-
-	$(info $(M) generating certificates...)
-	openssl req -newkey rsa:2048 -nodes -keyout certs/server.key \
-  		-subj "/C=AU/CN=${WEBHOOK_NAMESPACE}.${CN}" \
-  		-out certs/server.csr
-	openssl x509 -req \
-		-extfile <(printf "subjectAltName=DNS:redkey-operator-webhook-service.${WEBHOOK_NAMESPACE}.svc,DNS:redkey-operator-webhook-service.${WEBHOOK_NAMESPACE}.svc.cluster.local") \
-		-in certs/server.csr \
-		-CA certs/ca.crt -CAkey certs/ca.key -CAcreateserial \
-		-out certs/server.crt \
-		-days 365
-
-	@echo ">> Generating kube secrets..."
-	kubectl create secret tls redkey-operator-webhook-service-cert \
-		--cert=certs/server.crt \
-		--key=certs/server.key \
-		--dry-run=client -o yaml \
-		> ./config/webhook/bases/secret.yaml
-
-	cp config/webhook/kustomization.yaml config/webhook/kustomization.yaml.orig && \
-	(cd config/webhook && \
-		$(KUSTOMIZE) edit set namespace ${WEBHOOK_NAMESPACE}) && \
-	if [ ${PROFILE} == "dev" ]; then \
-		(cd config/webhook && \
-			$(KUSTOMIZE) edit set image redkey-operator-webhook=${IMG_WEBHOOK};) \
-	elif [ ${PROFILE} == "debug" ]; then \
-		(cd config/deploy-profiles/${PROFILE} && \
-			$(KUSTOMIZE) edit set image /redkey-operator-webhook=${IMG_WEBHOOK}); \
-	fi
-	$(KUSTOMIZE) build config/webhook > deployment/webhook.yaml
-	rm config/webhook/kustomization.yaml
-	mv config/webhook/kustomization.yaml.orig config/webhook/kustomization.yaml
-	rm config/webhook/bases/secret.yaml
-
-	@echo "Webhook manifest generated successfully"
-
-generate-ca-cert:
-	$(info $(M) generating CA certificates)
-	mkdir -p certs
-	openssl genrsa -out certs/ca.key 2048
-	openssl req -x509 -new -nodes -key certs/ca.key -days 3650 -out certs/ca.crt -subj "/CN=${WEBHOOK_NAMESPACE}.${CN}"
 
 deploy: deploy-manager ##		Deploy the manager into the K8s cluster specified by kubectl default context.
 
@@ -350,14 +280,6 @@ deploy-manager: process-manifests ##		Deploy the manager into the K8s cluster sp
 undeploy-manager: process-manifests ##		Delete the manager from the K8s cluster specified by kubectl default context.
 	$(info $(M) deleting Manager)
 	kubectl delete -f deployment/manager.yaml
-
-deploy-webhook: process-manifests-webhook ##		Deploy the webhook into the K8s cluster specified by kubectl default context.
-	$(info $(M) applying Webhook manifests)
-	kubectl apply -f deployment/webhook.yaml
-
-undeploy-webhook: process-manifests-webhook ##		Delete the webhook from the K8s cluster specified by kubectl default context.
-	$(info $(M) deleting Webhook)
-	kubectl delete -f deployment/webhook.yaml
 
 OPERATOR=$(shell kubectl -n ${NAMESPACE} get po -l='control-plane=redkey-operator' -o=jsonpath='{.items[0].metadata.name}')
 dev-deploy: ## 		Build a new manager binary, copy the file to the operator pod and run it.
@@ -378,44 +300,25 @@ port-forward: ##		Port forwarding of port 40000 for debugging the manager with D
 delete-operator: ##		Delete the operator pod (redkey-operator) in order to have a new clean pod created.
 	kubectl delete pod $(OPERATOR) -n ${NAMESPACE}
 
-apply-rkcl: ##		Apply the sample RedKey Cluster manifest.
-	$(info $(M) creating sample RedKey cluster)
+apply-rkcl: ##		Apply the sample Redkey Cluster manifest.
+	$(info $(M) creating sample Redkey cluster)
 	$(KUSTOMIZE) build config/samples/ephemeral | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | $(SED) 's,image: redkey-robin:0.1.0,image: ${IMG_ROBIN},' | kubectl apply -f -
 
-delete-rkcl: ##		Delete the sample RedKey Cluster manifest.
-	$(info $(M) deleting sample RedKey cluster)
+delete-rkcl: ##		Delete the sample Redkey Cluster manifest.
+	$(info $(M) deleting sample Redkey cluster)
 	$(KUSTOMIZE) build config/samples/ephemeral | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | $(SED) 's,image: redkey-robin:0.1.0,image: ${IMG_ROBIN},' | kubectl delete -f -
 
-apply-debug-rkcl: ##		Apply the sample RedKey Cluster manifest for Robin debugging.
-	$(info $(M) creating sample RedKey cluster)
+apply-debug-rkcl: ##		Apply the sample Redkey Cluster manifest for Robin debugging.
+	$(info $(M) creating sample Redkey cluster)
 	$(KUSTOMIZE) build config/samples/robin-debug | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | $(SED) 's,image: redkey-robin:0.1.0,image: ${IMG_DEBUG},' | kubectl apply -f -
 
-delete-debug-rkcl: ##		Delete the sample RedKey Cluster manifest for Robin debugging.
-	$(info $(M) deleting sample RedKey cluster)
+delete-debug-rkcl: ##		Delete the sample Redkey Cluster manifest for Robin debugging.
+	$(info $(M) deleting sample Redkey cluster)
 	$(KUSTOMIZE) build config/samples/robin-debug | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | $(SED) 's,image: redkey-robin:0.1.0,image: ${IMG_DEBUG},' | kubectl delete -f -
 
 apply-all: docker-build docker-push process-manifests install deploy apply-rkcl
 
 delete-all: delete-rkcl undeploy uninstall
-
-WEBHOOK=$(shell kubectl -n ${WEBHOOK_NAMESPACE} get po -l='control-plane=redkey-operator-webhook' -o=jsonpath='{.items[0].metadata.name}')
-dev-deploy-webhook: ## 		Build a new webhook binary, copy the file to the webhook pod and run it.
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -gcflags="all=-N -l" -C webhook -o ../bin/webhook  main.go
-	kubectl wait -n ${WEBHOOK_NAMESPACE} --for=condition=ready pod -l control-plane=redkey-operator-webhook
-	kubectl cp ./bin/webhook $(WEBHOOK):/webhook -n ${WEBHOOK_NAMESPACE}
-	kubectl exec -it po/$(WEBHOOK) -n ${WEBHOOK_NAMESPACE} exec /webhook
-
-debug-webhook: ##		Build a new webhook binary, copy the file to the webhhok pod and run it in debug mode (listening on port 40000 for Delve connections).
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -gcflags="all=-N -l" -C webhook -o ../bin/webhook  main.go
-	kubectl wait -n ${WEBHOOK_NAMESPACE} --for=condition=ready pod -l control-plane=redkey-operator-webhook
-	kubectl cp ./bin/webhook $(WEBHOOK):/webhook -n ${WEBHOOK_NAMESPACE}
-	kubectl exec -it po/$(WEBHOOK) -n ${WEBHOOK_NAMESPACE} -- dlv --listen=:40000 --headless=true --api-version=2 --accept-multiclient exec /webhook --continue
-
-port-forward-webhook: ##		Port forwarding of port 40001 for debugging the manager with Delve.
-	kubectl port-forward pods/$(WEBHOOK) 40001:40000 -n ${WEBHOOK_NAMESPACE}
-
-delete-webhook: ##		Delete the webhook pod in order to have a new clean pod created.
-	kubectl delete pod $(WEBHOOK) -n ${WEBHOOK_NAMESPACE}
 
 ##@ Tools
 
@@ -457,22 +360,22 @@ $(ENVTEST):
 ##@ Troubleshooting
 
 REDIS_PODS=$(shell kubectl get po -n ${NAMESPACE} --field-selector=status.phase=Running  -l='redis.redkeycluster.operator/component=redis' -o custom-columns=':metadata.name' )
-redis-check: ## Check information in pods related to RedKey cluster.
+redis-check: ## Check information in pods related to Redkey cluster.
 	for POD in $(REDIS_PODS); do kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli --cluster check localhost:6379; done
 
-redis-nodes: ## Check nodes of RedKey cluster.
+redis-nodes: ## Check nodes of Redkey cluster.
 	for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli CLUSTER NODES | sort; done
 
-redis-slots: ## Check slots of RedKey cluster.
+redis-slots: ## Check slots of Redkey cluster.
 	for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli CLUSTER SLOTS | sort; done
 
-redis-info: ## Check info of RedKey cluster
+redis-info: ## Check info of Redkey cluster
 	for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli CLUSTER INFO | sort; done
 
-redis-forget: ## Forget nodes of RedKey cluster
+redis-forget: ## Forget nodes of Redkey cluster
 	for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli CLUSTER FORGET $(nodeid); done
 
-redis-benchmark: # Benckmark a RedKey cluster
+redis-benchmark: # Benckmark a Redkey cluster
 	if [ "$(WORKSPACE)" == "default" ]; then \
   		kubectl exec -it -n $(NSTEST) redis-cluster-0 -- redis-benchmark -c 100 -n 100000 -t set,get; \
 	else \
@@ -483,10 +386,10 @@ redis-benchmark: # Benckmark a RedKey cluster
 	  fi \
 	fi
 
-redis-fix: ## Fix RedKey cluster
+redis-fix: ## Fix Redkey cluster
 	for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli --cluster fix localhost:6379; done
 
-redis-rebalance: ## Rebalance slots of RedKey cluster
+redis-rebalance: ## Rebalance slots of Redkey cluster
 	for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli --cluster rebalance --cluster-use-empty-masters localhost:6379; done
 
 args = `arg="$(filter-out $@,$(MAKECMDGOALS))" && echo $${arg:-${1}}`

@@ -6,4 +6,3 @@ resources:
 
 patches:
 - path: ./patches/operator-crd-patch.yaml
-- path: ./patches/webhook_in_redkeyclusters.yaml

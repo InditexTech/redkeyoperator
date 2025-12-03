@@ -30,7 +30,7 @@ fi
 
 
 # Create a clean RedisCluster
-if ! create_clean_rdcl "$NAMESPACE" "$LOCAL"; then
+if ! create_clean_rkcl "$NAMESPACE" "$LOCAL"; then
     echo "Error: Failed to create RedisCluster in namespace $NAMESPACE"
     exit 1
 fi

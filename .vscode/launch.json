@@ -2,18 +2,11 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "RedKey Manager",
+            "name": "Redkey Manager",
             "type": "go",
             "request": "launch",
             "mode": "auto",
             "program": "cmd/main.go"
-        },
-        {
-            "name": "Redis Webhook",
-            "type": "go",
-            "request": "launch",
-            "mode": "auto",
-            "program": "webhook/main.go"
         },
         {
             "name": "Connect to Manager",

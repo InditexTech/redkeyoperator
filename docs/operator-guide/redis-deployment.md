@@ -2,13 +2,13 @@
 
 ## CRD
 
-RedKey operator CRD defines a new resource type `RedKeyCluster`.
+Redkey operator CRD defines a new resource type `RedkeyCluster`.
 
-Below you'll find an example of manifest conforming to the resource definition that will deploy a RedKey cluster:
+Below you'll find an example of manifest conforming to the resource definition that will deploy a Redkey cluster:
 
 ```yaml
 apiVersion: redis.inditex.dev/v1
-kind: RedKeyCluster
+kind: RedkeyCluster
 metadata:
   name: rediscluster-sample
   namespace: default
@@ -19,7 +19,7 @@ spec:
   labels:
     redis-name: rediscluster-sample
     app: myapp
-  replicas: 3
+  primaries: 3
   storage: 3Gi
   image: redislabs/redisgraph:2.8.9
   resources:
@@ -57,17 +57,17 @@ The `config` item contains the Redis specific configuration attributes that are 
 
 ## Cluster vs Standalone
 
-Currently, RedKey operator **only deploys Rdis in cluster mode**.
+Currently, Redkey operator **only deploys Rdis in cluster mode**.
 
-However, it's possible to set `replicas: 1` to deploy a single instance RedKey cluster. With this configuration, all the slots will be by force allocated to that instance.
+However, it's possible to set `primaries: 1` to deploy a single instance Redkey cluster. With this configuration, all the slots will be by force allocated to that instance.
 
 ## Live reloading
 
 The configuration from `config` item will be placed under a ConfigMap created and managed by the Operator. This ConfigMap shares its name with the RedisCluster.
 
-The configuration contained in this ConfigMap is the `source of truth` that RedKey operator will use to create and configure the RedKey cluster nodes.
+The configuration contained in this ConfigMap is the `source of truth` that Redkey operator will use to create and configure the Redkey cluster nodes.
 
-Config reloading is supported by RedKey operator. When ConfigMap contents are updated RedKey operator's reconciliation loop will detect it and update the underlying mapping upgrading the RedKey cluster and restarting the Redis nodes to get the new configuration.
+Config reloading is supported by Redkey operator. When ConfigMap contents are updated Redkey operator's reconciliation loop will detect it and update the underlying mapping upgrading the Redkey cluster and restarting the Redis nodes to get the new configuration.
 
 ## Resources layout
 

@@ -1,8 +1,8 @@
-# Funtional Test for Kubernetes and Openshift RedKey Operator
+# Funtional Test for Kubernetes and Openshift Redkey Operator
 
 ## Purpose
 
-Funtional test for provision RedKey cluster environments in Kubernetes or Openshift.
+Funtional test for provision Redkey cluster environments in Kubernetes or Openshift.
 
 
 ## Folder structure
@@ -32,18 +32,18 @@ Manifests:
 ```
 
 * `namespace` name of namespace where the funtional will be executed
-* `image` name of image that deploy the RedKey Operator 
-* `test` name of the desired test `Initialize,ScalingUp,ScalingDown,ChangeStorage,ChangeStorageReplicas,AddLabel,DeleteLabel,InsertData,InsertDataWhileScaling,InsertDataWhileScalingDown,GetSpecificKey,ValidateBasicRedisMasterSlave,ScalingUpRedisMasterSlave,ScalingDownRedisMasterSlave,KillPodRedisMasterSlave`
-* `newRedisCluster` allows to create a new instance of RedKey Cluster `true,false`
-* `typeRedisCluster`  type of deployment of the RedKey Cluster `storage,ephemeral,repmaster`
+* `image` name of image that deploy the Redkey Operator 
+* `test` name of the desired test `Initialize,ScalingUp,ScalingDown,ChangeStorage,ChangeStorageReplicas,AddLabel,DeleteLabel,InsertData,InsertDataWhileScaling,InsertDataWhileScalingDown,GetSpecificKey,ValidateBasicRedisPrimaryReplica,ScalingUpRedisPrimaryReplica,ScalingDownRedisPrimaryReplica,KillPodRedisPrimaryReplica`
+* `newRedisCluster` allows to create a new instance of Redkey Cluster `true,false`
+* `typeRedisCluster`  type of deployment of the Redkey Cluster `storage,ephemeral,repprimary`
 
-## Deploying a RedKey cluster
+## Deploying a Redkey cluster
 
-There are 3 commands for creating RedKey clusters. 
+There are 3 commands for creating Redkey clusters. 
 
 * `./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.0" "Initialize" "true" "storage"` creates a persistent cluster 
 * `./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.0" "Initialize" "true" "ephemeral"` creates an ephemeral cluster. 
-* `./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.0" "Initialize" "true" "repmaster"` creates a master slave cluster. 
+* `./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.0" "Initialize" "true" "repprimary"` creates a primary replica cluster. 
 
 Please note that some of the following tooling (such as PoMonitor and load tester) are dependent of the cluster name, so both share the same name.
 
@@ -60,10 +60,10 @@ Please note that some of the following tooling (such as PoMonitor and load teste
 * InsertDataWhileScaling
 * InsertDataWhileScalingDown
 * GetSpecificKey
-* ValidateBasicRedisMasterSlave
-* ScalingUpRedisMasterSlave
-* ScalingDownRedisMasterSlave
-* KillPodRedisMasterSlave
+* ValidateBasicRedisPrimaryReplica
+* ScalingUpRedisPrimaryReplica
+* ScalingDownRedisPrimaryReplica
+* KillPodRedisPrimaryReplica
 
 
 Tests can be run with (examples):
@@ -82,10 +82,10 @@ Tests can be run with (examples):
  * ```./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.1" "InsertDataWhileScaling" "true" "storage"```
  * ```./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.1" "InsertDataWhileScalingDown" "true" "storage"```
  * ```./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.1" "GetSpecificKey" "true" "storage"```
- * ```./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.6" "ValidateBasicRedisMasterSlave" "true" "repmaster"```
- * ```./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.6" "ScalingUpRedisMasterSlave" "true" "repmaster"```
- * ```./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.6" "ScalingDownRedisMasterSlave" "true" "repmaster"```
- * ```./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.6" "KillPodRedisMasterSlave" "true" "repmaster"```
+ * ```./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.6" "ValidateBasicRedisPrimaryReplica" "true" "repprimary"```
+ * ```./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.6" "ScalingUpRedisPrimaryReplica" "true" "repprimary"```
+ * ```./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.6" "ScalingDownRedisPrimaryReplica" "true" "repprimary"```
+ * ```./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.6" "KillPodRedisPrimaryReplica" "true" "repprimary"```
  * ```./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.0" "All" "true" "storage"```
  * ```./test/cmd/redisClusterTest.sh "redis-system" "localhost:5001/redis-inditext-operator:v0.2.0" "DeleteRedisCluster"```
 

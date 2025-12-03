@@ -23,7 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func (r *RedKeyClusterReconciler) updateClusterStatus(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) error {
+func (r *RedkeyClusterReconciler) updateClusterStatus(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster) error {
 	var req reconcile.Request
 	req.NamespacedName.Namespace = redkeyCluster.Namespace
 	req.NamespacedName.Name = redkeyCluster.Name
@@ -33,27 +33,27 @@ func (r *RedKeyClusterReconciler) updateClusterStatus(ctx context.Context, redke
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		time.Sleep(time.Second * 1)
 
-		// Update RedKeyCluster status first
+		// Update RedkeyCluster status first
 
 		// get a fresh redkeycluster to minimize conflicts
-		refreshedRedKeyCluster := redkeyv1.RedKeyCluster{}
-		err := r.Client.Get(ctx, types.NamespacedName{Namespace: redkeyCluster.Namespace, Name: redkeyCluster.Name}, &refreshedRedKeyCluster)
+		refreshedRedkeyCluster := redkeyv1.RedkeyCluster{}
+		err := r.Client.Get(ctx, types.NamespacedName{Namespace: redkeyCluster.Namespace, Name: redkeyCluster.Name}, &refreshedRedkeyCluster)
 		if err != nil {
-			r.logError(redkeyCluster.NamespacedName(), err, "Error getting a refreshed RedKeyCluster before updating it. It may have been deleted?")
+			r.logError(redkeyCluster.NamespacedName(), err, "Error getting a refreshed RedkeyCluster before updating it. It may have been deleted?")
 			return err
 		}
 		// update the slots
-		refreshedRedKeyCluster.Status.Nodes = redkeyCluster.Status.Nodes
-		refreshedRedKeyCluster.Status.Status = redkeyCluster.Status.Status
-		refreshedRedKeyCluster.Status.Conditions = redkeyCluster.Status.Conditions
-		refreshedRedKeyCluster.Status.Substatus = redkeyCluster.Status.Substatus
+		refreshedRedkeyCluster.Status.Nodes = redkeyCluster.Status.Nodes
+		refreshedRedkeyCluster.Status.Status = redkeyCluster.Status.Status
+		refreshedRedkeyCluster.Status.Conditions = redkeyCluster.Status.Conditions
+		refreshedRedkeyCluster.Status.Substatus = redkeyCluster.Status.Substatus
 
-		err = r.Client.Status().Update(ctx, &refreshedRedKeyCluster)
+		err = r.Client.Status().Update(ctx, &refreshedRedkeyCluster)
 		if err != nil {
-			r.logError(redkeyCluster.NamespacedName(), err, "Error updating RedKeyCluster object with new status")
+			r.logError(redkeyCluster.NamespacedName(), err, "Error updating RedkeyCluster object with new status")
 			return err
 		}
-		r.logInfo(redkeyCluster.NamespacedName(), "RedKeyCluster has been updated with the new status", "status", redkeyCluster.Status.Status)
+		r.logInfo(redkeyCluster.NamespacedName(), "RedkeyCluster has been updated with the new status", "status", redkeyCluster.Status.Status)
 
 		// Update Robin status
 		// Do not update if we are switching to Initializing status because Robin needs some
@@ -86,19 +86,19 @@ func (r *RedKeyClusterReconciler) updateClusterStatus(ctx context.Context, redke
 	})
 }
 
-func (r *RedKeyClusterReconciler) updateClusterSubStatus(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster, substatus string, partition string) error {
-	refreshedRedKeyCluster := redkeyv1.RedKeyCluster{}
-	err := r.Client.Get(ctx, types.NamespacedName{Namespace: redkeyCluster.Namespace, Name: redkeyCluster.Name}, &refreshedRedKeyCluster)
+func (r *RedkeyClusterReconciler) updateClusterSubStatus(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster, substatus string, partition string) error {
+	refreshedRedkeyCluster := redkeyv1.RedkeyCluster{}
+	err := r.Client.Get(ctx, types.NamespacedName{Namespace: redkeyCluster.Namespace, Name: redkeyCluster.Name}, &refreshedRedkeyCluster)
 	if err != nil {
-		r.logError(redkeyCluster.NamespacedName(), err, "Error getting a refreshed RedKeyCluster before updating it. It may have been deleted?")
+		r.logError(redkeyCluster.NamespacedName(), err, "Error getting a refreshed RedkeyCluster before updating it. It may have been deleted?")
 		return err
 	}
-	refreshedRedKeyCluster.Status.Substatus.Status = substatus
-	refreshedRedKeyCluster.Status.Substatus.UpgradingPartition = partition
+	refreshedRedkeyCluster.Status.Substatus.Status = substatus
+	refreshedRedkeyCluster.Status.Substatus.UpgradingPartition = partition
 	redkeyCluster.Status.Substatus.Status = substatus
 	redkeyCluster.Status.Substatus.UpgradingPartition = partition
 
-	err = r.Client.Status().Update(ctx, &refreshedRedKeyCluster)
+	err = r.Client.Status().Update(ctx, &refreshedRedkeyCluster)
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error updating substatus")
 		return err
@@ -106,7 +106,7 @@ func (r *RedKeyClusterReconciler) updateClusterSubStatus(ctx context.Context, re
 	return nil
 }
 
-func (r *RedKeyClusterReconciler) updateScalingStatus(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) error {
+func (r *RedkeyClusterReconciler) updateScalingStatus(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster) error {
 	sset, ssetErr := r.FindExistingStatefulSet(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redkeyCluster.Name, Namespace: redkeyCluster.Namespace}})
 	if ssetErr != nil {
 		return ssetErr
@@ -119,11 +119,11 @@ func (r *RedKeyClusterReconciler) updateScalingStatus(ctx context.Context, redke
 	if realExpectedReplicas < currSsetReplicas {
 		redkeyCluster.Status.Status = redkeyv1.StatusScalingDown
 		setConditionFalse(logger, redkeyCluster, redkeyv1.ConditionScalingUp)
-		r.setConditionTrue(redkeyCluster, redkeyv1.ConditionScalingDown, fmt.Sprintf("Scaling down from %d to %d nodes", currSsetReplicas, redkeyCluster.Spec.Replicas))
+		r.setConditionTrue(redkeyCluster, redkeyv1.ConditionScalingDown, fmt.Sprintf("Scaling down from %d to %d nodes", currSsetReplicas, redkeyCluster.Spec.Primaries))
 	}
 	if realExpectedReplicas > currSsetReplicas {
 		redkeyCluster.Status.Status = redkeyv1.StatusScalingUp
-		r.setConditionTrue(redkeyCluster, redkeyv1.ConditionScalingUp, fmt.Sprintf("Scaling up from %d to %d nodes", currSsetReplicas, redkeyCluster.Spec.Replicas))
+		r.setConditionTrue(redkeyCluster, redkeyv1.ConditionScalingUp, fmt.Sprintf("Scaling up from %d to %d nodes", currSsetReplicas, redkeyCluster.Spec.Primaries))
 		setConditionFalse(logger, redkeyCluster, redkeyv1.ConditionScalingDown)
 	}
 	if realExpectedReplicas == currSsetReplicas {
@@ -155,7 +155,7 @@ func (r *RedKeyClusterReconciler) updateScalingStatus(ctx context.Context, redke
 	return nil
 }
 
-func (r *RedKeyClusterReconciler) updateUpgradingStatus(ctx context.Context, redkeyCluster *redkeyv1.RedKeyCluster) error {
+func (r *RedkeyClusterReconciler) updateUpgradingStatus(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster) error {
 	req := ctrl.Request{NamespacedName: types.NamespacedName{Name: redkeyCluster.Name, Namespace: redkeyCluster.Namespace}}
 	statefulSet, err := r.FindExistingStatefulSet(ctx, req)
 	if err != nil {
@@ -202,13 +202,13 @@ func (r *RedKeyClusterReconciler) updateUpgradingStatus(ctx context.Context, red
 		maps.Copy(desiredLabels, *redkeyCluster.Spec.Labels)
 
 		// Add labels from override
-		if redkeyCluster.Spec.Override != nil && redkeyCluster.Spec.Override.StatefulSet != nil && redkeyCluster.Spec.Override.StatefulSet.Spec.Template.Labels != nil {
-			for k2, v2 := range redkeyCluster.Spec.Override.StatefulSet.Spec.Template.Labels {
+		if redkeyCluster.Spec.Override != nil && redkeyCluster.Spec.Override.StatefulSet != nil && redkeyCluster.Spec.Override.StatefulSet.Spec != nil && redkeyCluster.Spec.Override.StatefulSet.Spec.Template != nil && redkeyCluster.Spec.Override.StatefulSet.Spec.Template.Metadata.Labels != nil {
+			for k2, v2 := range redkeyCluster.Spec.Override.StatefulSet.Spec.Template.Metadata.Labels {
 				desiredLabels[k2] = v2
 			}
 		}
 
-		r.logInfo(redkeyCluster.NamespacedName(), "Expected real labels configured in RedKeyCluster object", "Spec.Labels", desiredLabels)
+		r.logInfo(redkeyCluster.NamespacedName(), "Expected real labels configured in RedkeyCluster object", "Spec.Labels", desiredLabels)
 
 		// get the current value of labels configured in the statefulset object
 		observedLabels := statefulSet.Spec.Template.Labels
@@ -235,7 +235,7 @@ func (r *RedKeyClusterReconciler) updateUpgradingStatus(ctx context.Context, red
 		}
 
 		defaultLabels := map[string]string{
-			redis.RedKeyClusterLabel:                     redkeyCluster.Name,
+			redis.RedkeyClusterLabel:                     redkeyCluster.Name,
 			r.getStatefulSetSelectorLabel(redkeyCluster): "redis",
 		}
 

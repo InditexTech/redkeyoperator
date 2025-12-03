@@ -24,7 +24,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
 	"github.com/inditextech/redkeyoperator/controllers"
@@ -87,9 +86,6 @@ func main() {
 		Metrics: server.Options{
 			BindAddress: metricsAddr,
 		},
-		WebhookServer: webhook.NewServer(webhook.Options{
-			Port: 9443,
-		}),
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "db95d8a6.inditex.dev",
@@ -113,8 +109,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = controllers.NewRedKeyClusterReconciler(mgr, maxConcurrentReconciles, concurrentMigrates).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "RedKeyCluster")
+	if err = controllers.NewRedkeyClusterReconciler(mgr, maxConcurrentReconciles, concurrentMigrates).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "RedkeyCluster")
 		os.Exit(1)
 	}
 

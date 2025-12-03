@@ -29,8 +29,8 @@ import (
 
 const RedisCommPort = 6379
 const RedisGossPort = 16379
-const RedKeyClusterLabel = "redkey-cluster-name"
-const RedKeyClusterComponentLabel = "redis.redkeycluster.operator/component"
+const RedkeyClusterLabel = "redkey-cluster-name"
+const RedkeyClusterComponentLabel = "redis.redkeycluster.operator/component"
 
 var defaultPort = corev1.ServicePort{
 	Name:     "client",
@@ -42,9 +42,9 @@ var defaultPort = corev1.ServicePort{
 	},
 }
 
-func CreateStatefulSet(ctx context.Context, req ctrl.Request, spec redkeyv1.RedKeyClusterSpec, labels map[string]string) (*v1.StatefulSet, error) {
+func CreateStatefulSet(ctx context.Context, req ctrl.Request, spec redkeyv1.RedkeyClusterSpec, labels map[string]string) (*v1.StatefulSet, error) {
 	var err error = nil
-	//	req ctrl.Request, replicas int32, redisImage string, storage string
+
 	redisImage := spec.Image
 	replicas := int32(spec.NodesNeeded())
 
@@ -53,8 +53,8 @@ func CreateStatefulSet(ctx context.Context, req ctrl.Request, spec redkeyv1.RedK
 	}
 
 	defaultLabels := map[string]string{
-		RedKeyClusterLabel:          req.Name,
-		RedKeyClusterComponentLabel: common.ComponentLabelRedis,
+		RedkeyClusterLabel:          req.Name,
+		RedkeyClusterComponentLabel: common.ComponentLabelRedis,
 	}
 
 	// Add default labels and apply them to the statefulset.
@@ -79,7 +79,7 @@ func CreateStatefulSet(ctx context.Context, req ctrl.Request, spec redkeyv1.RedK
 			ServiceName: req.Name,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{RedKeyClusterLabel: req.Name, RedKeyClusterComponentLabel: common.ComponentLabelRedis},
+					Labels: map[string]string{RedkeyClusterLabel: req.Name, RedkeyClusterComponentLabel: common.ComponentLabelRedis},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -134,26 +134,51 @@ func CreateStatefulSet(ctx context.Context, req ctrl.Request, spec redkeyv1.RedK
 	return redisStatefulSet, err
 }
 
-func ApplyStsOverride(sts, override *v1.StatefulSet) (*v1.StatefulSet, error) {
+func ApplyStsOverride(sts *v1.StatefulSet, override *redkeyv1.PartialStatefulSet) (*v1.StatefulSet, error) {
+	// Use override.Spec directly; since it's a pointer, can be nil
+	var overrideSpec *redkeyv1.PartialStatefulSetSpec
+	if override != nil {
+		overrideSpec = override.Spec
+	}
+
 	// Set an empty selector if override does not set it. This is because a merge with nil removes the field in the merged result
-	if override.Spec.Selector == nil {
-		override.Spec.Selector = &metav1.LabelSelector{}
+	if overrideSpec == nil || overrideSpec.Selector == nil {
+		if overrideSpec == nil {
+			overrideSpec = &redkeyv1.PartialStatefulSetSpec{}
+		}
+		overrideSpec.Selector = &metav1.LabelSelector{}
 	}
 
 	// Copy the original serviceName. This is because if not, merged.Spec.ServiceName will be "" (override content)
-	override.Spec.ServiceName = sts.Spec.ServiceName
+	if overrideSpec != nil {
+		overrideSpec.ServiceName = sts.Spec.ServiceName
+	}
 
-	// Copy the original creationTimestamp and status
-	override.ObjectMeta.CreationTimestamp = sts.ObjectMeta.CreationTimestamp
-	override.Status = sts.Status
+	// Copy the original creationTimestamp
+	if override != nil {
+		override.Metadata.CreationTimestamp = sts.ObjectMeta.CreationTimestamp
+	}
 
-	// Marshal the original and the override to json
+	// Marshal the original and the override (built from typed spec + metadata) to json
 	original, err := json.Marshal(sts)
 	if err != nil {
 		return nil, err
 	}
 
-	patch, err := json.Marshal(override)
+	// Build a temporary object to marshal as patch: include metadata and the partial spec
+	patchObj := struct {
+		APIVersion string                           `json:"apiVersion,omitempty"`
+		Kind       string                           `json:"kind,omitempty"`
+		Metadata   metav1.ObjectMeta                `json:"metadata,omitempty"`
+		Spec       *redkeyv1.PartialStatefulSetSpec `json:"spec,omitempty"`
+	}{
+		APIVersion: override.APIVersion,
+		Kind:       override.Kind,
+		Metadata:   override.Metadata,
+		Spec:       overrideSpec,
+	}
+
+	patch, err := json.Marshal(patchObj)
 	if err != nil {
 		return nil, err
 	}
@@ -171,17 +196,17 @@ func ApplyStsOverride(sts, override *v1.StatefulSet) (*v1.StatefulSet, error) {
 		return nil, err
 	}
 
-	// Clean result
-	cleanStatefulSetResult(result, sts, override)
+	// Clean result; pass the partial override spec
+	cleanStatefulSetResult(result, sts, overrideSpec)
 
 	return result, nil
 }
 
-func cleanStatefulSetResult(result, original, override *v1.StatefulSet) {
+func cleanStatefulSetResult(result *v1.StatefulSet, original *v1.StatefulSet, overrideSpec *redkeyv1.PartialStatefulSetSpec) {
 	// Include the original redis container if the override does not set it. This can happen when the override containers is empty.
 	// This could also be handled before the strategic merge patch, initializing the override containers with the original one or an empty array if it is empty.
 	// However, that way the container deletion is not correctly handled, keeping the original container if the override container is empty.
-	if result.Spec.Template.Spec.Containers == nil {
+	if overrideSpec.Template == nil || overrideSpec.Template.Spec.Containers == nil {
 		result.Spec.Template.Spec.Containers = []corev1.Container{original.Spec.Template.Spec.Containers[0]}
 	}
 
@@ -217,7 +242,7 @@ func cleanStatefulSetResult(result, original, override *v1.StatefulSet) {
 	}
 
 	// Assure to clean volumes if override does not set them
-	if len(override.Spec.Template.Spec.Volumes) == 0 {
+	if overrideSpec == nil || overrideSpec.Template == nil || len(overrideSpec.Template.Spec.Volumes) == 0 {
 		result.Spec.Template.Spec.Volumes = []corev1.Volume{}
 
 		// Mantain the config and data volumes (if exists)
@@ -229,27 +254,27 @@ func cleanStatefulSetResult(result, original, override *v1.StatefulSet) {
 	}
 
 	// Assure to clean tolerations if override does not set them
-	if len(override.Spec.Template.Spec.Tolerations) == 0 {
+	if overrideSpec == nil || overrideSpec.Template == nil || len(overrideSpec.Template.Spec.Tolerations) == 0 {
 		result.Spec.Template.Spec.Tolerations = nil
 	}
 
 	// Assure to clean TopologySpreadConstraints if override does not set them
-	if len(override.Spec.Template.Spec.TopologySpreadConstraints) == 0 {
+	if overrideSpec == nil || overrideSpec.Template == nil || len(overrideSpec.Template.Spec.TopologySpreadConstraints) == 0 {
 		result.Spec.Template.Spec.TopologySpreadConstraints = nil
 	}
 
 	// Assure to clean Affinity if override does not set them
-	if override.Spec.Template.Spec.Affinity == nil {
+	if overrideSpec == nil || overrideSpec.Template == nil || overrideSpec.Template.Spec.Affinity == nil {
 		result.Spec.Template.Spec.Affinity = nil
 	}
 
 	// Assure to clean InitContainers if override does not set them
-	if len(override.Spec.Template.Spec.InitContainers) == 0 {
+	if overrideSpec == nil || overrideSpec.Template == nil || len(overrideSpec.Template.Spec.InitContainers) == 0 {
 		result.Spec.Template.Spec.InitContainers = nil
 	}
 }
 
-func AddStatefulSetStorage(statefulSet *v1.StatefulSet, req ctrl.Request, spec redkeyv1.RedKeyClusterSpec) error {
+func AddStatefulSetStorage(statefulSet *v1.StatefulSet, req ctrl.Request, spec redkeyv1.RedkeyClusterSpec) error {
 	storage := spec.Storage
 	if storage == "" {
 		return errors.New("non ephemeral cluster with no storage defined in spec.Storage")
@@ -331,23 +356,44 @@ func CreateService(Namespace, Name string, labels map[string]string) *corev1.Ser
 			Ports: []corev1.ServicePort{
 				defaultPort,
 			},
-			Selector:  map[string]string{RedKeyClusterLabel: Name, RedKeyClusterComponentLabel: common.ComponentLabelRedis},
+			Selector:  map[string]string{RedkeyClusterLabel: Name, RedkeyClusterComponentLabel: common.ComponentLabelRedis},
 			ClusterIP: "None",
 		},
 	}
 }
 
-func ApplyServiceOverride(service, override *corev1.Service) (*corev1.Service, error) {
-	// Assure to copy the original ClusterIP to not allow overriding it
-	override.Spec.ClusterIP = service.Spec.ClusterIP
+func ApplyServiceOverride(service *corev1.Service, override *redkeyv1.PartialService) (*corev1.Service, error) {
+	// Use override.Spec directly; since it's a pointer, can be nil
+	var overrideSpec *redkeyv1.PartialServiceSpec
+	if override != nil {
+		overrideSpec = override.Spec
+	}
 
-	// Marshal the original and the override to json
+	// Assure to copy the original ClusterIP to not allow overriding it
+	if overrideSpec == nil {
+		overrideSpec = &redkeyv1.PartialServiceSpec{}
+	}
+	overrideSpec.ClusterIP = service.Spec.ClusterIP
+
+	// Marshal original and a patch built from metadata + typed spec
 	original, err := json.Marshal(service)
 	if err != nil {
 		return nil, err
 	}
 
-	patch, err := json.Marshal(override)
+	patchObj := struct {
+		APIVersion string                       `json:"apiVersion,omitempty"`
+		Kind       string                       `json:"kind,omitempty"`
+		Metadata   metav1.ObjectMeta            `json:"metadata,omitempty"`
+		Spec       *redkeyv1.PartialServiceSpec `json:"spec,omitempty"`
+	}{
+		APIVersion: override.APIVersion,
+		Kind:       override.Kind,
+		Metadata:   override.Metadata,
+		Spec:       overrideSpec,
+	}
+
+	patch, err := json.Marshal(patchObj)
 	if err != nil {
 		return nil, err
 	}
@@ -365,15 +411,15 @@ func ApplyServiceOverride(service, override *corev1.Service) (*corev1.Service, e
 		return nil, err
 	}
 
-	// Clean result
-	cleanServiceResult(result, service, override)
+	// Clean result using the partial override spec
+	cleanServiceResult(result, service, overrideSpec, override)
 
 	return result, nil
 }
 
-func cleanServiceResult(result, original, override *corev1.Service) {
+func cleanServiceResult(result *corev1.Service, original *corev1.Service, overrideSpec *redkeyv1.PartialServiceSpec, override *redkeyv1.PartialService) {
 	// Assure to clean ports if override does not set them
-	if len(override.Spec.Ports) == 0 {
+	if overrideSpec == nil || len(overrideSpec.Ports) == 0 {
 		result.Spec.Ports = []corev1.ServicePort{}
 	}
 
@@ -391,8 +437,8 @@ func cleanServiceResult(result, original, override *corev1.Service) {
 	}
 
 	// Assure to clean selector if override does not set them
-	if len(override.Spec.Selector) == 0 {
-		result.Spec.Selector = map[string]string{RedKeyClusterLabel: original.Name, RedKeyClusterComponentLabel: common.ComponentLabelRedis}
+	if overrideSpec == nil || len(overrideSpec.Selector) == 0 {
+		result.Spec.Selector = map[string]string{RedkeyClusterLabel: original.Name, RedkeyClusterComponentLabel: common.ComponentLabelRedis}
 	}
 }
 
@@ -499,14 +545,14 @@ func ConfigStringToMap(config string) map[string][]string {
 	return configMap
 }
 
-func GenerateRedisConfig(redkeyCluster *redkeyv1.RedKeyCluster) string {
-	// Assuming RedKeyClusterType is the type of redkeyCluster
-	// and it has Spec with Config, Ephemeral, and ReplicasPerMaster fields
+func GenerateRedisConfig(redkeyCluster *redkeyv1.RedkeyCluster) string {
+	// Assuming RedkeyClusterType is the type of redkeyCluster
+	// and it has Spec with Config, Ephemeral, and ReplicasPerPrimary fields
 	// Convert string configuration to map
-	newRedKeyClusterConf := ConfigStringToMap(redkeyCluster.Spec.Config)
+	newRedkeyClusterConf := ConfigStringToMap(redkeyCluster.Spec.Config)
 
 	// Merge new configuration with the default
-	redisConfMap := MergeWithDefaultConfig(newRedKeyClusterConf, redkeyCluster.Spec.Ephemeral, redkeyCluster.Spec.ReplicasPerMaster)
+	redisConfMap := MergeWithDefaultConfig(newRedkeyClusterConf, redkeyCluster.Spec.Ephemeral, redkeyCluster.Spec.ReplicasPerPrimary)
 
 	// Convert the merged configuration map to a string
 	redisConf := MapToConfigString(redisConfMap)
@@ -553,8 +599,8 @@ func ExtractMaxMemory(desiredConfig map[string][]string) (int, error) {
 	return maxMemoryInt, nil
 }
 
-// Default configuration params for Master-Replica clusters.
-func DefaultConfigMasterReplica() map[string]string {
+// Default configuration params for Primary-Replica clusters.
+func DefaultConfigPrimaryReplica() map[string]string {
 	config := make(map[string]string)
 	config["maxmemory"] = "1600mb"
 	config["maxmemory-samples"] = "5"
@@ -574,8 +620,8 @@ func DefaultConfigMasterReplica() map[string]string {
 	return config
 }
 
-// Default configuration params for not Master-Replica clusters.
-func DefaultConfigNotMasterReplica() map[string]string {
+// Default configuration params for not Primary-Replica clusters.
+func DefaultConfigNotPrimaryReplica() map[string]string {
 	config := make(map[string]string)
 	config["maxmemory"] = "1600mb"
 	config["maxmemory-samples"] = "5"
@@ -591,8 +637,8 @@ func DefaultConfigNotMasterReplica() map[string]string {
 	return config
 }
 
-// Ephemeral clusters configuration params for Master-Replica clusters.
-func EphemeralConfigMasterReplica() map[string]string {
+// Ephemeral clusters configuration params for Primary-Replica clusters.
+func EphemeralConfigPrimaryReplica() map[string]string {
 	config := make(map[string]string)
 	config["maxmemory"] = "1600mb"
 	config["maxmemory-samples"] = "5"
@@ -612,8 +658,8 @@ func EphemeralConfigMasterReplica() map[string]string {
 	return config
 }
 
-// Ephemeral clusters configuration params for not Master-Replica clusters.
-func EphemeralConfigNotMasterReplica() map[string]string {
+// Ephemeral clusters configuration params for not Primary-Replica clusters.
+func EphemeralConfigNotPrimaryReplica() map[string]string {
 	config := make(map[string]string)
 	config["maxmemory"] = "1600mb"
 	config["maxmemory-samples"] = "5"
@@ -629,21 +675,21 @@ func EphemeralConfigNotMasterReplica() map[string]string {
 	return config
 }
 
-func GetDefaultConfiguration(ephemeral bool, replicasPerMaster int32) map[string]string {
+func GetDefaultConfiguration(ephemeral bool, replicasPerPrimary int32) map[string]string {
 	switch {
-	case ephemeral && replicasPerMaster > 0:
-		return EphemeralConfigMasterReplica()
+	case ephemeral && replicasPerPrimary > 0:
+		return EphemeralConfigPrimaryReplica()
 	case ephemeral:
-		return EphemeralConfigNotMasterReplica()
-	case !ephemeral && replicasPerMaster > 0:
-		return DefaultConfigMasterReplica()
+		return EphemeralConfigNotPrimaryReplica()
+	case !ephemeral && replicasPerPrimary > 0:
+		return DefaultConfigPrimaryReplica()
 	default:
-		return DefaultConfigNotMasterReplica()
+		return DefaultConfigNotPrimaryReplica()
 	}
 }
 
-func MergeWithDefaultConfig(newConfig map[string][]string, ephemeral bool, replicasPerMaster int32) map[string][]string {
-	defaultConfig := GetDefaultConfiguration(ephemeral, replicasPerMaster)
+func MergeWithDefaultConfig(newConfig map[string][]string, ephemeral bool, replicasPerPrimary int32) map[string][]string {
+	defaultConfig := GetDefaultConfiguration(ephemeral, replicasPerPrimary)
 	allowConfiguration := make(map[string][]string, len(defaultConfig))
 
 	overrideNotAllowed := map[string]bool{
