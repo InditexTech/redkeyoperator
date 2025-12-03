@@ -14,7 +14,7 @@ As we will see below, you can use the `make` command to deploy the different com
 
 ## Development profiles
 
-Three **Deployment Profiles** have been defined. Basically, these profiles determine which image will be used to deploy the Redkey Operator pod. These are the 3 Deployment Profiles and the default images used to create the Redkey Operator pod:
+Three **Deployment Profiles** have been defined. Basically, these profiles determine which image will be used to deploy the Redkey Operator pod. These are the 2 Deployment Profiles and the default images used to create the Redkey Operator pod:
 
 | Profile | Image used to create the Redkey Operator pod | Purpose                                         |
 |---------|----------------------------------------------|-------------------------------------------------|
