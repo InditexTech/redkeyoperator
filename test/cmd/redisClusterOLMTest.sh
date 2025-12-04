@@ -209,11 +209,11 @@ validateRedisMasterSlave() {
     local totalSlaves=0
     local resultMessage="0"
     # get replicas for RedkeyCluster
-    local rkclReplicas=$(kubectl -n $namespace get rkcl $name -o custom-columns=':spec.replicas' | sed 's/ *$//g' | tr -d $'\r')
+    local rkclReplicas=$(kubectl -n $namespace get rkcl $name -o custom-columns=':spec.primaries' | sed 's/ *$//g' | tr -d $'\r')
     # get replicas per primary for RedkeyCluster
-    local rkclReplicasPerMaster=$(kubectl -n $namespace get rkcl $name -o custom-columns=':spec.replicasPerMaster' | sed 's/ *$//g' | tr -d $'\r')
+    local rkclReplicasPerMaster=$(kubectl -n $namespace get rkcl $name -o custom-columns=':spec.replicasPerPrimary' | sed 's/ *$//g' | tr -d $'\r')
     # get replicas for statefulset associate to RedkeyCluster
-    local stsReplicas=$(kubectl -n $namespace get sts $name -o custom-columns=':spec.replicas' | sed 's/ *$//g' | tr -d $'\r')
+    local stsReplicas=$(kubectl -n $namespace get sts $name -o custom-columns=':spec.primaries' | sed 's/ *$//g' | tr -d $'\r')
     # get minimum replicas calculate for StateFulSet
     minRkclRepSlaves=$((rkclReplicas * rkclReplicasPerMaster))
     minRepStatefulSet=$((rkclReplicas + minRkclRepSlaves))
@@ -224,7 +224,7 @@ validateRedisMasterSlave() {
     # validate if rediscluster has the minimum replicas per primary
     elif [[ $rkclReplicasPerMaster -lt $minReplicasPerMaster ]]; then
         resultMessage="ERROR:: Minimum configuration required RedisCluster minReplicasPerMaster"
-    # validate if statefulset creates the minimum replicas per replicas per primary (redisCluster.spec.replicas + (redisCluster.spec.replicas*replicasPerMaster))
+    # validate if statefulset creates the minimum replicas per replicas per primary (redisCluster.spec.primaries + (redisCluster.spec.primaries*replicasPerPrimary))
     elif [[ $minRepStatefulSet -lt $stsReplicas ]]; then
         resultMessage="ERROR:: Minimum configuration required StateFulSet minRepStatefulSet"
     else

@@ -25,9 +25,9 @@ log_info "Starting cluster test for cluster '$REDIS_CLUSTER_NAME' in namespace '
 #     exit 1
 # fi
 
-# Create a clean RedisCluster
+# Create a clean RedkeyCluster
 if ! create_clean_rkcl "$NAMESPACE" "$LOCAL"; then
-    echo "Error: Failed to create RedisCluster in namespace $NAMESPACE"
+    echo "Error: Failed to create RedkeyCluster in namespace $NAMESPACE"
     exit 1
 fi
 
