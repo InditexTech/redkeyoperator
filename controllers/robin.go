@@ -268,8 +268,8 @@ func (r *RedkeyClusterReconciler) getRobinConfiguration(req ctrl.Request, spec r
 			Cluster: robin.RedkeyClusterConfig{
 				Namespace:                req.Namespace,
 				Name:                     req.Name,
-				Replicas:                 int(spec.Primaries),
-				ReplicasPerMaster:        int(spec.ReplicasPerPrimary),
+				Primaries:                int(spec.Primaries),
+				ReplicasPerPrimary:       int(spec.ReplicasPerPrimary),
 				Status:                   redkeyv1.RobinStatusUnknown,
 				Ephemeral:                spec.Ephemeral,
 				HealthProbePeriodSeconds: *spec.Robin.Config.Cluster.HealthProbePeriodSeconds,

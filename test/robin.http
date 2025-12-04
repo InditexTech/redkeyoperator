@@ -34,8 +34,8 @@ GET {{robinBaseUrl}}/v1/redkeycluster/replicas
 PUT {{robinBaseUrl}}/v1/redkeycluster/replicas
 
 {
-    "replicas": 6,
-    "replicas_per_master": 0
+    "primaries": 6,
+    "replicas_per_primary": 0
 }
 
 ## Cluster

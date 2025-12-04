@@ -78,8 +78,8 @@ type RedisReconcilerConfig struct {
 type RedkeyClusterConfig struct {
 	Namespace                string        `yaml:"namespace"`
 	Name                     string        `yaml:"name"`
-	Replicas                 int           `yaml:"replicas"`
-	ReplicasPerMaster        int           `yaml:"replicas_per_master"`
+	Primaries                int           `yaml:"primaries"`
+	ReplicasPerPrimary       int           `yaml:"replicas_per_primary"`
 	Status                   string        `yaml:"status"`
 	Ephemeral                bool          `yaml:"ephemeral"`
 	HealthProbePeriodSeconds int           `yaml:"health_probe_interval_seconds"`
@@ -126,8 +126,8 @@ type SlotRange struct {
 }
 
 type ClusterReplicas struct {
-	Replicas          int `json:"replicas"`
-	ReplicasPerMaster int `json:"replicas_per_master"`
+	Primaries          int `json:"primaries"`
+	ReplicasPerPrimary int `json:"replicas_per_primary"`
 }
 
 type MoveSlots struct {
@@ -237,15 +237,15 @@ func (r *Robin) GetReplicas() (int, int, error) {
 		return 0, 0, fmt.Errorf("parsing Robin status response: %w", err)
 	}
 
-	return clusterReplicas.Replicas, clusterReplicas.ReplicasPerMaster, nil
+	return clusterReplicas.Primaries, clusterReplicas.ReplicasPerPrimary, nil
 }
 
-func (r *Robin) SetReplicas(clusterReplicas int, clusterReplicasPerMaster int) error {
+func (r *Robin) SetReplicas(clusterReplicas int, clusterReplicasPerPrimary int) error {
 	url := EndpointProtocolPrefix + r.Pod.Status.PodIP + ":" + strconv.Itoa(Port) + EndpointReplicas
 
 	var replicas ClusterReplicas
-	replicas.Replicas = clusterReplicas
-	replicas.ReplicasPerMaster = clusterReplicasPerMaster
+	replicas.Primaries = clusterReplicas
+	replicas.ReplicasPerPrimary = clusterReplicasPerPrimary
 	payload, err := json.Marshal(replicas)
 	if err != nil {
 		return fmt.Errorf("setting Robin status: %w", err)
@@ -255,7 +255,7 @@ func (r *Robin) SetReplicas(clusterReplicas int, clusterReplicasPerMaster int) e
 	if err != nil {
 		return fmt.Errorf("setting Robin status: %w", err)
 	}
-	r.Logger.Info("Robin cluster replicas updated", "replicas", replicas.Replicas, "replicas per master", replicas.ReplicasPerMaster, "response body", string(body))
+	r.Logger.Info("Robin cluster primaries and replicas updated", "primaries", replicas.Primaries, "replicas per primary", replicas.ReplicasPerPrimary, "response body", string(body))
 
 	return nil
 }
@@ -427,7 +427,7 @@ func CompareConfigurations(a, b *Configuration) bool {
 	a2 := new(Configuration)
 	*a2 = *a
 	a2.Redis.Cluster.Status = b.Redis.Cluster.Status
-	a2.Redis.Cluster.Replicas = b.Redis.Cluster.Replicas
+	a2.Redis.Cluster.Primaries = b.Redis.Cluster.Primaries
 	return reflect.DeepEqual(a2, b)
 }
 
@@ -476,7 +476,7 @@ func PersistRobinStatus(ctx context.Context, client ctrlClient.Client, redkeyClu
 }
 
 // Updates configuration in Robin ConfigMap with the new replicas.
-func PersistRobinReplicas(ctx context.Context, client ctrlClient.Client, redkeyCluster *redkeyv1.RedkeyCluster, replicas int, replicasPerMaster int) error {
+func PersistRobinReplicas(ctx context.Context, client ctrlClient.Client, redkeyCluster *redkeyv1.RedkeyCluster, replicas int, replicasPerPrimary int) error {
 	cmap := &corev1.ConfigMap{}
 	err := client.Get(ctx, types.NamespacedName{Name: redkeyCluster.Name + "-robin", Namespace: redkeyCluster.Namespace}, cmap)
 	if err != nil {
@@ -486,8 +486,8 @@ func PersistRobinReplicas(ctx context.Context, client ctrlClient.Client, redkeyC
 	if err := yaml.Unmarshal([]byte(cmap.Data["application-configmap.yml"]), &config); err != nil {
 		return fmt.Errorf("persist Robin replicas: %w", err)
 	}
-	config.Redis.Cluster.Replicas = replicas
-	config.Redis.Cluster.ReplicasPerMaster = replicasPerMaster
+	config.Redis.Cluster.Primaries = replicas
+	config.Redis.Cluster.ReplicasPerPrimary = replicasPerPrimary
 	confUpdated, err := yaml.Marshal(config)
 	if err != nil {
 		return fmt.Errorf("persist Robin replicas: %w", err)
