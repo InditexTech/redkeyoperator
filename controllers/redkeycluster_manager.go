@@ -425,7 +425,7 @@ func (r *RedkeyClusterReconciler) refreshClusterNodesInfo(ctx context.Context, r
 
 	updatedNodes := make(map[string]*redkeyv1.RedisNode, 0)
 	for _, node := range clusterNodes.Nodes {
-		updatedNodes[node.Id] = &redkeyv1.RedisNode{IP: node.Ip, Name: node.Name, ReplicaOf: node.MasterId}
+		updatedNodes[node.Id] = &redkeyv1.RedisNode{IP: node.Ip, Name: node.Name, ReplicaOf: node.PrimaryId}
 		updatedNodes[node.Id].IsPrimary = strings.Contains(node.Flags, "master")
 	}
 

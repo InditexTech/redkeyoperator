@@ -113,7 +113,7 @@ type Node struct {
 	Ip         string      `yaml:"ip"`
 	Flags      string      `yaml:"flags"`
 	Slots      []SlotRange `yaml:"slots"`
-	MasterId   string      `yaml:"masterId"`
+	PrimaryId  string      `yaml:"primaryId"`
 	Failures   int         `yaml:"failures"`
 	Sent       int         `yaml:"sent"`
 	Recv       int         `yaml:"recv"`
