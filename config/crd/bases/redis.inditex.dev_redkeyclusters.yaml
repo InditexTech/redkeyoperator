@@ -4080,7 +4080,6 @@ spec:
                       cluster:
                         properties:
                           backOff:
-                            format: int64
                             type: integer
                           healingTimeSeconds:
                             type: integer
