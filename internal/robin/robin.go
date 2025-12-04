@@ -108,15 +108,15 @@ type ClusterNodes struct {
 }
 
 type Node struct {
-	Name       string      `yaml:"name"`
-	Id         string      `yaml:"id"`
-	Ip         string      `yaml:"ip"`
-	Flags      string      `yaml:"flags"`
-	PrimaryId  string      `yaml:"primaryId"`
-	Failures   int         `yaml:"failures"`
-	Sent       int         `yaml:"sent"`
-	Recv       int         `yaml:"recv"`
-	LinkStatus string      `yaml:"linkStatus"`
+	Name       string `yaml:"name"`
+	Id         string `yaml:"id"`
+	Ip         string `yaml:"ip"`
+	Flags      string `yaml:"flags"`
+	PrimaryId  string `yaml:"primaryId"`
+	Failures   int    `yaml:"failures"`
+	Sent       int    `yaml:"sent"`
+	Recv       int    `yaml:"recv"`
+	LinkStatus string `yaml:"linkStatus"`
 }
 
 type SlotRange struct {
