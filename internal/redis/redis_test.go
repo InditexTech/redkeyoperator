@@ -22,13 +22,13 @@ import (
 
 var replicas = int32(3)
 var defaultLabels = map[string]string{
-	RedkeyClusterLabel:          "rediscluster",
+	RedkeyClusterLabel:          "redkeycluster",
 	RedkeyClusterComponentLabel: common.ComponentLabelRedis,
 }
 
 var redisStatefulSet = &appsv1.StatefulSet{
 	ObjectMeta: metav1.ObjectMeta{
-		Name:      "rediscluster",
+		Name:      "redkeycluster",
 		Namespace: "default",
 		Labels:    defaultLabels,
 		CreationTimestamp: metav1.Time{
@@ -41,7 +41,7 @@ var redisStatefulSet = &appsv1.StatefulSet{
 		Selector: &metav1.LabelSelector{
 			MatchLabels: defaultLabels,
 		},
-		ServiceName: "rediscluster",
+		ServiceName: "redkeycluster",
 		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: defaultLabels,
@@ -81,7 +81,7 @@ var redisStatefulSet = &appsv1.StatefulSet{
 						Name: "config",
 						VolumeSource: corev1.VolumeSource{
 							ConfigMap: &corev1.ConfigMapVolumeSource{
-								LocalObjectReference: corev1.LocalObjectReference{Name: "rediscluster"},
+								LocalObjectReference: corev1.LocalObjectReference{Name: "redkeycluster"},
 								Items:                []corev1.KeyToPath{{Key: "redis.conf", Path: "redis.conf"}},
 							},
 						},
@@ -101,7 +101,7 @@ var redisService = &corev1.Service{
 		Kind: "Service", APIVersion: "v1",
 	},
 	ObjectMeta: metav1.ObjectMeta{
-		Name:      "rediscluster",
+		Name:      "redkeycluster",
 		Namespace: "default",
 		Labels:    defaultLabels,
 	},
@@ -116,7 +116,7 @@ var redisService = &corev1.Service{
 				},
 			},
 		},
-		Selector:  map[string]string{RedkeyClusterLabel: "rediscluster", RedkeyClusterComponentLabel: common.ComponentLabelRedis},
+		Selector:  map[string]string{RedkeyClusterLabel: "redkeycluster", RedkeyClusterComponentLabel: common.ComponentLabelRedis},
 		ClusterIP: "None",
 	},
 }
@@ -166,7 +166,7 @@ var podTemplateSpec = &corev1.PodTemplateSpec{
 				Name: "config",
 				VolumeSource: corev1.VolumeSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
-						LocalObjectReference: corev1.LocalObjectReference{Name: "rediscluster"},
+						LocalObjectReference: corev1.LocalObjectReference{Name: "redkeycluster"},
 						Items:                []corev1.KeyToPath{{Key: "redis.conf", Path: "redis.conf"}},
 					},
 				},
@@ -385,7 +385,7 @@ func Test_ApplyStsOverride(t *testing.T) {
 			},
 			expected: &appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "rediscluster",
+					Name:      "redkeycluster",
 					Namespace: "default",
 					Labels:    defaultLabels,
 					CreationTimestamp: metav1.Time{
@@ -398,7 +398,7 @@ func Test_ApplyStsOverride(t *testing.T) {
 					Selector: &metav1.LabelSelector{
 						MatchLabels: defaultLabels,
 					},
-					ServiceName: "rediscluster",
+					ServiceName: "redkeycluster",
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: defaultLabels,
@@ -452,7 +452,7 @@ func Test_ApplyStsOverride(t *testing.T) {
 									Name: "config",
 									VolumeSource: corev1.VolumeSource{
 										ConfigMap: &corev1.ConfigMapVolumeSource{
-											LocalObjectReference: corev1.LocalObjectReference{Name: "rediscluster"},
+											LocalObjectReference: corev1.LocalObjectReference{Name: "redkeycluster"},
 											Items:                []corev1.KeyToPath{{Key: "redis.conf", Path: "redis.conf"}},
 										},
 									},
@@ -472,7 +472,7 @@ func Test_ApplyStsOverride(t *testing.T) {
 			name: "Remove sidecar container",
 			original: &appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "rediscluster",
+					Name:      "redkeycluster",
 					Namespace: "default",
 					Labels:    defaultLabels,
 					CreationTimestamp: metav1.Time{
@@ -485,7 +485,7 @@ func Test_ApplyStsOverride(t *testing.T) {
 					Selector: &metav1.LabelSelector{
 						MatchLabels: defaultLabels,
 					},
-					ServiceName: "rediscluster",
+					ServiceName: "redkeycluster",
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: defaultLabels,
@@ -539,7 +539,7 @@ func Test_ApplyStsOverride(t *testing.T) {
 									Name: "config",
 									VolumeSource: corev1.VolumeSource{
 										ConfigMap: &corev1.ConfigMapVolumeSource{
-											LocalObjectReference: corev1.LocalObjectReference{Name: "rediscluster"},
+											LocalObjectReference: corev1.LocalObjectReference{Name: "redkeycluster"},
 											Items:                []corev1.KeyToPath{{Key: "redis.conf", Path: "redis.conf"}},
 										},
 									},
@@ -591,7 +591,7 @@ func Test_ApplyStsOverride(t *testing.T) {
 			},
 			expected: &appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "rediscluster",
+					Name:      "redkeycluster",
 					Namespace: "default",
 					Labels:    defaultLabels,
 					CreationTimestamp: metav1.Time{
@@ -604,7 +604,7 @@ func Test_ApplyStsOverride(t *testing.T) {
 					Selector: &metav1.LabelSelector{
 						MatchLabels: defaultLabels,
 					},
-					ServiceName: "rediscluster",
+					ServiceName: "redkeycluster",
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: defaultLabels,
@@ -663,7 +663,7 @@ func Test_ApplyStsOverride(t *testing.T) {
 									Name: "config",
 									VolumeSource: corev1.VolumeSource{
 										ConfigMap: &corev1.ConfigMapVolumeSource{
-											LocalObjectReference: corev1.LocalObjectReference{Name: "rediscluster"},
+											LocalObjectReference: corev1.LocalObjectReference{Name: "redkeycluster"},
 											Items:                []corev1.KeyToPath{{Key: "redis.conf", Path: "redis.conf"}},
 										},
 									},
@@ -683,7 +683,7 @@ func Test_ApplyStsOverride(t *testing.T) {
 			name: "Remove volume and init container",
 			original: &appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "rediscluster",
+					Name:      "redkeycluster",
 					Namespace: "default",
 					Labels:    defaultLabels,
 					CreationTimestamp: metav1.Time{
@@ -696,7 +696,7 @@ func Test_ApplyStsOverride(t *testing.T) {
 					Selector: &metav1.LabelSelector{
 						MatchLabels: defaultLabels,
 					},
-					ServiceName: "rediscluster",
+					ServiceName: "redkeycluster",
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: defaultLabels,
@@ -749,7 +749,7 @@ func Test_ApplyStsOverride(t *testing.T) {
 									Name: "config",
 									VolumeSource: corev1.VolumeSource{
 										ConfigMap: &corev1.ConfigMapVolumeSource{
-											LocalObjectReference: corev1.LocalObjectReference{Name: "rediscluster"},
+											LocalObjectReference: corev1.LocalObjectReference{Name: "redkeycluster"},
 											Items:                []corev1.KeyToPath{{Key: "redis.conf", Path: "redis.conf"}},
 										},
 									},
@@ -817,7 +817,7 @@ func Test_ApplyStsOverride(t *testing.T) {
 			},
 			expected: &appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "rediscluster",
+					Name:      "redkeycluster",
 					Namespace: "default",
 					Labels:    defaultLabels,
 					CreationTimestamp: metav1.Time{
@@ -830,7 +830,7 @@ func Test_ApplyStsOverride(t *testing.T) {
 					Selector: &metav1.LabelSelector{
 						MatchLabels: defaultLabels,
 					},
-					ServiceName: "rediscluster",
+					ServiceName: "redkeycluster",
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: defaultLabels,
@@ -870,7 +870,7 @@ func Test_ApplyStsOverride(t *testing.T) {
 									Name: "config",
 									VolumeSource: corev1.VolumeSource{
 										ConfigMap: &corev1.ConfigMapVolumeSource{
-											LocalObjectReference: corev1.LocalObjectReference{Name: "rediscluster"},
+											LocalObjectReference: corev1.LocalObjectReference{Name: "redkeycluster"},
 											Items:                []corev1.KeyToPath{{Key: "redis.conf", Path: "redis.conf"}},
 										},
 									},
@@ -927,7 +927,7 @@ func Test_ApplyStsOverride(t *testing.T) {
 			name: "Remove tolerations, topology constraint and affinity",
 			original: &appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "rediscluster",
+					Name:      "redkeycluster",
 					Namespace: "default",
 					Labels:    defaultLabels,
 					CreationTimestamp: metav1.Time{
@@ -940,7 +940,7 @@ func Test_ApplyStsOverride(t *testing.T) {
 					Selector: &metav1.LabelSelector{
 						MatchLabels: defaultLabels,
 					},
-					ServiceName: "rediscluster",
+					ServiceName: "redkeycluster",
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: defaultLabels,
@@ -980,7 +980,7 @@ func Test_ApplyStsOverride(t *testing.T) {
 									Name: "config",
 									VolumeSource: corev1.VolumeSource{
 										ConfigMap: &corev1.ConfigMapVolumeSource{
-											LocalObjectReference: corev1.LocalObjectReference{Name: "rediscluster"},
+											LocalObjectReference: corev1.LocalObjectReference{Name: "redkeycluster"},
 											Items:                []corev1.KeyToPath{{Key: "redis.conf", Path: "redis.conf"}},
 										},
 									},
@@ -1079,9 +1079,9 @@ func Test_ApplyServiceOverride(t *testing.T) {
 					Kind: "Service", APIVersion: "v1",
 				},
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        "rediscluster",
+					Name:        "redkeycluster",
 					Namespace:   "default",
-					Labels:      map[string]string{RedkeyClusterLabel: "rediscluster", RedkeyClusterComponentLabel: common.ComponentLabelRedis, "new-label": "new-value"},
+					Labels:      map[string]string{RedkeyClusterLabel: "redkeycluster", RedkeyClusterComponentLabel: common.ComponentLabelRedis, "new-label": "new-value"},
 					Annotations: map[string]string{"new-annotation": "new-value"},
 				},
 				Spec: corev1.ServiceSpec{
@@ -1095,7 +1095,7 @@ func Test_ApplyServiceOverride(t *testing.T) {
 							},
 						},
 					},
-					Selector:  map[string]string{RedkeyClusterLabel: "rediscluster", RedkeyClusterComponentLabel: common.ComponentLabelRedis},
+					Selector:  map[string]string{RedkeyClusterLabel: "redkeycluster", RedkeyClusterComponentLabel: common.ComponentLabelRedis},
 					ClusterIP: "None",
 				},
 			},
@@ -1114,7 +1114,7 @@ func Test_ApplyServiceOverride(t *testing.T) {
 					Kind: "Service", APIVersion: "v1",
 				},
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "rediscluster",
+					Name:      "redkeycluster",
 					Namespace: "default",
 					Labels:    defaultLabels,
 				},
@@ -1129,7 +1129,7 @@ func Test_ApplyServiceOverride(t *testing.T) {
 							},
 						},
 					},
-					Selector:  map[string]string{RedkeyClusterLabel: "rediscluster", RedkeyClusterComponentLabel: common.ComponentLabelRedis, "new-selector": "new-value"},
+					Selector:  map[string]string{RedkeyClusterLabel: "redkeycluster", RedkeyClusterComponentLabel: common.ComponentLabelRedis, "new-selector": "new-value"},
 					ClusterIP: "None",
 				},
 			},
@@ -1142,7 +1142,7 @@ func Test_ApplyServiceOverride(t *testing.T) {
 					Kind: "Service", APIVersion: "v1",
 				},
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "rediscluster",
+					Name:      "redkeycluster",
 					Namespace: "default",
 					Labels:    defaultLabels,
 				},
@@ -1157,7 +1157,7 @@ func Test_ApplyServiceOverride(t *testing.T) {
 							},
 						},
 					},
-					Selector:  map[string]string{RedkeyClusterLabel: "rediscluster", RedkeyClusterComponentLabel: common.ComponentLabelRedis, "new-selector": "new-value"},
+					Selector:  map[string]string{RedkeyClusterLabel: "redkeycluster", RedkeyClusterComponentLabel: common.ComponentLabelRedis, "new-selector": "new-value"},
 					ClusterIP: "None",
 				},
 			},
@@ -1187,7 +1187,7 @@ func Test_ApplyServiceOverride(t *testing.T) {
 					Kind: "Service", APIVersion: "v1",
 				},
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "rediscluster",
+					Name:      "redkeycluster",
 					Namespace: "default",
 					Labels:    defaultLabels,
 				},
@@ -1223,7 +1223,7 @@ func Test_ApplyServiceOverride(t *testing.T) {
 					Kind: "Service", APIVersion: "v1",
 				},
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "rediscluster",
+					Name:      "redkeycluster",
 					Namespace: "default",
 					Labels:    defaultLabels,
 				},
@@ -1308,7 +1308,7 @@ func Test_ApplyPodTemplateSpecOverride(t *testing.T) {
 							Name: "config",
 							VolumeSource: corev1.VolumeSource{
 								ConfigMap: &corev1.ConfigMapVolumeSource{
-									LocalObjectReference: corev1.LocalObjectReference{Name: "rediscluster"},
+									LocalObjectReference: corev1.LocalObjectReference{Name: "redkeycluster"},
 									Items:                []corev1.KeyToPath{{Key: "redis1.conf", Path: "redis1.conf"}},
 								},
 							},
@@ -1361,7 +1361,7 @@ func Test_ApplyPodTemplateSpecOverride(t *testing.T) {
 							Name: "config",
 							VolumeSource: corev1.VolumeSource{
 								ConfigMap: &corev1.ConfigMapVolumeSource{
-									LocalObjectReference: corev1.LocalObjectReference{Name: "rediscluster"},
+									LocalObjectReference: corev1.LocalObjectReference{Name: "redkeycluster"},
 									Items:                []corev1.KeyToPath{{Key: "redis1.conf", Path: "redis1.conf"}},
 								},
 							},
@@ -1382,7 +1382,7 @@ func Test_ApplyPodTemplateSpecOverride(t *testing.T) {
 			},
 			expected: &corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:      map[string]string{"new-label": "new-value", RedkeyClusterLabel: "rediscluster", RedkeyClusterComponentLabel: common.ComponentLabelRedis},
+					Labels:      map[string]string{"new-label": "new-value", RedkeyClusterLabel: "redkeycluster", RedkeyClusterComponentLabel: common.ComponentLabelRedis},
 					Annotations: map[string]string{"new-annotation": "new-value"},
 				},
 				Spec: corev1.PodSpec{},
@@ -1437,7 +1437,7 @@ func Test_ApplyPodTemplateSpecOverride(t *testing.T) {
 							Name: "config",
 							VolumeSource: corev1.VolumeSource{
 								ConfigMap: &corev1.ConfigMapVolumeSource{
-									LocalObjectReference: corev1.LocalObjectReference{Name: "rediscluster"},
+									LocalObjectReference: corev1.LocalObjectReference{Name: "redkeycluster"},
 									Items:                []corev1.KeyToPath{{Key: "redis.conf", Path: "redis.conf"}},
 								},
 							},
@@ -1527,7 +1527,7 @@ func Test_ApplyPodTemplateSpecOverride(t *testing.T) {
 							Name: "config",
 							VolumeSource: corev1.VolumeSource{
 								ConfigMap: &corev1.ConfigMapVolumeSource{
-									LocalObjectReference: corev1.LocalObjectReference{Name: "rediscluster"},
+									LocalObjectReference: corev1.LocalObjectReference{Name: "redkeycluster"},
 									Items:                []corev1.KeyToPath{{Key: "redis.conf", Path: "redis.conf"}},
 								},
 							},
@@ -1621,7 +1621,7 @@ func Test_ApplyPodTemplateSpecOverride(t *testing.T) {
 							Name: "config",
 							VolumeSource: corev1.VolumeSource{
 								ConfigMap: &corev1.ConfigMapVolumeSource{
-									LocalObjectReference: corev1.LocalObjectReference{Name: "rediscluster"},
+									LocalObjectReference: corev1.LocalObjectReference{Name: "redkeycluster"},
 									Items:                []corev1.KeyToPath{{Key: "redis.conf", Path: "redis.conf"}},
 								},
 							},

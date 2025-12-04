@@ -111,7 +111,7 @@ rules:
 - apiGroups:
   - redis.inditex.com
   resources:
-  - redisclusters
+  - redkeyclusters
   verbs:
   - create
   - delete
@@ -123,13 +123,13 @@ rules:
 - apiGroups:
   - redis.inditex.com
   resources:
-  - redisclusters/finalizers
+  - redkeyclusters/finalizers
   verbs:
   - update
 - apiGroups:
   - redis.inditex.com
   resources:
-  - redisclusters/status
+  - redkeyclusters/status
   verbs:
   - get
   - patch
@@ -203,7 +203,7 @@ rules:
 - apiGroups:
   - redis.inditex.com
   resources:
-  - redisclusters
+  - redkeyclusters
   verbs:
   - create
   - delete
@@ -215,13 +215,13 @@ rules:
 - apiGroups:
   - redis.inditex.com
   resources:
-  - redisclusters/finalizers
+  - redkeyclusters/finalizers
   verbs:
   - update
 - apiGroups:
   - redis.inditex.com
   resources:
-  - redisclusters/status
+  - redkeyclusters/status
   verbs:
   - get
   - patch
@@ -232,12 +232,12 @@ kind: ClusterRole
 metadata:
   labels:
     rbac.authorization.k8s.io/aggregate-to-admin: "true"
-  name: rediscluster-editor-role
+  name: redkeycluster-editor-role
 rules:
 - apiGroups:
   - redis.inditex.com
   resources:
-  - redisclusters
+  - redkeyclusters
   verbs:
   - create
   - delete
@@ -249,7 +249,7 @@ rules:
 - apiGroups:
   - redis.inditex.com
   resources:
-  - redisclusters/status
+  - redkeyclusters/status
   verbs:
   - get
 ---

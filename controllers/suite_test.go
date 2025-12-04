@@ -236,7 +236,7 @@ func CreateRedkeyCluster() *redkeyv1.RedkeyCluster {
 			APIVersion: "redis.inditex.dev/redisv1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:       "rediscluster-sample",
+			Name:       "redkeycluster-sample",
 			Namespace:  "default",
 			Finalizers: []string{finalizerId},
 			Labels:     map[string]string{"team": "team-a"},

@@ -167,7 +167,7 @@ function wait_redis_ready {
 
         # Fetch the cluster JSON once.
         local cluster_json
-        if ! cluster_json=$(kubectl get rediscluster/"$cluster" -n "$namespace" -o json 2>/dev/null); then
+        if ! cluster_json=$(kubectl get redkeycluster/"$cluster" -n "$namespace" -o json 2>/dev/null); then
             log_error "Failed to retrieve cluster JSON in namespace '$namespace'. Retrying..."
             sleep "$delay"
             continue
@@ -244,12 +244,12 @@ function scale_redis {
 
     log_info "Scaling cluster '$cluster' to $replicas replicas in namespace '$namespace'."
 
-    if ! kubectl patch rediscluster/"$cluster" -n "$namespace" -p '{"spec":{"replicas":'"$replicas"'}}' --type merge; then
+    if ! kubectl patch redkeycluster/"$cluster" -n "$namespace" -p '{"spec":{"primaries":'"$replicas"'}}' --type merge; then
         log_error "Failed to scale cluster."
         return 1
     fi
 
-    log_info "Successfully scaled cluster '$cluster' to $replicas replicas in namespace '$namespace'."
+    log_info "Successfully scaled cluster '$cluster' to $replicas primaries in namespace '$namespace'."
 }
 
 
@@ -266,7 +266,7 @@ function log_warning {
     echo "$(date +"%Y/%m/%d %H:%M:%S") WARNING: $*" >&2
 }
 
-# Function to create a clean RedisCluster
+# Function to create a clean RedkeyCluster
 function create_clean_rkcl {
     local namespace="$1"
     local is_local="${2:-false}"
@@ -292,10 +292,10 @@ function create_clean_rkcl {
     kubectl apply -n "$namespace" -f "$manifest"
 }
 
-# Function to check if RedisCluster CRD exists
+# Function to check if RedkeyCluster CRD exists
 function ensure_rediscluster {
-    if ! kubectl explain rediscluster &>/dev/null; then
-        log_error "Kubernetes or RedisCluster CRD is missing!"
+    if ! kubectl explain redkeycluster &>/dev/null; then
+        log_error "Kubernetes or RedkeyCluster CRD is missing!"
         return 1
     fi
 }
@@ -394,8 +394,8 @@ function check_redis {
     local namespace="$2"
 
     local replicas status
-    replicas=$(kubectl get rediscluster/"$cluster" -n "$namespace" -o json | jq -r .spec.primaries)
-    status=$(kubectl get rediscluster/"$cluster" -n "$namespace" -o json | jq -r .status.status)
+    replicas=$(kubectl get redkeycluster/"$cluster" -n "$namespace" -o json | jq -r .spec.primaries)
+    status=$(kubectl get redkeycluster/"$cluster" -n "$namespace" -o json | jq -r .status.status)
 
     if [[ "$status" != "Ready" ]]; then
         log_error "cluster $cluster is not Ready in namespace $namespace (Status: $status)"

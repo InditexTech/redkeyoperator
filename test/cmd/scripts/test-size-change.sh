@@ -19,14 +19,14 @@ LOCAL="${4:-false}"
 
 log_info "Starting Redis resource assertions test for cluster '$REDIS_CLUSTER_NAME' in namespace '$NAMESPACE'."
 
-# # Start manager process and create a clean RedisCluster
+# # Start manager process and create a clean RedkeyCluster
 # if ! ensure_manager "$NAMESPACE" "$TEST_NAME" ; then
 #     log_error "Error: Failed to ensure manager process is running."
 #     exit 1
 # fi
 
 if ! create_clean_rkcl "$NAMESPACE" "$LOCAL"; then
-    log_error "Error: Failed to create RedisCluster in namespace '$NAMESPACE'."
+    log_error "Error: Failed to create RedkeyCluster in namespace '$NAMESPACE'."
     exit 1
 fi
 
