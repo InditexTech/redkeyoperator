@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"os"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -44,10 +45,45 @@ const (
 	defaultConfig                 = `save ""
 appendonly no
 maxmemory 70mb`
-	finalizerName  = "redis.inditex.com/configmap-cleanup"
+	finalizerName  = "redis.inditex.dev/configmap-cleanup"
 	pollInterval   = 5 * time.Second
 	defaultTimeout = 60 * time.Minute
+
+	defaultSidecarImage = "alpine:3.21.3"
+	changedRedisImage   = "redis:8.2.3"
+	defaultRedisImage   = "redis:8.4.0"
+	defaultRobinImage   = "redkey-robin:dev"
 )
+
+func GetSidecarImage() string {
+	if img := os.Getenv("SIDECARD_IMAGE"); img != "" {
+		return img
+	}
+	return defaultSidecarImage
+}
+
+func GetChangedRedisImage() string {
+	if img := os.Getenv("CHANGED_REDIS_IMAGE"); img != "" {
+		return img
+	}
+	return changedRedisImage
+}
+
+// GetRedisImage reads REDIS_IMAGE or falls back
+func GetRedisImage() string {
+	if img := os.Getenv("REDIS_IMAGE"); img != "" {
+		return img
+	}
+	return defaultRedisImage
+}
+
+// GetRobinImage reads ROBIN_IMAGE or falls back
+func GetRobinImage() string {
+	if img := os.Getenv("ROBIN_IMAGE"); img != "" {
+		return img
+	}
+	return defaultRobinImage
+}
 
 type ClusterStatus struct {
 	State                 string
@@ -146,6 +182,75 @@ func EnsureClusterExistsOrCreate(
 
 		// Finally attach the override
 		rc.Spec.Override = &ov
+
+		// Robin configuration - required for the reconciler to work
+		robinImage := GetRobinImage()
+		rc.Spec.Robin = &redkeyv1.RobinSpec{
+			Template: &corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:            "robin",
+							Image:           robinImage,
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							Ports: []corev1.ContainerPort{
+								{
+									ContainerPort: 8080,
+									Name:          "http",
+									Protocol:      corev1.ProtocolTCP,
+								},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      key.Name + "-robin-config",
+									MountPath: "/opt/conf/configmap",
+								},
+							},
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("50m"),
+									corev1.ResourceMemory: resource.MustParse("64Mi"),
+								},
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("100m"),
+									corev1.ResourceMemory: resource.MustParse("128Mi"),
+								},
+							},
+							SecurityContext: &corev1.SecurityContext{
+								RunAsNonRoot:             ptr.To(true),
+								RunAsUser:                ptr.To(int64(1001)),
+								AllowPrivilegeEscalation: ptr.To(false),
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: key.Name + "-robin-config",
+							VolumeSource: corev1.VolumeSource{
+								ConfigMap: &corev1.ConfigMapVolumeSource{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: key.Name + "-robin",
+									},
+									DefaultMode: ptr.To(int32(420)),
+								},
+							},
+						},
+					},
+				},
+			},
+			Config: &redkeyv1.RobinConfig{
+				Reconciler: &redkeyv1.RobinConfigReconciler{
+					IntervalSeconds:                 ptr.To(30),
+					OperationCleanUpIntervalSeconds: ptr.To(30),
+				},
+				Cluster: &redkeyv1.RobinConfigCluster{
+					HealthProbePeriodSeconds: ptr.To(60),
+					HealingTimeSeconds:       ptr.To(60),
+					MaxRetries:               ptr.To(10),
+					BackOff:                  ptr.To(10),
+				},
+			},
+		}
 
 		return nil
 	})

@@ -159,7 +159,7 @@ func (r *RedkeyClusterReconciler) checkAndCreateStatefulSet(ctx context.Context,
 		if errors.IsNotFound(err) {
 			// Create StatefulSet
 			r.logInfo(redkeyCluster.NamespacedName(), "Creating statefulset")
-			statefulSet, createSsetError = r.createStatefulSet(ctx, req, redkeyCluster.Spec, *redkeyCluster.Spec.Labels, configMap)
+			statefulSet, createSsetError = r.createStatefulSet(ctx, req, redkeyCluster.Spec, redkeyCluster.GetLabels(), configMap)
 			if createSsetError != nil {
 				r.logError(redkeyCluster.NamespacedName(), createSsetError, "Error when creating StatefulSet")
 				return immediateRequeue, createSsetError

@@ -1,3 +1,3 @@
 # Development Guide - Table of Contents
 
-* [Operator Development Guide](operator-development.md)
+* [Development Guide](development-guide.md)

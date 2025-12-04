@@ -11,10 +11,6 @@ golang_version := 1.24.6
 delve_version  := 1.25
 package        := github.com/inditextech/$(name)
 
-# Image URL to use for building/pushing image targets when using `pro` deployment profile.
-IMG ?= redkey-operator:$(version)
-IMG_ROBIN ?= redkey-robin:$(version)
-
 # .............................................................................
 # DONT TOUCH THIS SECTION
 # .............................................................................
@@ -34,10 +30,14 @@ M = $(shell printf "\033[34;1m▶\033[0m")
 MODULE=$(shell go list -m)
 GO_COMPILE_FLAGS='-X $(MODULE)/cmd/server.GitCommit=$(COMMIT) -X $(MODULE)/cmd/server.BuildDate=$(DATE) -X $(MODULE)/cmd/server.VersionBuild=$(version)'
 
+# Auxiliar programs
+SED = sed
+
 # Test coverage files
-TEST_COVERAGE_PROFILE_OUTPUT = "coverage.out"
-TEST_REPORT_OUTPUT = ".local/test_report.ndjson"
-TEST_REPORT_OUTPUT_E2E = ".local/test_report_e2e.ndjson"
+TEST_COVERAGE_PROFILE_OUTPUT = .local/coverage.out
+TEST_E2E_OUTPUT = .local/results.json
+TEST_REPORT_OUTPUT = .local/test_report.ndjson
+TEST_REPORT_OUTPUT_E2E = .local/test_report_e2e.ndjson
 # .............................................................................
 # / END SECTION
 # .............................................................................
@@ -45,7 +45,25 @@ TEST_REPORT_OUTPUT_E2E = ".local/test_report_e2e.ndjson"
 # .............................................................................
 # / IMPORTANT VARIABLES
 # .............................................................................
-# CHANNELS define the bundle channels used in the bundle. 
+# Allowed deploying profiles. dev: testing in local and debug: testing with delve in the operator
+PROFILES := dev debug
+# Allowed robin deploying profiles. dev: testing robin in local and debug: testing with delve in robin
+PROFILES_ROBIN := dev debug
+# Deploying profile used to generate the manifest files to deploy the operator.
+# The files to generate the manifests are kustomized from the directory config/deploy-profile/<PROFILE>.
+# By default, `dev` profile is used. It can be overwritten (e.g. make process-manifests PROFILE=debug).
+# Only the values defined in `PROFILES` are allowed.
+PROFILE ?= dev
+ifeq ($(filter $(PROFILE),$(PROFILES)), )
+$(error The profile specified ($(PROFILE)) is not supported)
+endif
+
+PROFILE_ROBIN ?= dev
+ifeq ($(filter $(PROFILE_ROBIN),$(PROFILES_ROBIN)), )
+$(error The PROFILE_ROBIN specified ($(PROFILE)) is not supported)
+endif
+
+# CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "preview,fast,stable")
 # To re-generate a bundle for other specific channels without changing the standard setup, you can:
 # - use the CHANNELS as arg of the bundle target (e.g make bundle CHANNELS=preview,fast,stable)
@@ -54,7 +72,7 @@ ifneq ($(origin CHANNELS), undefined)
 BUNDLE_CHANNELS := --channels=$(CHANNELS)
 endif
 
-# DEFAULT_CHANNEL defines the default channel used in the bundle. 
+# DEFAULT_CHANNEL defines the default channel used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g DEFAULT_CHANNEL = "stable")
 # To re-generate a bundle for any other default channel without changing the default setup, you can:
 # - use the DEFAULT_CHANNEL as arg of the bundle target (e.g make bundle DEFAULT_CHANNEL=stable)
@@ -71,13 +89,13 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
-# BUNDLE_IMG defines the image:tag used for the bundle. 
+# Image URL to use for building/pushing image targets
+IMG ?= localhost:5001/redkey-operator:$(PROFILE)
+IMG_ROBIN ?= localhost:5001/redkey-robin:$(PROFILE_ROBIN)
+
+# BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
 BUNDLE_IMG ?= controller-bundle:$(version)
-
-# Image URL to use for deploying the operator pod when using `debug` deployment profile.
-# A base golang image is used with Delve installed, in order to be able to remotely debug the manager.
-IMG_DEBUG ?= delve:1.24.6
 
 # Set the Operator SDK version to use. By default, what is installed on the system is used.
 # This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.
@@ -92,17 +110,6 @@ IMAGE_REF ?= $(IMG)
 # Namespace in which the manager will be deployed.
 NAMESPACE ?= redkey-operator
 
-# Allowed deploying profiles.
-PROFILES := dev debug pro
-
-# Deploying profile used to generate the manifest files to deploy the operator.
-# The files to generate the manifests are kustomized from the directory config/deploy-profile/<PROFILE>.
-# By default, `dev` profile is used. It can be overwritten (e.g. make process-manifests PROFILE=debug).
-# Only the values defined in `PROFILES` are allowed.
-PROFILE ?= dev
-ifeq ($(filter $(PROFILE),$(PROFILES)), )
-$(error The profile specified ($(PROFILE)) is not supported)
-endif
 # .............................................................................
 # / END SECTION
 # .............................................................................
@@ -134,7 +141,7 @@ deps: ## Installs dependencies
 	$(info $(M) installing dependencies)
 	GONOSUMDB=honnef.co/go/* GONOPROXY=honnef.co/go/* $(GO) install honnef.co/go/tools/cmd/staticcheck@v0.6.1
 
-.PHONY: version 
+.PHONY: version
 version:: ## Print the current version of the project.
 	@echo "$(version)"
 
@@ -148,7 +155,7 @@ version-set:: ## Set the project version to the given version, using the NEW_VER
 	@echo "Setting version to $(NEW_VERSION)"
 	sed -ri 's/(.*)(VERSION\s*:=\s*)([0-9]+\.[0-9]+\.[0-9]+)(-SNAPSHOT)(.*)/echo "\1\2$(NEW_VERSION)\5"/ge' Makefile
 
-.PHONY: checkfmt 
+.PHONY: checkfmt
 checkfmt: ## Check format validation
 	$(info $(M) running gofmt checking code style)
 	@fmtRes=$$($(GOFMT) -d $(SRC)); \
@@ -158,17 +165,17 @@ checkfmt: ## Check format validation
 		exit 1; \
 	fi
 
-.PHONY: fmt 
+.PHONY: fmt
 fmt: ## Run gofmt on all source files
 	$(info $(M) running go fmt)
 	$(GOFMT) -l -w $(SRC)
 
-.PHONY: lint 
+.PHONY: lint
 lint: deps ## Run golint
 	$(info $(M) running staticcheck)
 	$(GOLINT) ./...
 
-.PHONY: vet 
+.PHONY: vet
 vet: ## Run go vet
 	$(info $(M) running go vet)
 	$(GO) vet ./...
@@ -218,24 +225,19 @@ run: ##	Execute the program locally
 	$(info $(M) running app)
 	CONFIGMAP_PATH=./config_test/configmap.local.yml SECRET_PATH=./config_test/secrets.local.yml $(GO) run ./cmd/main.go
 
-docker-build: test ##	Build docker image with the manager (uses `${IMG}` image name).
-	$(info $(M) building Manager docker image)
-	docker build -t ${IMG} --build-arg GOLANG_VERSION=${golang_version} .
-
-docker-push: ##	Push docker image with the manager (uses `${IMG}` image name).
-	$(info $(M) pushing Manager docker image)
+docker-build: test ##	Build operator docker image from source or an empty image to copy the binary if default profile (uses `${IMG}` image name)
+	$(info $(M) building operator docker image)
+	if [ ${PROFILE} != "debug" ]; then \
+		docker build -t ${IMG} --build-arg GOLANG_VERSION=${golang_version} . ; \
+	else \
+		docker build -t ${IMG} -f debug.Dockerfile --build-arg GOLANG_VERSION=${golang_version} --build-arg DELVE_VERSION=${delve_version} . ; \
+	fi
+docker-push: ##	Push operator docker image (uses `${IMG}` image name).
+	$(info $(M) pushing operator docker image)
 	docker push ${IMG}
 
-debug-docker-build: ##	Build docker image for debugging from debug.Dockerfile (uses `${IMG_DEBUG}` image name).
-	$(info $(M) building debug docker image)
-	docker build -t ${IMG_DEBUG} -f debug.Dockerfile --build-arg GOLANG_VERSION=${golang_version} --build-arg DELVE_VERSION=${delve_version} .
-
-debug-docker-push: ##	Push docker image for debugging from debug.Dockerfile (uses `${IMG_DEBUG}` image name).
-	$(info $(M) building debug docker image)
-	docker push ${IMG_DEBUG}
-
 ##@ Deployment
-install: process-manifests-crd ##		Install CRD into the K8s cluster specified by kubectl default context (Kustomize is installed if not present).
+install: create-namespace process-manifests-crd ##		Install CRD into the K8s cluster specified by kubectl default context (Kustomize is installed if not present).
 	$(info $(M) applying CRD manifest file)
 	kubectl apply -f deployment/redis.inditex.dev_redkeyclusters.yaml
 
@@ -248,17 +250,10 @@ process-manifests: kustomize process-manifests-crd ##		Generate the kustomized y
 	cp config/deploy-profiles/${PROFILE}/kustomization.yaml config/deploy-profiles/${PROFILE}/kustomization.yaml.orig && \
 	(cd config/deploy-profiles/${PROFILE} && \
 		$(KUSTOMIZE) edit set namespace ${NAMESPACE}) && \
-	if [ ${PROFILE} == "dev" ]; then \
-		(cd config/deploy-profiles/${PROFILE} && \
+	(cd config/deploy-profiles/${PROFILE} && \
 			$(KUSTOMIZE) edit set image redkey-operator=${IMG}); \
-		$(KUSTOMIZE) build config/deploy-profiles/dev > deployment/manager.yaml; \
+		$(KUSTOMIZE) build config/deploy-profiles/${PROFILE} > deployment/manager.yaml; \
 		$(SED) -i -e 's/watch-namespace/$(NAMESPACE)/' deployment/manager.yaml; \
-	elif [ ${PROFILE} == "debug" ]; then \
-		(cd config/deploy-profiles/${PROFILE} && \
-			$(KUSTOMIZE) edit set image redkey-operator=${IMG_DEBUG}); \
-		$(KUSTOMIZE) build config/deploy-profiles/debug > deployment/manager.yaml; \
-		$(SED) -i -e 's/watch-namespace/$(NAMESPACE)/' deployment/manager.yaml; \
-	fi
 	rm config/deploy-profiles/${PROFILE}/kustomization.yaml
 	mv config/deploy-profiles/${PROFILE}/kustomization.yaml.orig config/deploy-profiles/${PROFILE}/kustomization.yaml
 	@echo "Manifest generated successfully"
@@ -282,7 +277,7 @@ undeploy-manager: process-manifests ##		Delete the manager from the K8s cluster 
 	kubectl delete -f deployment/manager.yaml
 
 OPERATOR=$(shell kubectl -n ${NAMESPACE} get po -l='control-plane=redkey-operator' -o=jsonpath='{.items[0].metadata.name}')
-dev-deploy: ## 		Build a new manager binary, copy the file to the operator pod and run it.
+dev-deploy: ##		Build a new manager binary, copy the file to the operator pod and run it.
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -gcflags="all=-N -l" -o bin/manager ./cmd/main.go
 	kubectl wait -n ${NAMESPACE} --for=condition=ready pod -l control-plane=redkey-operator
 	kubectl cp ./bin/manager $(OPERATOR):/manager -n ${NAMESPACE}
@@ -300,25 +295,25 @@ port-forward: ##		Port forwarding of port 40000 for debugging the manager with D
 delete-operator: ##		Delete the operator pod (redkey-operator) in order to have a new clean pod created.
 	kubectl delete pod $(OPERATOR) -n ${NAMESPACE}
 
-apply-rkcl: ##		Apply the sample Redkey Cluster manifest.
+create-namespace: ##		Create namespace if does not exist (uses  ${NAMESPACE})
+	$(info Creating namespace if it does not exist $(NAMESPACE))
+	@if ! kubectl get namespace $(NAMESPACE) >/dev/null 2>&1; then \
+		kubectl create namespace $(NAMESPACE); \
+	fi
+
+apply-rkcl:  create-namespace ##		Apply the sample Redkey Cluster manifest.
 	$(info $(M) creating sample Redkey cluster)
-	$(KUSTOMIZE) build config/samples/ephemeral | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | $(SED) 's,image: redkey-robin:0.1.0,image: ${IMG_ROBIN},' | kubectl apply -f -
+	$(KUSTOMIZE) build config/examples/ephemeral-robin-$(PROFILE_ROBIN) | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | $(SED) 's,image: redkey-robin:0.1.0,image: ${IMG_ROBIN},' | kubectl apply -f -
 
 delete-rkcl: ##		Delete the sample Redkey Cluster manifest.
 	$(info $(M) deleting sample Redkey cluster)
-	$(KUSTOMIZE) build config/samples/ephemeral | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | $(SED) 's,image: redkey-robin:0.1.0,image: ${IMG_ROBIN},' | kubectl delete -f -
-
-apply-debug-rkcl: ##		Apply the sample Redkey Cluster manifest for Robin debugging.
-	$(info $(M) creating sample Redkey cluster)
-	$(KUSTOMIZE) build config/samples/robin-debug | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | $(SED) 's,image: redkey-robin:0.1.0,image: ${IMG_DEBUG},' | kubectl apply -f -
-
-delete-debug-rkcl: ##		Delete the sample Redkey Cluster manifest for Robin debugging.
-	$(info $(M) deleting sample Redkey cluster)
-	$(KUSTOMIZE) build config/samples/robin-debug | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | $(SED) 's,image: redkey-robin:0.1.0,image: ${IMG_DEBUG},' | kubectl delete -f -
+	$(KUSTOMIZE) build config/examples/ephemeral-robin-$(PROFILE_ROBIN) | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | $(SED) 's,image: redkey-robin:0.1.0,image: ${IMG_ROBIN},' | kubectl delete -f -
 
 apply-all: docker-build docker-push process-manifests install deploy apply-rkcl
 
 delete-all: delete-rkcl undeploy uninstall
+
+
 
 ##@ Tools
 
@@ -377,7 +372,7 @@ redis-forget: ## Forget nodes of Redkey cluster
 
 redis-benchmark: # Benckmark a Redkey cluster
 	if [ "$(WORKSPACE)" == "default" ]; then \
-  		kubectl exec -it -n $(NSTEST) redis-cluster-0 -- redis-benchmark -c 100 -n 100000 -t set,get; \
+		kubectl exec -it -n $(NSTEST) redis-cluster-0 -- redis-benchmark -c 100 -n 100000 -t set,get; \
 	else \
 	  if [ -z "$(REDIS_POD)" ]; then \
 	    echo "ERROR:: No pods running to benchmark, starts your cluster to use this feature."; \
@@ -404,12 +399,12 @@ redis-insert:
 	rm -f /tmp/data.txt
 	for ((i=1;i<=100;i++)); do echo "set $${RANDOM}$${RANDOM} $${RANDOM}$${RANDOM}" >> /tmp/data.txt; done
 	if [ "$(WORKSPACE)" == "test" ]; then \
-  		cat /tmp/data.txt | kubectl exec -i -n $(NSTEST) redis-cluster-0 -- redis-cli -c; \
+		cat /tmp/data.txt | kubectl exec -i -n $(NSTEST) redis-cluster-0 -- redis-cli -c; \
 	else \
 	  if [ -z "$(REDIS_POD)" ]; then \
 	    echo "ERROR:: No pods running to insert data, starts your cluster to use this feature."; \
 	  else \
-    	cat /tmp/data.txt | kubectl exec -i $(REDIS_POD) -n ${NAMESPACE} -- redis-cli -c; \
+	cat /tmp/data.txt | kubectl exec -i $(REDIS_POD) -n ${NAMESPACE} -- redis-cli -c; \
 	  fi \
 	fi
 
@@ -424,10 +419,10 @@ redis-restore:
 	for POD in $(REDIS_PODS); do echo $${POD}; kubectl cp /tmp/$${POD}-dump.rdb $${POD}:/data/dump.rdb -n ${NAMESPACE}; done
 
 redis-aof-disable:
-	kubectl patch rkcl redis-cluster -n ${NAMESPACE} --type='json' -p='[{"op": "replace", "path": "/spec/config", "value":"maxmemory 200mb\nmaxmemory-samples 5\nmaxmemory-policy allkeys-lru\nappendonly no\nprotected-mode no\nloadmodule /usr/lib/redis/modules/redisgraph.so"}]' | for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli SHUTDOWN; done | sleep 5
+	kubectl patch rkcl redis-cluster -n ${NAMESPACE} --type='json' -p='[{"op": "replace", "path": "/spec/config", "value":"maxmemory 200mb\nmaxmemory-examples 5\nmaxmemory-policy allkeys-lru\nappendonly no\nprotected-mode no\nloadmodule /usr/lib/redis/modules/redisgraph.so"}]' | for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli SHUTDOWN; done | sleep 5
 
 redis-aof-enable:
-	kubectl patch rkcl redis-cluster -n ${NAMESPACE} --type='json' -p='[{"op": "replace", "path": "/spec/config", "value":"maxmemory 200mb\nmaxmemory-samples 5\nmaxmemory-policy allkeys-lru\nappendonly yes\nprotected-mode no\nloadmodule /usr/lib/redis/modules/redisgraph.so"}]'
+	kubectl patch rkcl redis-cluster -n ${NAMESPACE} --type='json' -p='[{"op": "replace", "path": "/spec/config", "value":"maxmemory 200mb\nmaxmemory-examples 5\nmaxmemory-policy allkeys-lru\nappendonly yes\nprotected-mode no\nloadmodule /usr/lib/redis/modules/redisgraph.so"}]'
 
 
 ##@ Integration with OLM
@@ -449,7 +444,7 @@ OPERATOR_SDK = $(shell which operator-sdk)
 endif
 endif
 
-.PHONY: bundle 
+.PHONY: bundle
 bundle: kustomize manifests ## Generate the files for bundle.
 	rm -rf bundle/manifests/*
 	rm -rf bundle/metadata/*
@@ -458,7 +453,7 @@ bundle: kustomize manifests ## Generate the files for bundle.
 	$(KUSTOMIZE) build config | $(OPERATOR_SDK) generate bundle -q --overwrite --channels $(CHANNELS) --version $(version) $(BUNDLE_METADATA_OPTS)
 	$(OPERATOR_SDK) bundle validate ./bundle
 
-.PHONY: bundle-build 
+.PHONY: bundle-build
 bundle-build: ## Build the bundle image.
 	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
@@ -467,72 +462,60 @@ bundle-push: ## Push the bundle image.
 
 
 ##@ Test
-ginkgo:
-	go install github.com/onsi/ginkgo/v2/ginkgo
 
-.PHONY: test-e2e
-test-e2e: process-manifests-crd ginkgo ## Execute e2e application test
-	$(info running e2e tests...)	
-	ginkgo -procs=$(TEST_PARALLEL_PROCESS) \
-	    	-vv \
-			./test/e2e \
-	    	GOMAXPROCS=$(GOMAXPROCS) \
-	    	OPERATOR_IMAGE=$(IMG) \
-	    	REDIS_IMAGE=$(REDIS_IMAGE) \
-	    	CHANGED_REDIS_IMAGE=$(CHANGED_REDIS_IMAGE) \
-	    	SIDECARD_IMAGE=$(SIDECARD_IMAGE)
+TEST_PATHS := ./controllers/ ./internal/*/ ./api/*/
 
-.PHONY: test-e2e-cov
-test-e2e-cov: process-manifests-crd ginkgo ## Execute e2e application test
-	$(info generating coverage report...)
-	$(eval TEST_REPORT_OUTPUT_DIRNAME=$(shell dirname $(TEST_REPORT_OUTPUT)))
-	mkdir -p $(TEST_REPORT_OUTPUT_DIRNAME)
-
-	ginkgo -procs=$(TEST_PARALLEL_PROCESS) \
-			--fail-fast \
-			--flake-attempts=5 \
-			-vv \
-			-cover \
-			-covermode=count \
-			-coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT) \
-			./test/e2e \
-			GOMAXPROCS=$(GOMAXPROCS) \
-			OPERATOR_IMAGE=$(IMG) \
-			REDIS_IMAGE=$(REDIS_IMAGE) \
-			CHANGED_REDIS_IMAGE=$(CHANGED_REDIS_IMAGE) \
-			SIDECARD_IMAGE=$(SIDECARD_IMAGE)
-
-
-.PHONY: test-sonar 
-test-sonar:	## Execute the application test for Sonar (coverage + test report)
-	$(info $(M) running tests and generating sonar report)
-	$(eval TEST_COVERAGE_PROFILE_OUTPUT_DIRNAME=$(shell dirname $(TEST_COVERAGE_PROFILE_OUTPUT)))
-	$(eval TEST_REPORT_OUTPUT_DIRNAME=$(shell dirname $(TEST_REPORT_OUTPUT)))
-	mkdir -p $(TEST_COVERAGE_PROFILE_OUTPUT_DIRNAME) $(TEST_REPORT_OUTPUT_DIRNAME)
-	$(GO) test ./controllers/ ./internal/*/ -coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT) -json > $(TEST_REPORT_OUTPUT)
+.PHONY: test
+test:  ## Execute unit tests
+	$(info $(M) running unit tests)
+	$(GO) test $(TEST_PATHS)
 
 .PHONY: test-cov
-test-cov: 	## Execute the application test with coverage
+test-cov:  ## Execute the application test with coverage
 	$(info $(M) running tests and generating coverage report)
-	$(eval TEST_REPORT_OUTPUT_DIRNAME=$(shell dirname $(TEST_REPORT_OUTPUT)))
-	mkdir -p $(TEST_REPORT_OUTPUT_DIRNAME)
-	$(GO) test ./controllers/ ./internal/*/ ./api/*/ -coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT) -covermode=count
+	@mkdir -p $(dir $(TEST_REPORT_OUTPUT))
+	$(GO) test $(TEST_PATHS) -coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT) -covermode=count
 
-# Integration tests
-SED = $(shell which sed)
+.PHONY: test-sonar
+test-sonar:  ## Execute tests for Sonar (coverage + test report)
+	$(info $(M) running tests and generating sonar report)
+	@mkdir -p $(dir $(TEST_REPORT_OUTPUT))
+	$(GO) test $(TEST_PATHS) -coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT) -json > $(TEST_REPORT_OUTPUT)
 
-int-test-generate: ## Generate manifests and metadata files.
-	cd config/int-test; $(KUSTOMIZE) edit set image redkey-operator=${IMG}; \
-	$(KUSTOMIZE) edit set namespace $(NAMESPACE); $(KUSTOMIZE) build > tests.yaml
+## Common ginkgo options for e2e tests
 
-int-test-clean:	## Clear manifests and metadata files.
-	-kubectl delete -f config/int-test/tests.yaml
-	-rm config/int-test/tests.yaml
+.PHONY: ginkgo
+ginkgo:
+	$(GO) install github.com/onsi/ginkgo/v2/ginkgo
 
-int-test-apply:	## Apply manifests and metadata files.
-	$(KUSTOMIZE) build config/crd/ | kubectl apply -f -
-	sleep 3 # We need to sleep for a bit to make sure the CRDs are registered before we apply the test
-	kubectl apply -f config/int-test/tests.yaml
 
-# .PHONY=int-test 
-# int-test: kustomize int-test-generate int-test-apply ## Generate manifests and metadata, then apply generated files.
+TEST_PARALLEL_PROCESS ?= 4
+GOMAXPROCS ?= 4
+REDIS_IMAGE ?= redis:8.4.0
+CHANGED_REDIS_IMAGE ?= redis:8.2.3
+
+GINKGO_OPTS ?= $(GINKGO_EXTRA_OPTS) -procs=$(TEST_PARALLEL_PROCESS) -vv
+
+GINKGO_ENV ?= GOMAXPROCS=$(GOMAXPROCS) \
+	OPERATOR_IMAGE=$(IMG) \
+	ROBIN_IMAGE=$(IMG_ROBIN) \
+	REDIS_IMAGE=$(REDIS_IMAGE) \
+	CHANGED_REDIS_IMAGE=$(CHANGED_REDIS_IMAGE) \
+	SIDECARD_IMAGE=$(SIDECARD_IMAGE)
+
+GINKGO_PACKAGES ?= ./test/e2e
+
+.PHONY: test-e2e
+test-e2e: process-manifests-crd ginkgo  ## Execute e2e application test
+	$(info $(M) running e2e tests...)
+	@mkdir -p $(dir $(TEST_E2E_OUTPUT))
+	$(GINKGO_ENV) ginkgo --json-report=$(TEST_E2E_OUTPUT) $(GINKGO_OPTS) $(GINKGO_PACKAGES)
+
+.PHONY: test-e2e-cov
+test-e2e-cov: process-manifests-crd ginkgo  ## Execute e2e application test with coverage
+	$(info $(M) running e2e tests with coverage $(GINKGO_ENV))
+	exit 1
+	@mkdir -p $(dir $(TEST_COVERAGE_PROFILE_OUTPUT))
+	$(GINKGO_ENV) ginkgo \
+	     -cover -covermode=count -coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT) \
+		$(GINKGO_OPTS) $(GINKGO_PACKAGES)

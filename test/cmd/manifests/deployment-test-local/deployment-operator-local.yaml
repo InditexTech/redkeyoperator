@@ -109,7 +109,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - redis.inditex.com
+  - redis.inditex.dev
   resources:
   - redkeyclusters
   verbs:
@@ -121,13 +121,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - redis.inditex.com
+  - redis.inditex.dev
   resources:
   - redkeyclusters/finalizers
   verbs:
   - update
 - apiGroups:
-  - redis.inditex.com
+  - redis.inditex.dev
   resources:
   - redkeyclusters/status
   verbs:
@@ -201,7 +201,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - redis.inditex.com
+  - redis.inditex.dev
   resources:
   - redkeyclusters
   verbs:
@@ -213,13 +213,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - redis.inditex.com
+  - redis.inditex.dev
   resources:
   - redkeyclusters/finalizers
   verbs:
   - update
 - apiGroups:
-  - redis.inditex.com
+  - redis.inditex.dev
   resources:
   - redkeyclusters/status
   verbs:
@@ -235,7 +235,7 @@ metadata:
   name: redkeycluster-editor-role
 rules:
 - apiGroups:
-  - redis.inditex.com
+  - redis.inditex.dev
   resources:
   - redkeyclusters
   verbs:
@@ -247,7 +247,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - redis.inditex.com
+  - redis.inditex.dev
   resources:
   - redkeyclusters/status
   verbs:

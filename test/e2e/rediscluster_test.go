@@ -6,7 +6,6 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"os"
 	"slices"
 	"strings"
 
@@ -30,34 +29,6 @@ import (
 	"github.com/inditextech/redkeyoperator/internal/redis"
 	"github.com/inditextech/redkeyoperator/test/e2e/framework"
 )
-
-var (
-	defaultSidecarImage = "alpine:3.21.3"
-	changedRedisImage   = "redis/redis-stack-server:7.2.0-v10"
-	defaultRedisImage   = "redis/redis-stack-server:7.4.0-v3"
-)
-
-func getSidecarImage() string {
-	if img := os.Getenv("SIDECARD_IMAGE"); img != "" {
-		return img
-	}
-	return defaultSidecarImage
-}
-
-func getChangedRedisImage() string {
-	if img := os.Getenv("CHANGED_REDIS_IMAGE"); img != "" {
-		return img
-	}
-	return changedRedisImage
-}
-
-// getOperatorImage reads OPERATOR_IMAGE or falls back
-func getRedisImage() string {
-	if img := os.Getenv("REDIS_IMAGE"); img != "" {
-		return img
-	}
-	return defaultRedisImage
-}
 
 // helper: creates a namespace with a GenerateName prefix and waits for it to be ready
 func createNamespace(ctx context.Context, c client.Client, prefix string) *corev1.Namespace {
@@ -132,12 +103,12 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 		Expect(err).NotTo(HaveOccurred())
 		Expect(rc.Spec.Primaries).To(Equal(primaries))
 		Expect(rc.Spec.Storage).To(Equal(storage))
-		Expect(rc.Spec.PurgeKeysOnRebalance).To(Equal(purgeKeys))
+		Expect(*rc.Spec.PurgeKeysOnRebalance).To(Equal(purgeKeys))
 		Expect(rc.Spec.Ephemeral).To(Equal(ephemeral))
 		Expect(rc.Kind).To(Equal("RedkeyCluster"))
-		Expect(rc.APIVersion).To(Equal("redis.inditex.com/v1"))
+		Expect(rc.APIVersion).To(Equal("redis.inditex.dev/v1"))
 		Expect(rc.Spec.Auth).To(Equal(redkeyv1.RedisAuth{}))
-		Expect(rc.Spec.Image).To(Equal(getRedisImage()))
+		Expect(rc.Spec.Image).To(Equal(framework.GetRedisImage()))
 		Expect(rc.Spec.Pdb).To(Equal(pdb))
 		Expect(rc.Spec.ReplicasPerPrimary).To(Equal(replicasPerPrimary))
 		Expect(rc.Name).To(Equal(name))
@@ -179,7 +150,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				name := fmt.Sprintf("%s-%d-%d", base, initial, target)
 				key := types.NamespacedName{Namespace: namespace.Name, Name: name}
 
-				mustCreateAndReady(name, initial, 0, "", getRedisImage(), true, true, redkeyv1.Pdb{}, redkeyv1.RedkeyClusterOverrideSpec{})
+				mustCreateAndReady(name, initial, 0, "", framework.GetRedisImage(), true, true, redkeyv1.Pdb{}, redkeyv1.RedkeyClusterOverrideSpec{})
 
 				// change primaries → wait Ready again
 				rc, trace, err := framework.ChangeCluster(ctx, k8sClient, key,
@@ -256,7 +227,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 						Template: &redkeyv1.PartialPodTemplateSpec{Spec: redkeyv1.PartialPodSpec{
 							Containers: []corev1.Container{{
 								Name:    "test-sidecar",
-								Image:   getSidecarImage(),
+								Image:   framework.GetSidecarImage(),
 								Command: []string{"sleep", "infinity"},
 							}},
 						}},
@@ -271,7 +242,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 						Template: &redkeyv1.PartialPodTemplateSpec{Spec: redkeyv1.PartialPodSpec{
 							Containers: []corev1.Container{{
 								Name:    "test-sidecar",
-								Image:   getSidecarImage(),
+								Image:   framework.GetSidecarImage(),
 								Command: []string{"sleep", "infinity"},
 							}},
 						}},
@@ -294,7 +265,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				// Create the cluster in one shot with initial override
 				mustCreateAndReady(
 					key.Name,
-					1, 0, "", getRedisImage(), true, true,
+					1, 0, "", framework.GetRedisImage(), true, true,
 					redkeyv1.Pdb{},
 					*e.initial,
 				)
@@ -328,7 +299,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 			key = types.NamespacedName{Namespace: namespace.Name, Name: baseName}
 
 			// create cluster (3 primaries are enough)
-			mustCreateAndReady(baseName, 3, 0, "", getRedisImage(), true, true,
+			mustCreateAndReady(baseName, 3, 0, "", framework.GetRedisImage(), true, true,
 				redkeyv1.Pdb{}, redkeyv1.RedkeyClusterOverrideSpec{})
 
 			// helper to read *sorted* ports from the cluster-IP Service
@@ -372,7 +343,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 			mustCreateAndReady(
 				clusterName,
 				3, 0, // primaries / replcias-per-primary
-				"", getRedisImage(), true, true, // storage / image / purgeKeys / ephemeral
+				"", framework.GetRedisImage(), true, true, // storage / image / purgeKeys / ephemeral
 				redkeyv1.Pdb{},                       // no-PDB
 				redkeyv1.RedkeyClusterOverrideSpec{}, // no override
 			)
@@ -419,34 +390,43 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 			"foo":                                    "bar",
 		}
 
-		DescribeTable("adds / removes spec.labels",
-			func(apply, want map[string]string) {
-				rc, phases, err := framework.ChangeCluster(ctx, k8sClient, key,
-					framework.ChangeClusterOptions{
-						Mutate: func(r *redkeyv1.RedkeyCluster) { r.Spec.Labels = &apply },
-					})
-				Expect(err).NotTo(HaveOccurred())
+		It("sets and clears custom labels", func() {
+			// Step 1: Set custom labels
+			customLabels := map[string]string{"team": "teamA", "foo": "bar"}
+			rc, phases, err := framework.ChangeCluster(ctx, k8sClient, key,
+				framework.ChangeClusterOptions{
+					Mutate: func(r *redkeyv1.RedkeyCluster) { r.Spec.Labels = &customLabels },
+				})
+			Expect(err).NotTo(HaveOccurred())
 
-				// the returned RC is sane
-				checkRC(rc, apply)
+			// the returned RC is sane
+			checkRC(rc, customLabels)
 
-				// controller went Upgrading → Ready
-				Expect(phases).To(ContainElements(redkeyv1.StatusUpgrading, redkeyv1.StatusReady))
-				Expect(phases[len(phases)-1]).To(Equal(redkeyv1.StatusReady))
+			// controller went Upgrading → Ready
+			Expect(phases).To(ContainElements(redkeyv1.StatusUpgrading, redkeyv1.StatusReady))
+			Expect(phases[len(phases)-1]).To(Equal(redkeyv1.StatusReady))
 
-				// all children carry the wanted labels
-				checkChildren(want)
-			},
+			// all children carry the wanted labels
+			checkChildren(with)
 
-			Entry("set custom labels",
-				map[string]string{"team": "teamA", "foo": "bar"}, // apply
-				with, // wanted on children
-			),
-			Entry("clear labels",
-				map[string]string{}, // apply (empty map)
-				base,                // wanted on children
-			),
-		)
+			// Step 2: Clear labels (now there are custom labels to clear)
+			emptyLabels := map[string]string{}
+			rc, phases, err = framework.ChangeCluster(ctx, k8sClient, key,
+				framework.ChangeClusterOptions{
+					Mutate: func(r *redkeyv1.RedkeyCluster) { r.Spec.Labels = &emptyLabels },
+				})
+			Expect(err).NotTo(HaveOccurred())
+
+			// the returned RC is sane
+			checkRC(rc, emptyLabels)
+
+			// controller went Upgrading → Ready
+			Expect(phases).To(ContainElements(redkeyv1.StatusUpgrading, redkeyv1.StatusReady))
+			Expect(phases[len(phases)-1]).To(Equal(redkeyv1.StatusReady))
+
+			// all children carry only base labels
+			checkChildren(base)
+		})
 	})
 
 	Context("Storage guard & scaling", func() {
@@ -463,7 +443,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				name,
 				initialRep, 0,
 				initialPVC, // with PVC
-				getRedisImage(),
+				framework.GetRedisImage(),
 				true,  /* purgeKeys */
 				false, /* NOT ephemeral */
 				redkeyv1.Pdb{},
@@ -560,7 +540,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				clusterName,
 				initPrimaries, initPerPrimary,
 				"", // no PVC
-				getRedisImage(),
+				framework.GetRedisImage(),
 				true, // purgeKeys
 				true, // ephemeral
 				redkeyv1.Pdb{},
@@ -652,7 +632,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 
 		BeforeEach(func() {
 			key = types.NamespacedName{Namespace: namespace.Name, Name: base}
-			rc = mustCreateAndReady(base, 5, 0, "", getRedisImage(),
+			rc = mustCreateAndReady(base, 5, 0, "", framework.GetRedisImage(),
 				/*purge*/ false /*ephemeral*/, true,
 				redkeyv1.Pdb{}, redkeyv1.RedkeyClusterOverrideSpec{})
 		})
@@ -731,7 +711,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 
 		BeforeEach(func() {
 			key = types.NamespacedName{Namespace: namespace.Name, Name: name}
-			mustCreateAndReady(name, 1, 0, "", getRedisImage(),
+			mustCreateAndReady(name, 1, 0, "", framework.GetRedisImage(),
 				true, true, redkeyv1.Pdb{}, redkeyv1.RedkeyClusterOverrideSpec{})
 		})
 
@@ -778,9 +758,9 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 
 			Entry("change image",
 				tc{
-					mutate: func(r *redkeyv1.RedkeyCluster) { r.Spec.Image = getChangedRedisImage() },
+					mutate: func(r *redkeyv1.RedkeyCluster) { r.Spec.Image = framework.GetChangedRedisImage() },
 					verify: func(sts *appsv1.StatefulSet) {
-						Expect(sts.Spec.Template.Spec.Containers[0].Image).To(Equal(getChangedRedisImage()))
+						Expect(sts.Spec.Template.Spec.Containers[0].Image).To(Equal(framework.GetChangedRedisImage()))
 					},
 					wantPhases: []string{redkeyv1.StatusUpgrading, redkeyv1.StatusReady},
 				},
@@ -804,7 +784,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 					base, strings.ReplaceAll(strings.ToLower(t.desc), " ", "-"))
 				key := types.NamespacedName{Namespace: namespace.Name, Name: name}
 
-				mustCreateAndReady(name, 1, 0, "", getRedisImage(),
+				mustCreateAndReady(name, 1, 0, "", framework.GetRedisImage(),
 					/*purge=*/ true /*ephemeral=*/, true,
 					redkeyv1.Pdb{}, redkeyv1.RedkeyClusterOverrideSpec{})
 
@@ -882,7 +862,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				key := types.NamespacedName{Namespace: namespace.Name, Name: name}
 				pdbKey := types.NamespacedName{Namespace: namespace.Name, Name: name + "-pdb"}
 
-				mustCreateAndReady(name, 3, 0, "", getRedisImage(), true, true,
+				mustCreateAndReady(name, 3, 0, "", framework.GetRedisImage(), true, true,
 					redkeyv1.Pdb{}, redkeyv1.RedkeyClusterOverrideSpec{})
 
 				for i, s := range t.steps {
@@ -1039,7 +1019,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				// create a 3-primaries cluster
 				rc := mustCreateAndReady(name,
 					3 /*primaries*/, 0, /*replicasPerPrimary*/
-					"" /*storage*/, getRedisImage(), true /*purgeKeys*/, true, /*ephemeral*/
+					"" /*storage*/, framework.GetRedisImage(), true /*purgeKeys*/, true, /*ephemeral*/
 					redkeyv1.Pdb{}, redkeyv1.RedkeyClusterOverrideSpec{})
 
 				// optional scale operator

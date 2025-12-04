@@ -696,7 +696,7 @@ func (r *RedkeyClusterReconciler) upgradeClusterConfigurationUpdate(ctx context.
 	}
 
 	// RedkeyCluster .Spec.Labels
-	mergedLabels := *redkeyCluster.Spec.Labels
+	mergedLabels := redkeyCluster.GetLabels()
 	defaultLabels := map[string]string{
 		redis.RedkeyClusterLabel:                     redkeyCluster.Name,
 		r.getStatefulSetSelectorLabel(redkeyCluster): "redis",
