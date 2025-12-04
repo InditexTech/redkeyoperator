@@ -111,7 +111,7 @@ type Node struct {
 	Name       string `yaml:"name"`
 	Id         string `yaml:"id"`
 	Ip         string `yaml:"ip"`
-	Flags      string `yaml:"flags"`
+	Role       string `yaml:"role"`
 	PrimaryId  string `yaml:"primaryId"`
 	Failures   int    `yaml:"failures"`
 	Sent       int    `yaml:"sent"`
@@ -433,7 +433,7 @@ func CompareConfigurations(a, b *Configuration) bool {
 func (cn *ClusterNodes) GetPrimaryNodes() []*Node {
 	primaryNodes := make([]*Node, 0)
 	for _, node := range cn.Nodes {
-		if strings.Contains(node.Flags, "master") {
+		if strings.Contains(node.Role, "primary") {
 			primaryNodes = append(primaryNodes, &node)
 		}
 	}
@@ -443,7 +443,7 @@ func (cn *ClusterNodes) GetPrimaryNodes() []*Node {
 func (cn *ClusterNodes) GetReplicaNodes() []*Node {
 	replicaNodes := make([]*Node, 0)
 	for _, node := range cn.Nodes {
-		if !strings.Contains(node.Flags, "master") {
+		if !strings.Contains(node.Role, "primary") {
 			replicaNodes = append(replicaNodes, &node)
 		}
 	}
