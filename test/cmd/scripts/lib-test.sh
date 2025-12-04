@@ -175,7 +175,7 @@ function wait_redis_ready {
 
         # Extract desired fields from the JSON.
         local replicas status
-        replicas=$(echo "$cluster_json" | jq -r '.spec.replicas // empty')
+        replicas=$(echo "$cluster_json" | jq -r '.spec.primaries // empty')
         status=$(echo "$cluster_json" | jq -r '.status.status // empty')
 
         if [[ -z "$replicas" || -z "$status" ]]; then
@@ -394,7 +394,7 @@ function check_redis {
     local namespace="$2"
 
     local replicas status
-    replicas=$(kubectl get rediscluster/"$cluster" -n "$namespace" -o json | jq -r .spec.replicas)
+    replicas=$(kubectl get rediscluster/"$cluster" -n "$namespace" -o json | jq -r .spec.primaries)
     status=$(kubectl get rediscluster/"$cluster" -n "$namespace" -o json | jq -r .status.status)
 
     if [[ "$status" != "Ready" ]]; then
