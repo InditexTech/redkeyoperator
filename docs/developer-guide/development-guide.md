@@ -30,7 +30,7 @@ Once your K8s cluster and registry are ready to use, make the image you want to 
 
 > If you want to debug the operator, execute the `export PROFILE=debug` before the following make commands and read [Debugging Redkey Operator](#debugging-redkey-operator) below.
 
-Build and push the Redis Operator image:
+Build and push the Redkey Operator image:
 
 ```shell
 make docker-build
@@ -39,7 +39,7 @@ make docker-push
 
 > **To test a released Redkey Operator image**, you'll have to manually pull the image, tag, and push it in the local registry.
 
-Once the Redkey Operator is available in your local registry, deploy it into you K8s cluster:
+Once the Redkey Operator is available in your local registry, deploy it into your K8s cluster:
 
 1. Install the CRD (The `redkey-operator` or  `$NAMESPACE` if defined will be used)
 
@@ -47,14 +47,13 @@ Once the Redkey Operator is available in your local registry, deploy it into you
 make install
 ```
 
-3. Generate the manifests (generated in `deployment` directory) and deploy the Redkey Operator.
+2. Generate the manifests (generated in `deployment` directory) and deploy the Redkey Operator.
 
 ```shell
 make deploy
-make process-manifests
 ```
 
-4. Deploy an example Redkey Cluster from `config/examples` folder. Just so you know, a Redkey Robin image is required; for example, see [Redkey Robin](https://github.com/InditexTech/redkeyrobin).
+3. Deploy an example Redkey Cluster from `config/examples` folder. Just so you know, a Redkey Robin image is required; for example, see [Redkey Robin](https://github.com/InditexTech/redkeyrobin).
 
 ```shell
 # Create a rkcl/redis-cluster-ephemeral: 3 nodes, ephemeral: true and purgeKeysOnRebalance: true.
@@ -103,7 +102,7 @@ make port-forward
 
 #### 3. Connect from your IDE to remote debugging
 
-Attach the IDE/debbuger to the debug session. If using VSCode, the configuration could be:
+Attach the IDE/debugger to the debug session. If using VSCode, the configuration could be:
 
 ```json
 {

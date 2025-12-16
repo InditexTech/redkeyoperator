@@ -419,10 +419,10 @@ redis-restore:
 	for POD in $(REDIS_PODS); do echo $${POD}; kubectl cp /tmp/$${POD}-dump.rdb $${POD}:/data/dump.rdb -n ${NAMESPACE}; done
 
 redis-aof-disable:
-	kubectl patch rkcl redis-cluster -n ${NAMESPACE} --type='json' -p='[{"op": "replace", "path": "/spec/config", "value":"maxmemory 200mb\nmaxmemory-examples 5\nmaxmemory-policy allkeys-lru\nappendonly no\nprotected-mode no\nloadmodule /usr/lib/redis/modules/redisgraph.so"}]' | for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli SHUTDOWN; done | sleep 5
+	kubectl patch rkcl redis-cluster -n ${NAMESPACE} --type='json' -p='[{"op": "replace", "path": "/spec/config", "value":"maxmemory 200mb\nmaxmemory-samples 5\nmaxmemory-policy allkeys-lru\nappendonly no\nprotected-mode no\nloadmodule /usr/lib/redis/modules/redisgraph.so"}]' | for POD in $(REDIS_PODS); do echo $${POD}; kubectl exec -it $${POD} -n ${NAMESPACE} -- redis-cli SHUTDOWN; done | sleep 5
 
 redis-aof-enable:
-	kubectl patch rkcl redis-cluster -n ${NAMESPACE} --type='json' -p='[{"op": "replace", "path": "/spec/config", "value":"maxmemory 200mb\nmaxmemory-examples 5\nmaxmemory-policy allkeys-lru\nappendonly yes\nprotected-mode no\nloadmodule /usr/lib/redis/modules/redisgraph.so"}]'
+	kubectl patch rkcl redis-cluster -n ${NAMESPACE} --type='json' -p='[{"op": "replace", "path": "/spec/config", "value":"maxmemory 200mb\nmaxmemory-samples 5\nmaxmemory-policy allkeys-lru\nappendonly yes\nprotected-mode no\nloadmodule /usr/lib/redis/modules/redisgraph.so"}]'
 
 
 ##@ Integration with OLM
@@ -514,7 +514,6 @@ test-e2e: process-manifests-crd ginkgo  ## Execute e2e application test
 .PHONY: test-e2e-cov
 test-e2e-cov: process-manifests-crd ginkgo  ## Execute e2e application test with coverage
 	$(info $(M) running e2e tests with coverage $(GINKGO_ENV))
-	exit 1
 	@mkdir -p $(dir $(TEST_COVERAGE_PROFILE_OUTPUT))
 	$(GINKGO_ENV) ginkgo \
 	     -cover -covermode=count -coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT) \
