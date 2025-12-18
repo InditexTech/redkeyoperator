@@ -68,7 +68,7 @@ func (r *RedkeyClusterReconciler) updatePodDisruptionBudget(ctx context.Context,
 			refreshedPdb.Spec.MaxUnavailable = nil
 			refreshedPdb.Spec.MinAvailable = &redkeyCluster.Spec.Pdb.PdbSizeAvailable
 		}
-		refreshedPdb.ObjectMeta.Labels = *redkeyCluster.Spec.Labels
+		refreshedPdb.ObjectMeta.Labels = redkeyCluster.GetLabels()
 		refreshedPdb.Spec.Selector.MatchLabels = map[string]string{redis.RedkeyClusterLabel: redkeyCluster.ObjectMeta.Name, r.getStatefulSetSelectorLabel(redkeyCluster): "redis"}
 
 		var updateErr = r.Client.Update(ctx, refreshedPdb)
@@ -86,7 +86,7 @@ func (r *RedkeyClusterReconciler) checkAndManagePodDisruptionBudget(ctx context.
 		if err != nil {
 			if errors.IsNotFound(err) {
 				// Create PodDisruptionBudget
-				pdb := r.createPodDisruptionBudget(req, redkeyCluster, *redkeyCluster.Spec.Labels)
+				pdb := r.createPodDisruptionBudget(req, redkeyCluster, redkeyCluster.GetLabels())
 				ctrl.SetControllerReference(redkeyCluster, pdb, r.Scheme)
 				pdbCreateErr := r.Client.Create(ctx, pdb)
 				if pdbCreateErr != nil {

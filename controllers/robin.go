@@ -65,7 +65,7 @@ func (r *RedkeyClusterReconciler) handleRobinConfig(ctx context.Context, req ctr
 		}
 
 		// Create Robin ConfigMap
-		newConfigMap := r.createRobinConfigMap(req, redkeyCluster.Spec, *redkeyCluster.Spec.Labels)
+		newConfigMap := r.createRobinConfigMap(req, redkeyCluster.Spec, redkeyCluster.GetLabels())
 		r.createRobinObject(ctx, newConfigMap, redkeyCluster, "configmap")
 		return nil
 	}
@@ -124,7 +124,7 @@ func (r *RedkeyClusterReconciler) handleRobinDeployment(ctx context.Context, req
 		}
 
 		// Create Robin Deployment
-		robinDeployment := r.createRobinDeployment(req, redkeyCluster, *redkeyCluster.Spec.Labels)
+		robinDeployment := r.createRobinDeployment(req, redkeyCluster, redkeyCluster.GetLabels())
 		r.createRobinObject(ctx, robinDeployment, redkeyCluster, "deployment")
 		return
 	}
@@ -255,6 +255,48 @@ func (r *RedkeyClusterReconciler) createRobinDeployment(req ctrl.Request, redkey
 }
 
 func (r *RedkeyClusterReconciler) getRobinConfiguration(req ctrl.Request, spec redkeyv1.RedkeyClusterSpec) robin.Configuration {
+	// Set default values for Robin configuration
+	reconcilerInterval := 30
+	reconcilerCleanupInterval := 30
+	clusterHealthProbe := 60
+	clusterHealingTime := 60
+	clusterMaxRetries := 10
+	clusterBackOff := 10
+	metricsInterval := 60
+	var metricsRedisInfoKeys []string
+
+	// Override with provided values if they exist
+	if spec.Robin != nil && spec.Robin.Config != nil {
+		if spec.Robin.Config.Reconciler != nil {
+			if spec.Robin.Config.Reconciler.IntervalSeconds != nil {
+				reconcilerInterval = *spec.Robin.Config.Reconciler.IntervalSeconds
+			}
+			if spec.Robin.Config.Reconciler.OperationCleanUpIntervalSeconds != nil {
+				reconcilerCleanupInterval = *spec.Robin.Config.Reconciler.OperationCleanUpIntervalSeconds
+			}
+		}
+		if spec.Robin.Config.Cluster != nil {
+			if spec.Robin.Config.Cluster.HealthProbePeriodSeconds != nil {
+				clusterHealthProbe = *spec.Robin.Config.Cluster.HealthProbePeriodSeconds
+			}
+			if spec.Robin.Config.Cluster.HealingTimeSeconds != nil {
+				clusterHealingTime = *spec.Robin.Config.Cluster.HealingTimeSeconds
+			}
+			if spec.Robin.Config.Cluster.MaxRetries != nil {
+				clusterMaxRetries = *spec.Robin.Config.Cluster.MaxRetries
+			}
+			if spec.Robin.Config.Cluster.BackOff != nil {
+				clusterBackOff = *spec.Robin.Config.Cluster.BackOff
+			}
+		}
+		if spec.Robin.Config.Metrics != nil {
+			if spec.Robin.Config.Metrics.IntervalSeconds != nil {
+				metricsInterval = *spec.Robin.Config.Metrics.IntervalSeconds
+			}
+			metricsRedisInfoKeys = spec.Robin.Config.Metrics.RedisInfoKeys
+		}
+	}
+
 	config := robin.Configuration{
 		Metadata: map[string]string{
 			"namespace": req.Namespace,
@@ -262,8 +304,8 @@ func (r *RedkeyClusterReconciler) getRobinConfiguration(req ctrl.Request, spec r
 		Redis: robin.RedisConfig{
 			Standalone: false,
 			Reconciler: robin.RedisReconcilerConfig{
-				IntervalSeconds:                 *spec.Robin.Config.Reconciler.IntervalSeconds,
-				OperationCleanupIntervalSeconds: *spec.Robin.Config.Reconciler.OperationCleanUpIntervalSeconds,
+				IntervalSeconds:                 reconcilerInterval,
+				OperationCleanupIntervalSeconds: reconcilerCleanupInterval,
 			},
 			Cluster: robin.RedkeyClusterConfig{
 				Namespace:                req.Namespace,
@@ -272,14 +314,14 @@ func (r *RedkeyClusterReconciler) getRobinConfiguration(req ctrl.Request, spec r
 				ReplicasPerPrimary:       int(spec.ReplicasPerPrimary),
 				Status:                   redkeyv1.RobinStatusUnknown,
 				Ephemeral:                spec.Ephemeral,
-				HealthProbePeriodSeconds: *spec.Robin.Config.Cluster.HealthProbePeriodSeconds,
-				HealingTimeSeconds:       *spec.Robin.Config.Cluster.HealingTimeSeconds,
-				MaxRetries:               *spec.Robin.Config.Cluster.MaxRetries,
-				BackOff:                  time.Duration(*spec.Robin.Config.Cluster.BackOff) * time.Second,
+				HealthProbePeriodSeconds: clusterHealthProbe,
+				HealingTimeSeconds:       clusterHealingTime,
+				MaxRetries:               clusterMaxRetries,
+				BackOff:                  time.Duration(clusterBackOff) * time.Second,
 			},
 			Metrics: robin.RedisMetricsConfig{
-				IntervalSeconds: *spec.Robin.Config.Metrics.IntervalSeconds,
-				RedisInfoKeys:   spec.Robin.Config.Metrics.RedisInfoKeys,
+				IntervalSeconds: metricsInterval,
+				RedisInfoKeys:   metricsRedisInfoKeys,
 			},
 		},
 	}

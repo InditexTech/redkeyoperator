@@ -150,6 +150,14 @@ func (redkeyCluster RedkeyCluster) NamespacedName() types.NamespacedName {
 	}
 }
 
+// GetLabels returns the labels from Spec.Labels or an empty map if nil.
+func (redkeyCluster RedkeyCluster) GetLabels() map[string]string {
+	if redkeyCluster.Spec.Labels != nil {
+		return *redkeyCluster.Spec.Labels
+	}
+	return map[string]string{}
+}
+
 // RedkeyClusterSpec defines the desired state of RedkeyCluster.
 // +kubebuilder:validation:XValidation:rule="self.ephemeral || has(self.storage)", message="Ephemeral or storage must be set"
 // +kubebuilder:validation:XValidation:rule="!(self.ephemeral && has(self.storage))", message="Ephemeral and storage cannot be combined"
