@@ -313,8 +313,6 @@ apply-all: docker-build docker-push process-manifests install deploy apply-rkcl
 
 delete-all: delete-rkcl undeploy uninstall
 
-
-
 port-forward-profiling: ##		Port forwarding of port 6060 for profiling the manager with pprof.
 	kubectl port-forward pods/$(OPERATOR) 6060:6060 -n ${NAMESPACE}
 
