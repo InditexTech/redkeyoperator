@@ -45,8 +45,8 @@ TEST_REPORT_OUTPUT_E2E = .local/test_report_e2e.ndjson
 # .............................................................................
 # / IMPORTANT VARIABLES
 # .............................................................................
-# Allowed deploying profiles. dev: testing in local and debug: testing with delve in the operator
-PROFILES := dev debug
+# Allowed deploying profiles. dev: testing in local, debug: testing with delve in the operator and profiling: testing with pprof enabled in the operator for performance analysis
+PROFILES := dev debug profiling
 # Allowed robin deploying profiles. dev: testing robin in local and debug: testing with delve in robin
 PROFILES_ROBIN := dev debug
 # Deploying profile used to generate the manifest files to deploy the operator.
@@ -314,6 +314,9 @@ apply-all: docker-build docker-push process-manifests install deploy apply-rkcl
 delete-all: delete-rkcl undeploy uninstall
 
 
+
+port-forward-profiling: ##		Port forwarding of port 6060 for profiling the manager with pprof.
+	kubectl port-forward pods/$(OPERATOR) 6060:6060 -n ${NAMESPACE}
 
 ##@ Tools
 
