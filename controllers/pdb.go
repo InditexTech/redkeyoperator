@@ -97,7 +97,7 @@ func (r *RedkeyClusterReconciler) checkAndManagePodDisruptionBudget(ctx context.
 			}
 		}
 	}
-	if redkeyCluster.Spec.Primaries == 1 || !redkeyCluster.Spec.Pdb.Enabled {
+	if redkeyCluster.Spec.Primaries <= 1 || !redkeyCluster.Spec.Pdb.Enabled {
 		r.deletePodDisruptionBudget(ctx, redkeyCluster)
 	}
 }
