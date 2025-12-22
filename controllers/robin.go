@@ -131,6 +131,16 @@ func (r *RedkeyClusterReconciler) handleRobinDeployment(ctx context.Context, req
 
 	// Robin deployment found: check if it needs to be updated
 	patchedPodTemplateSpec, changed := r.overrideRobinDeployment(req, redkeyCluster, deployment.Spec.Template)
+
+	// Check if Robin deployment needs to be scaled up (e.g., after scaling from 0 primaries)
+	needsScaleUp := deployment.Spec.Replicas != nil && *deployment.Spec.Replicas == 0 && redkeyCluster.Spec.Primaries > 0
+	if needsScaleUp {
+		r.logInfo(redkeyCluster.NamespacedName(), "Scaling up Robin deployment from 0 replicas")
+		replicas := int32(1)
+		deployment.Spec.Replicas = &replicas
+		changed = true
+	}
+
 	if !changed {
 		return
 	}
