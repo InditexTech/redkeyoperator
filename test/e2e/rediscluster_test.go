@@ -105,8 +105,6 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 		Expect(rc.Spec.Storage).To(Equal(storage))
 		Expect(*rc.Spec.PurgeKeysOnRebalance).To(Equal(purgeKeys))
 		Expect(rc.Spec.Ephemeral).To(Equal(ephemeral))
-		Expect(rc.Kind).To(Equal("RedkeyCluster"))
-		Expect(rc.APIVersion).To(Equal("redis.inditex.dev/v1"))
 		Expect(rc.Spec.Auth).To(Equal(redkeyv1.RedisAuth{}))
 		Expect(rc.Spec.Image).To(Equal(framework.GetRedisImage()))
 		Expect(rc.Spec.Pdb).To(Equal(pdb))

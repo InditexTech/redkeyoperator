@@ -6,12 +6,10 @@ package e2e
 
 import (
 	"context"
-	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
-
-	"k8s.io/apimachinery/pkg/api/errors"
 
 	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
 	. "github.com/onsi/ginkgo/v2"
@@ -20,104 +18,100 @@ import (
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/rest"
-	"k8s.io/kubectl/pkg/scheme"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
 const (
-	crdDirName  = "deployment"
-	metricsAddr = ":8080"
 	defaultPoll = 10 * time.Second
 	defaultWait = 100 * time.Second
 )
 
 var (
-	testEnv       *envtest.Environment
-	k8sClient     client.Client
-	managerCancel context.CancelFunc
-	ctx           context.Context
+	k8sClient client.Client
+	ctx       context.Context
+	cancel    context.CancelFunc
 )
-
-// NewCachingClientFunc returns a controller‑runtime NewClientFunc
-// that enables Unstructured caching (i.e. watches on arbitrary CRDs).
-// This is useful when you rely on types not registered in the built‑in scheme.
-func NewCachingClientFunc() client.NewClientFunc {
-	return func(cfg *rest.Config, opts client.Options) (client.Client, error) {
-		// Turn on unstructured caching for CRDs / unknown types
-		opts.Cache.Unstructured = true
-		return client.New(cfg, opts)
-	}
-}
 
 func TestE2E(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Redkey Operator E2E Suite", Label("e2e"))
 }
 
-var _ = BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+// SynchronizedBeforeSuite ensures cluster-level setup runs once across all
+// parallel Ginkgo processes. The first process (process 1) performs the
+// one-time setup, and all processes then create their own Kubernetes client.
+var _ = SynchronizedBeforeSuite(
+	// This function runs ONLY on process 1 (the "primary" process).
+	// It returns data that will be passed to all processes.
+	func() []byte {
+		logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
-	By("bootstrapping test environment")
-	useCluster := true
-	testEnv = &envtest.Environment{
-		UseExistingCluster:       &useCluster,
-		AttachControlPlaneOutput: true,
-		CRDDirectoryPaths:        []string{filepath.Join("..", "..", crdDirName)},
-		ErrorIfCRDPathMissing:    true,
-	}
+		By("registering schemes (process 1)")
+		utilruntime.Must(redkeyv1.AddToScheme(scheme.Scheme))
+		utilruntime.Must(corev1.AddToScheme(scheme.Scheme))
+		utilruntime.Must(apiextensions.AddToScheme(scheme.Scheme))
+		utilruntime.Must(metav1.AddMetaToScheme(scheme.Scheme))
 
-	cfg, err := testEnv.Start()
-	if err != nil {
-		if errors.IsAlreadyExists(err) {
-			GinkgoWriter.Printf("warning: CRD already existed, continuing: %v\n", err)
-			err = nil
-		} else {
-			Fail(fmt.Sprintf("failed to start test environment: %v", err))
+		// Verify CRD directory exists for documentation purposes only.
+		// The CRD should already be installed in the cluster.
+		crdDir := filepath.Join("..", "..", "deployment")
+		_, err := os.Stat(crdDir)
+		Expect(err).NotTo(HaveOccurred(), "CRD directory %q must exist", crdDir)
+
+		// Return empty data; all processes will create their own client.
+		return nil
+	},
+	// This function runs on ALL processes (including process 1).
+	// It receives the data returned by the first function.
+	func(_ []byte) {
+		logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+
+		By("creating Kubernetes client")
+
+		// Register schemes on this process (they're per-process state)
+		utilruntime.Must(redkeyv1.AddToScheme(scheme.Scheme))
+		utilruntime.Must(corev1.AddToScheme(scheme.Scheme))
+		utilruntime.Must(apiextensions.AddToScheme(scheme.Scheme))
+		utilruntime.Must(metav1.AddMetaToScheme(scheme.Scheme))
+
+		// Load kubeconfig from standard locations
+		kubeconfig := os.Getenv("KUBECONFIG")
+		if kubeconfig == "" {
+			home, _ := os.UserHomeDir()
+			kubeconfig = filepath.Join(home, ".kube", "config")
 		}
-	}
-	Expect(cfg).NotTo(BeNil())
-	Expect(err).NotTo(HaveOccurred())
 
-	// register all schemes in one shot
-	utilruntime.Must(redkeyv1.AddToScheme(scheme.Scheme))
-	utilruntime.Must(corev1.AddToScheme(scheme.Scheme))
-	utilruntime.Must(apiextensions.AddToScheme(scheme.Scheme))
-	utilruntime.Must(metav1.AddMetaToScheme(scheme.Scheme))
+		cfg, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+		Expect(err).NotTo(HaveOccurred(), "failed to load kubeconfig from %s", kubeconfig)
+		Expect(cfg).NotTo(BeNil())
 
-	port := 8080 + GinkgoParallelProcess() - 1
-	metricsAddr := fmt.Sprintf(":%d", port)
+		// Create a simple controller-runtime client (no manager needed for E2E)
+		k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
+		Expect(err).NotTo(HaveOccurred(), "failed to create Kubernetes client")
+		Expect(k8sClient).NotTo(BeNil())
 
-	By("creating controller manager")
-	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
-		NewClient: NewCachingClientFunc(),
-		Scheme:    scheme.Scheme,
-		Cache:     cache.Options{DefaultNamespaces: map[string]cache.Config{}},
-		Metrics:   server.Options{BindAddress: metricsAddr},
-	})
+		// Create a cancellable context for all tests
+		ctx, cancel = context.WithCancel(context.Background())
+	},
+)
 
-	Expect(err).NotTo(HaveOccurred())
-
-	k8sClient = mgr.GetClient()
-	Expect(k8sClient).NotTo(BeNil())
-
-	ctx, managerCancel = context.WithCancel(ctrl.SetupSignalHandler())
-	go func() {
-		defer GinkgoRecover()
-		Expect(mgr.Start(ctx)).To(Succeed())
-	}()
-})
-
-var _ = AfterSuite(func() {
-	By("shutting down test environment")
-	if managerCancel != nil {
-		managerCancel()
-	}
-	Expect(testEnv.Stop()).To(Succeed())
-})
+// SynchronizedAfterSuite ensures cleanup runs safely across all parallel processes.
+// The second function runs only on process 1 after all other processes have finished.
+var _ = SynchronizedAfterSuite(
+	// This function runs on ALL processes.
+	func() {
+		By("cleaning up test context")
+		if cancel != nil {
+			cancel()
+		}
+	},
+	// This function runs ONLY on process 1, after all other processes have exited.
+	func() {
+		By("final cleanup complete")
+		// No cluster-level teardown needed; we use an existing cluster.
+	},
+)
