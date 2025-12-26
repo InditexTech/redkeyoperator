@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -16,9 +17,9 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
-	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -30,58 +31,9 @@ import (
 	"github.com/inditextech/redkeyoperator/test/e2e/framework"
 )
 
-// helper: creates a namespace with a GenerateName prefix and waits for it to be ready
-func createNamespace(ctx context.Context, c client.Client, prefix string) *corev1.Namespace {
-	ns := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: prefix + "-",
-		},
-	}
-	Expect(c.Create(ctx, ns)).To(Succeed())
-	// wait until it's admitted
-	Eventually(func() bool {
-		var tmp corev1.Namespace
-		return c.Get(ctx, client.ObjectKey{Name: ns.Name}, &tmp) == nil
-	}, defaultWait, defaultPoll).Should(BeTrue())
-	return ns
-}
-
-// deleteNamespace tears down everything in the namespace, including
-// RedkeyCluster CRs with finalizers, then deletes the namespace itself.
-func deleteNamespace(ctx context.Context, c client.Client, ns *corev1.Namespace) {
-	// 1) Remove any RedkeyCluster CRs so their finalizers don't stall namespace deletion
-	var rcList redkeyv1.RedkeyClusterList
-	Expect(c.List(ctx, &rcList, &client.ListOptions{Namespace: ns.Name})).To(Succeed())
-
-	for i := range rcList.Items {
-		name := rcList.Items[i].Name
-		ns := rcList.Items[i].Namespace
-
-		// Strip finalizers with retry
-		Expect(retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			rc := &redkeyv1.RedkeyCluster{}
-			if err := c.Get(ctx, client.ObjectKey{Namespace: ns, Name: name}, rc); err != nil {
-				return err
-			}
-			rc.Finalizers = nil
-			return c.Update(ctx, rc)
-		})).To(Succeed(), "removing finalizers from %s/%s", ns, name)
-
-		// delete the CR immediately
-		Expect(c.Delete(ctx, &redkeyv1.RedkeyCluster{
-			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns},
-		})).To(Succeed(), "deleting RedkeyCluster %s/%s", ns, name)
-	}
-
-	// 2) Delete the namespace
-	Expect(c.Delete(ctx, ns)).To(Succeed(), "deleting namespace %s", ns.Name)
-
-	// 3) Wait for the namespace to actually disappear
-	Eventually(func() bool {
-		err := c.Get(ctx, types.NamespacedName{Name: ns.Name}, &corev1.Namespace{})
-		return err != nil
-	}, defaultWait, defaultPoll).Should(BeTrue(), "namespace %s should be gone", ns.Name)
-}
+const (
+	simpleTestDuration = 5 * time.Minute
+)
 
 var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "cluster"), func() {
 	var (
@@ -114,11 +66,18 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 	}
 
 	BeforeEach(func() {
-		namespace = createNamespace(ctx, k8sClient, fmt.Sprintf("redis-e2e-%d", GinkgoParallelProcess()))
+		var err error
+		namespace, err = framework.CreateNamespace(ctx, k8sClient, fmt.Sprintf("redis-e2e-%d", GinkgoParallelProcess()))
+		if err != nil {
+			fmt.Fprintf(GinkgoWriter, "Error creating namespace: %e", err)
+		}
 		Expect(EnsureOperatorSetup(ctx, namespace.Name)).To(Succeed())
+		if err != nil {
+			fmt.Fprintf(GinkgoWriter, "Error creating namespace: %e", err)
+		}
 	})
 	AfterEach(func() {
-		deleteNamespace(ctx, k8sClient, namespace)
+		framework.DeleteNamespace(ctx, k8sClient, namespace)
 	})
 
 	Context("Operator health", func() {
@@ -143,7 +102,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 		}
 
 		DescribeTable("scale cycles",
-			func(initial, target int32, phases []string) {
+			func(ctx SpecContext, initial, target int32, phases []string) {
 				// unique name per entry so jobs can run in parallel
 				name := fmt.Sprintf("%s-%d-%d", base, initial, target)
 				key := types.NamespacedName{Namespace: namespace.Name, Name: name}
@@ -162,13 +121,13 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				expectPhases(trace, phases...)
 			},
 
-			Entry("up → 3", int32(0), int32(3),
+			Entry("up → 3", SpecTimeout(simpleTestDuration), int32(0), int32(3),
 				[]string{redkeyv1.StatusScalingUp, redkeyv1.StatusReady}),
-			Entry("up → 5", int32(3), int32(5),
+			Entry("up → 5", SpecTimeout(simpleTestDuration), int32(3), int32(5),
 				[]string{redkeyv1.StatusScalingUp, redkeyv1.StatusReady}),
-			Entry("down → 3", int32(5), int32(3),
+			Entry("down → 3", SpecTimeout(simpleTestDuration), int32(5), int32(3),
 				[]string{redkeyv1.StatusScalingDown, redkeyv1.StatusReady}),
-			Entry("down → 0", int32(3), int32(0),
+			Entry("down → 0", SpecTimeout(simpleTestDuration), int32(3), int32(0),
 				[]string{redkeyv1.StatusReady}),
 		)
 	})
@@ -303,7 +262,10 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 			// helper to read *sorted* ports from the cluster-IP Service
 			getPorts = func() []int32 {
 				svc := &corev1.Service{}
-				_ = k8sClient.Get(ctx, key, svc)
+				err := k8sClient.Get(ctx, key, svc)
+				if err != nil {
+					fmt.Fprintf(GinkgoWriter, "Error getting PDB: %e", err)
+				}
 				ports := make([]int32, len(svc.Spec.Ports))
 				for i, p := range svc.Spec.Ports {
 					ports[i] = p.Port
@@ -317,7 +279,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 		})
 
 		// shared test-body: apply the mutator, then expect reconciliation
-		test := func(mutator func(context.Context, client.Client, types.NamespacedName) error) {
+		test := func(ctx SpecContext, mutator func(context.Context, client.Client, types.NamespacedName) error) {
 			Expect(mutator(ctx, k8sClient, key)).To(Succeed())
 
 			// eventually we must be back to a single comm port
@@ -327,8 +289,8 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 
 		DescribeTable("prunes / restores the *only* comm port",
 			test,
-			Entry("remove all ports", framework.RemoveServicePorts),
-			Entry("add extra random ports", framework.AddServicePorts),
+			Entry("remove all ports", SpecTimeout(simpleTestDuration), framework.RemoveServicePorts),
+			Entry("add extra random ports", SpecTimeout(simpleTestDuration), framework.AddServicePorts),
 		)
 	})
 
@@ -467,7 +429,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 		}
 
 		DescribeTable("PVC-backed cluster mutations",
-			func(t tc) {
+			func(ctx SpecContext, t tc) {
 				rc, phases, err := framework.ChangeCluster(ctx, k8sClient, key,
 					framework.ChangeClusterOptions{Mutate: t.mutate})
 
@@ -486,7 +448,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				Expect(phases).To(ContainElements(t.wantPhases))
 			},
 
-			Entry("forbid storage resize",
+			Entry("forbid storage resize", SpecTimeout(simpleTestDuration),
 				tc{
 					desc: "resize PVC",
 					mutate: func(r *redkeyv1.RedkeyCluster) {
@@ -498,7 +460,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				},
 			),
 
-			Entry("scale up to 6 primaries",
+			Entry("scale up to 6 primaries", SpecTimeout(simpleTestDuration),
 				tc{
 					desc: "scale-up",
 					mutate: func(r *redkeyv1.RedkeyCluster) {
@@ -509,7 +471,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				},
 			),
 
-			Entry("scale down to 1 replica",
+			Entry("scale down to 1 replica", SpecTimeout(simpleTestDuration),
 				tc{
 					desc: "scale-down",
 					mutate: func(r *redkeyv1.RedkeyCluster) {
@@ -564,7 +526,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 		}
 
 		DescribeTable("primary/replica mutations",
-			func(t tc) {
+			func(ctx SpecContext, t tc) {
 				if t.mutate == nil {
 					checkLayout(t.wantRep, t.wantPerPrimary)
 					return
@@ -583,7 +545,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 			},
 
 			// ──────────────────────────────────────────────────────────
-			Entry("baseline distribution is correct",
+			Entry("baseline distribution is correct", SpecTimeout(simpleTestDuration),
 				tc{
 					desc:           "validateInitial",
 					mutate:         nil,
@@ -592,7 +554,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				},
 			),
 
-			Entry("scale up to 7/2",
+			Entry("scale up to 7/2", SpecTimeout(simpleTestDuration),
 				tc{
 					desc: "scaleUp",
 					mutate: func(r *redkeyv1.RedkeyCluster) {
@@ -605,7 +567,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				},
 			),
 
-			Entry("scale down to 3/1",
+			Entry("scale down to 3/1", SpecTimeout(simpleTestDuration),
 				tc{
 					desc: "scaleDown",
 					mutate: func(r *redkeyv1.RedkeyCluster) {
@@ -663,7 +625,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 		}
 
 		DescribeTable("insert data scales and check data persist",
-			func(t tc) {
+			func(ctx SpecContext, t tc) {
 				insert()
 
 				// optional scale
@@ -683,18 +645,18 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				flush()
 			},
 
-			Entry("no scale",
+			Entry("no scale", SpecTimeout(simpleTestDuration),
 				tc{primaries: 0},
 			),
 
-			Entry("scale from 5 → 7",
+			Entry("scale from 5 → 7", SpecTimeout(simpleTestDuration),
 				tc{
 					primaries:  7,
 					wantPhases: []string{redkeyv1.StatusScalingUp, redkeyv1.StatusReady},
 				},
 			),
 
-			Entry("scale from 5 → 3",
+			Entry("scale from 5 → 3", SpecTimeout(simpleTestDuration),
 				tc{
 					primaries:  3,
 					wantPhases: []string{redkeyv1.StatusScalingDown, redkeyv1.StatusReady},
@@ -720,7 +682,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 		}
 
 		DescribeTable("propagates to STS",
-			func(t tc) {
+			func(ctx SpecContext, t tc) {
 				_, trace, err := framework.ChangeCluster(ctx, k8sClient, key,
 					framework.ChangeClusterOptions{Mutate: t.mutate})
 				Expect(err).NotTo(HaveOccurred())
@@ -731,7 +693,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				t.verify(sts)
 			},
 
-			Entry("change resources",
+			Entry("change resources", SpecTimeout(simpleTestDuration),
 				tc{
 					mutate: func(r *redkeyv1.RedkeyCluster) {
 						req := corev1.ResourceRequirements{
@@ -754,7 +716,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				},
 			),
 
-			Entry("change image",
+			Entry("change image", SpecTimeout(simpleTestDuration),
 				tc{
 					mutate: func(r *redkeyv1.RedkeyCluster) { r.Spec.Image = framework.GetChangedRedisImage() },
 					verify: func(sts *appsv1.StatefulSet) {
@@ -777,7 +739,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 		}
 
 		DescribeTable("mutation attempts",
-			func(t tc) {
+			func(ctx SpecContext, t tc) {
 				name := fmt.Sprintf("%s-%s",
 					base, strings.ReplaceAll(strings.ToLower(t.desc), " ", "-"))
 				key := types.NamespacedName{Namespace: namespace.Name, Name: name}
@@ -798,7 +760,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				t.verify(rc)
 			},
 
-			Entry("deny: flip to PVC (Ephemeral=false + Storage)",
+			Entry("deny: flip to PVC (Ephemeral=false + Storage)", SpecTimeout(simpleTestDuration),
 				tc{
 					desc: "flip-to-PVC",
 					mutate: func(r *redkeyv1.RedkeyCluster) {
@@ -813,7 +775,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				},
 			),
 
-			Entry("deny: add Storage while Ephemeral=true",
+			Entry("deny: add Storage while Ephemeral=true", SpecTimeout(simpleTestDuration),
 				tc{
 					desc: "add-storage",
 					mutate: func(r *redkeyv1.RedkeyCluster) {
@@ -850,16 +812,21 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 		ensurePDBState := func(pdbKey types.NamespacedName, want bool) {
 			Eventually(func() bool {
 				err := getPDB(pdbKey)
-				return (err == nil) == want
+				if (want && err == nil) || (!want && errors.IsNotFound(err)) {
+					return true
+				}
+				if err != nil {
+					fmt.Fprintf(GinkgoWriter, "Error getting PDB: %s: %s\n", pdbKey, err)
+				}
+				return false
 			}, defaultWait*2, defaultPoll).Should(BeTrue())
 		}
 
 		DescribeTable("reconciles PodDisruptionBudget according to .spec.pdb/enabled",
-			func(t tc) {
+			func(ctx SpecContext, t tc) {
 				name := fmt.Sprintf("%s-%s", base, strings.ReplaceAll(t.name, "_", "-"))
 				key := types.NamespacedName{Namespace: namespace.Name, Name: name}
 				pdbKey := types.NamespacedName{Namespace: namespace.Name, Name: name + "-pdb"}
-
 				mustCreateAndReady(name, 3, 0, "", framework.GetRedisImage(), true, true,
 					redkeyv1.Pdb{}, redkeyv1.RedkeyClusterOverrideSpec{})
 
@@ -870,12 +837,12 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 						"step %d (%s) ChangeCluster failed", i, s.desc)
 
 					Expect(trace).To(ContainElements(s.wantPhases))
-
+					fmt.Fprintf(GinkgoWriter, "PDB %s phase: %s\n", pdbKey, s.desc)
 					ensurePDBState(pdbKey, s.wantPDB)
 				}
 			},
 
-			Entry("enable → disable → re-enable",
+			Entry("enable → disable → re-enable", SpecTimeout(simpleTestDuration),
 				tc{
 					name: "enable_disable_enable",
 					steps: []step{
@@ -903,7 +870,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				},
 			),
 
-			Entry("enable → scale-to-zero → scale-up",
+			Entry("enable → scale-to-zero → scale-up", SpecTimeout(simpleTestDuration),
 				tc{
 					name: "enable_scale_zero_up",
 					steps: []step{
@@ -931,7 +898,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				},
 			),
 
-			Entry("enable → scale-to-zero → scale-up → disable",
+			Entry("enable → scale-to-zero → scale-up → disable", SpecTimeout(simpleTestDuration),
 				tc{
 					name: "enable_scale_zero_up_disable",
 					steps: []step{
@@ -1008,7 +975,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 		}
 
 		DescribeTable("self-heals after disruptive events",
-			func(t tc) {
+			func(ctx SpecContext, t tc) {
 				// unique cluster name
 				name := fmt.Sprintf("%s-%s",
 					base, strings.ReplaceAll(strings.ToLower(t.desc), " ", "-"))
@@ -1038,7 +1005,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 			},
 
 			// ────────────────── ENTRY 1 ──────────────────
-			Entry("forget one node - operator running",
+			Entry("forget one node - operator running", SpecTimeout(simpleTestDuration),
 				tc{
 					desc: "forget-node",
 					operate: func(rc *redkeyv1.RedkeyCluster) error {
@@ -1048,7 +1015,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 			),
 
 			// ────────────────── ENTRY 2 ──────────────────
-			Entry("operator outage → forget/fix/meet → operator back",
+			Entry("operator outage → forget/fix/meet → operator back", SpecTimeout(simpleTestDuration),
 				tc{
 					desc:    "forget-fix-meet-without-operator",
 					preHook: func() { scaleOperator(0) }, // stop the operator
