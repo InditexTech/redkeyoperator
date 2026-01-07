@@ -43,12 +43,11 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 	// mustCreateAndReady creates a cluster and blocks until it's Ready
 	mustCreateAndReady := func(name string, primaries, replicasPerPrimary int32, storage, image string, purgeKeys, ephemeral bool, pdb redkeyv1.Pdb, userOverride redkeyv1.RedkeyClusterOverrideSpec) *redkeyv1.RedkeyCluster {
 		key := types.NamespacedName{Namespace: namespace.Name, Name: name}
-		Expect(framework.EnsureClusterExistsOrCreate(
-			ctx, k8sClient, key,
-			primaries, replicasPerPrimary,
-			storage, image, purgeKeys, ephemeral,
-			pdb, userOverride,
-		)).To(Succeed())
+
+		err := framework.EnsureClusterExistsOrCreate(ctx, k8sClient, key, primaries, replicasPerPrimary,
+			storage, image, purgeKeys, ephemeral, pdb, userOverride)
+
+		Expect(err).To(Succeed())
 
 		rc, err := framework.WaitForReady(ctx, k8sClient, key)
 

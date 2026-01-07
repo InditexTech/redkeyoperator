@@ -1008,13 +1008,13 @@ func (r *RedkeyClusterReconciler) scaleDownCluster(ctx context.Context, redkeyCl
 	}
 
 	// Ensure Robin has completed resharding before scaling down the StatefulSet
-	robinStatus, err := redkeyRobin.GetStatus()
+	robinStatus, err := redkeyRobin.GetClusterStatus()
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin status")
 		return true, err
 	}
 	if robinStatus != robin.StatusReady {
-		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for Robin to complete resharding before scaling down pods", "robin status", robinStatus)
+		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for Robin to complete resharding ", "robin status", robinStatus)
 		return true, nil // Requeue
 	}
 
