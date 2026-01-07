@@ -356,16 +356,22 @@ func ChangeCluster(
 		return nil, nil, err
 	}
 
-	// 2) mutate (with retry-on-conflict)
 	rc := &redkeyv1.RedkeyCluster{ObjectMeta: metav1.ObjectMeta{Name: key.Name, Namespace: key.Namespace}}
-	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		_, err := controllerutil.CreateOrUpdate(ctx, c, rc, func() error {
-			opts.Mutate(rc)
-			controllerutil.AddFinalizer(rc, finalizerName) // keep your existing finalizer
-			return nil
-		})
+
+	changeRedkeyResource := func() error {
+		opts.Mutate(rc)
+		controllerutil.AddFinalizer(rc, finalizerName) // keep your existing finalizer
+		return nil
+	}
+
+	mutateCluster := func() error {
+		_, err := controllerutil.CreateOrUpdate(ctx, c, rc, changeRedkeyResource)
 		return err
-	}); err != nil {
+	}
+
+	// 2) mutate (with retry-on-conflict)
+	err := retry.RetryOnConflict(retry.DefaultRetry, mutateCluster)
+	if err != nil {
 		return nil, nil, fmt.Errorf("patch RedkeyCluster: %w", err)
 	}
 

@@ -1007,12 +1007,24 @@ func (r *RedkeyClusterReconciler) scaleDownCluster(ctx context.Context, redkeyCl
 		return true, nil // Requeue
 	}
 
+	// Ensure Robin has completed resharding before scaling down the StatefulSet
+	robinStatus, err := redkeyRobin.GetClusterStatus()
+	if err != nil {
+		r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin status")
+		return true, err
+	}
+	if robinStatus != robin.StatusReady {
+		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for Robin to complete resharding ", "robin status", robinStatus)
+		return true, nil // Requeue
+	}
+
 	// Update StatefulSet
 	sset, err := r.FindExistingStatefulSet(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redkeyCluster.Name, Namespace: redkeyCluster.Namespace}})
 	if err != nil {
 		return true, err
 	}
-	sset.Spec.Replicas = &redkeyCluster.Spec.Primaries
+	realExpectedNodes := int32(redkeyCluster.NodesNeeded())
+	sset.Spec.Replicas = &realExpectedNodes
 	_, err = r.updateStatefulSet(ctx, sset, redkeyCluster)
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Failed to update StatefulSet")
