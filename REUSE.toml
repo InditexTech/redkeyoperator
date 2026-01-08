@@ -7,6 +7,7 @@ SPDX-PackageDownloadLocation = "https://github.com/InditexTech/redkeyoperator"
 path = [
     ".github/CODEOWNERS",
     ".go-version",
+    "repolinter.json",
     ".vscode/launch.json",
     "docs/files/redis-cluster-status-transitions.drawio",
     "docs/images/badge.png",
