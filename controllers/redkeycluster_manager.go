@@ -34,7 +34,7 @@ const (
 	UpgradingDefaultTimeout   time.Duration = 30
 	ScalingDefaultTimeout     time.Duration = 30
 	ReadyRequeueTimeout       time.Duration = 30
-	ErrorRequeueTimeout       time.Duration = 30
+	ErrorRequeueTimeout       time.Duration = 5
 	MaintenanceRequeueTimeout time.Duration = 30
 )
 
