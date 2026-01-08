@@ -1,0 +1,35 @@
+version = 1
+SPDX-PackageName = "redkeyoperator"
+SPDX-PackageSupplier = "2025 Industria de Diseño Textil S.A."
+SPDX-PackageDownloadLocation = "https://github.com/InditexTech/redkeyoperator"
+
+[[annotations]]
+path = [
+    ".github/CODEOWNERS",
+    ".go-version",
+    ".vscode/launch.json",
+    "docs/files/redis-cluster-status-transitions.drawio",
+    "docs/images/badge.png",
+    "docs/images/badge.svg",
+    "docs/images/profiling-http-server.png",
+    "docs/images/profiling-imports.png",
+    "docs/images/redis-dashboard.png",
+    "docs/images/redis-load-dashboard.png",
+    "docs/images/redisbackup.png",
+    "docs/images/redisk8slayout.png",
+    "docs/images/redispvcnodeslayout.png",
+    "docs/images/redkey-cluster-initialization.png",
+    "docs/images/redkey-cluster-substatus-scalingdown-fast.png",
+    "docs/images/redkey-cluster-substatus-scalingdown-slow.png",
+    "docs/images/redkey-cluster-substatus-scalingup-fast.png",
+    "docs/images/redkey-cluster-substatus-scalingup-slow.png",
+    "docs/images/redkey-cluster-substatus-upgrading-fast.png",
+    "docs/images/redkey-cluster-substatus-upgrading-slow.png",
+    "docs/images/redkey-logo-50.png",
+    "docs/images/redkey-logo.png",
+    "docs/images/redkey-operator-robin.png",
+    "go.sum",
+    "test/cmd/data_44kl.txt",
+]
+SPDX-FileCopyrightText = "2025 Industria Textil de Diseño, S.A."
+SPDX-License-Identifier = "Apache-2.0"
