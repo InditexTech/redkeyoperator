@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2024 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
 # Security
 
 We at Inditex believe that responsible disclosure of security vulnerabilities helps us ensure the security and privacy

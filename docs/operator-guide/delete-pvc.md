@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2024 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Deletion of PVCs on successful scale-down and cluster deletion
 
 The PVCs (Persisteng Volume Claims) of the Redis nodes not only holds its data, but also its configuration, including its knowledge about the other nodes in the cluster. While this is an expected behaviour for persistent clusters, it creates issues especially in development environments where people tend to delete and create clusters and scale up and down frequently.

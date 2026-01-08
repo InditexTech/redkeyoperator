@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2024 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Key purge (purgeKeysOnRebalance)
 
 When using Redkey Cluster as a cache (`ephemeral` parameter set to **true**), we have the option to tell the Operator whether we want to keep the keys when performing scaling or upgrade operations, or whether we want to discard them.

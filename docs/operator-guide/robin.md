@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2024 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Redkey Cluster Robin
 
 The Redkey Cluster CRD provides the field `spec.robin` to deploy the Redkey Cluster Robin, a faithful partner who assists the operator in the dangerous Gotham.
