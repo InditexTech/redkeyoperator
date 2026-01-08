@@ -1,90 +1,68 @@
-# Contributing to Redkey Operator
+<!--
+SPDX-FileCopyrightText: 2024 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
 
-Thank you for considering contributing to Redkey Operator. We appreciate your interest in helping improve this project.
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
 
-Whether you are fixing bugs, adding features, or improving documentation, your contributions are welcome. By following this guide, you'll help ensure that your contributions are accepted and make the process easier for everyone.
+# Contributing
 
-## How to Contribute
+Thank you for your interest in contributing to this project! We value and appreciate any contributions you can make. To maintain a collaborative and respectful environment, please consider the following guidelines when contributing to this project.
 
-### 1. Create a Descriptive Issue
+## Commit and Pull Request Signature Requirements
 
-Open an issue using the provided templates:
+When you open a Pull Request (PR), you must ensure that:
 
-- Bug report: use this template to report a bug. The issue must contain:
-  - A detailed description of the problem
-  - The expected behaviour
-  - The proposed technical solution
-- Feature request: suggest an idea/feature for this project. The issue must contain:
-  - Feature motivation
-  - Analysis of current status
-  - The proposed technical solution
+1. **Contributor License Agreement (CLA):**
+   - You are agreeing to the terms of the CLA by submitting your PR. The CLA document is available [here](./CLA.md).
 
-Once created, the project maintainers will review the issue and discuss the proposed solution. When the proposed solution is accepted, the developer can continue with the next step.
+2. **Sign Off Each Commit:**
+   - Every commit in your PR must include the `Signed-off-by` line in the commit message. This is done by using the `-s` option with `git commit`:
 
+     ```sh
+     git commit -s -m "Your commit message"
+     ```
 
-### 2. Fork the Repository
+   - This line certifies your agreement to the CLA for each contribution. For more details, see the [git commit documentation](https://git-scm.com/docs/git-commit#Documentation/git-commit.txt--s).
 
-Begin by forking the repository. This will create a copy of the project in your GitHub account, which you can work on freely.
+3. **GPG-Sign All Commits:**
+   - All commits must be signed with a valid and verified GPG signature.
+   - The signature must be verified by GitHub and use a verified email address associated with your GitHub account.
+   - For instructions on setting up GPG signing, refer to:
+     - [GitHub: About commit signature verification](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification)
+     - [Git Book: Signing Your Work](https://git-scm.com/book/en/v2/Git-Tools-Signing-Your-Work)
+   - *Tip:* After configuring your client to sign commits, it is advisable to activate signing by default in your local repository:
 
-### 3. Clone Your Fork
+     ```sh
+     git config --local commit.gpgsign true
+     ```
 
-Clone your fork to your local machine to work on it:
+   > This ensures all your commits are signed automatically.
 
-```bash
-git clone https://github.com/your-username/[project-name].git
-cd [project-name]
-```
+## Pull Request Validation Process
 
-### 4. Create a Branch
+When you open a PR:
 
-Create a new branch for the changes you want to make:
+- An automated comment will confirm that your commit signatures are valid and provide a link to the CLA document you are signing.
+- If there are any errors (missing sign-off, invalid GPG signature, or unverified email), the comment will include details about the issue.
 
-```bash
-git checkout -b your-branch-name
-```
+Please ensure all requirements are met before submitting your PR to avoid delays in the review process.
 
-The name of the branch must be associated with the issue of the change, following the pattern:
+## Code of Conduct and Technical Guidelines
 
-```
-<issue type>/GH-<issue number>-<description>
-```
+All contributions must adhere to the following:
 
-where:
+1. **Code of Conduct:**
+   - All contributors are expected to follow the project's [Code of Conduct](./CODE_OF_CONDUCT.md). Please be respectful and considerate towards other contributors.
 
-- `<issue type>` is `bugfix` for a Bug report or `feature` for a Feature request.
-- `<issue number>` is the issue number.
-- `<description>` is a brief description (one or two words) of the issue.  
+2. **Technical Guidelines:**
+   - Contributions must follow the technical guidelines specified in each repository. Please review the repository-specific documentation before starting work.
 
+### General Contribution Guidelines
 
-### 5. Make and Commit Your Changes
-
-Make the necessary changes to the codebase, documentation, or any other aspect of the project. Be sure to:
-
-- Write clear, concise commit messages.
-- Follow the coding style and standards of the project.
-- Use [conventional commits](https://www.conventionalcommits.org/).
-- Ensure that your changes are well-documented and tested (if applicable).
-
-
-### 6. Push Your Changes
-
-Push your branch to your forked repository on GitHub:
-
-```bash
-git push origin your-branch-name
-```
-
-### 7. Create a Pull Request
-Go to the original repository where you want to contribute and create a pull request (PR) from your branch. Be sure to include:
-
-- A clear description of what your PR does.
-- A link to any related issues or discussions.
-
-We’ll review your PR and provide feedback. If everything looks good, we will merge it!
-
-
-## Running tests
-
-Redkey Operator has both unit and behavioral (End To End) tests. Please refer to the [operator guide](./docs/operator-guide/toc.md), [developer guide](./docs/developer-guide.md) 
-and [test guide](./test/README.md) for more information
-
+- Before starting work on a new feature or fix, check existing issues and pull requests to avoid duplications and unnecessary discussions.
+- If you wish to work on an existing issue, comment on the issue to inform other contributors that you are working on it. This will help coordinate efforts and prevent conflicts.
+- Discuss and gather feedback from the community before making significant changes to the project's structure or architecture.
+- Ensure a clean and organized commit history. Divide your changes into logical and descriptive commits. We recommend using the [Conventional Commits Specification](https://www.conventionalcommits.org/en/v1.0.0/).
+- Document any new changes or features you add. This will help other contributors and project users understand your work and its purpose.
+- Be sure to link the corresponding issue in your pull request to maintain proper tracking of contributions.
+- Remember to add license and copyright information following the [REUSE Specification](https://reuse.software/spec/#copyright-and-licensing-information).

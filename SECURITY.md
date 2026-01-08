@@ -1,35 +1,20 @@
-# Security Policy
+# Security
 
-## Reporting a Vulnerability
+We at Inditex believe that responsible disclosure of security vulnerabilities helps us ensure the security and privacy
+of all opensource community.
 
-If you discover a security vulnerability in this project, please report it to us responsibly. We take security seriously and appreciate your help in keeping this project safe.
+If you believe you have found a security vulnerability in any Inditex repository that meets Inditex definition of a
+security vulnerability, please report it to us as described below. We appreciate the hard work maintainers put into
+fixing vulnerabilities and understand that sometimes more time is required to properly address an issue.
 
-Please **do not** disclose the vulnerability publicly until we have had a chance to investigate and address it. 
+## Reporting security issues
 
-To report a vulnerability, please use our [disclosure submission program](https://vdp.inditex.com).
+> [!CAUTION]
+> Do not file public issues on GitHub for security vulnerabilities
 
-## Security Updates
-
-We are committed to fixing any security vulnerabilities discovered in the project. Once a report is received, we will:
-
-1. Acknowledge the report within 48 hours.
-2. Work to resolve the issue and release an appropriate patch.
-3. Publicly disclose the details of the fix once it is available, while following responsible disclosure practices.
-
-We recommend that all users keep their project dependencies up to date to minimize the risk of vulnerabilities.
-
-## Security Best Practices
-
-We recommend that contributors follow these security best practices when developing, reviewing, or maintaining the project:
-
-- Avoid exposing sensitive data in code or logs (e.g., passwords, tokens, and API keys).
-- Use strong encryption algorithms and libraries for handling sensitive data.
-- Regularly update dependencies to ensure that known vulnerabilities are patched.
-- Follow established security practices in the relevant technology stack.
-- Review and audit code changes with an emphasis on security.
-- Avoid using unsafe or deprecated functions and libraries.
-  
-## Code of Conduct Compliance
-
-As part of the responsibility for maintaining a secure environment, we ask that all contributors adhere to the project's Code of Conduct, ensuring that contributions do not introduce security risks or malicious behavior into the project.
-
+* Let us know by submitting the finding through our [disclosure submission program](https://vdp.inditex.com) as soon as possible, upon discovery of a potential security issue.
+* Once we've assessed your report, we will create a GitHub "security advisory", which will allow the reporter and Inditex team to work on the issue in a confidential manner. We will invite you as a collaborator to the advisory and any needed trusted persons.
+* That "security advisory" will also allow us to have a temporary private fork, to work on the fix in confidentiality.
+* Once a fix is ready, we will include the fix in our next release and mark that release as a security release.
+* Details on the issue will be embargoed for 30 days to give users an oppurtunity to upgrade, after which we will coordinate disclosure with the researcher(s).
+* If you've contributed the fix, you will be credited for it.
