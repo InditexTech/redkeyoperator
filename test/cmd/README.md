@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 INDUSTRIA DE DISEÑO TEXTIL, S.A. (INDITEX, S.A.)
+#
+# SPDX-License-Identifier: Apache-2.0
+
 # Funtional Test for Kubernetes and Openshift Redkey Operator
 
 ## Purpose
