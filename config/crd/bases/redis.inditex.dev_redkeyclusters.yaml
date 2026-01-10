@@ -7761,6 +7761,8 @@ spec:
               rule: self.ephemeral || has(self.storage)
             - message: Ephemeral and storage cannot be combined
               rule: '!(self.ephemeral && has(self.storage))'
+            - message: Cannot set purgeKeysOnRebalance to true for non-ephemeral clusters
+              rule: '!(!self.ephemeral && self.purgeKeysOnRebalance == true)'
           status:
             properties:
               conditions:
