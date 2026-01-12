@@ -161,6 +161,7 @@ func (redkeyCluster RedkeyCluster) GetLabels() map[string]string {
 // RedkeyClusterSpec defines the desired state of RedkeyCluster.
 // +kubebuilder:validation:XValidation:rule="self.ephemeral || has(self.storage)", message="Ephemeral or storage must be set"
 // +kubebuilder:validation:XValidation:rule="!(self.ephemeral && has(self.storage))", message="Ephemeral and storage cannot be combined"
+// +kubebuilder:validation:XValidation:rule="!(!self.ephemeral && self.purgeKeysOnRebalance == true)", message="Cannot set purgeKeysOnRebalance to true for non-ephemeral clusters"
 type RedkeyClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	// RedisAuth
