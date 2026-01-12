@@ -140,7 +140,7 @@ func newOperatorContainer(ns string) corev1.Container {
 		Command:         []string{"/manager"},
 		Args:            []string{"--leader-elect", "--max-concurrent-reconciles", "10"},
 		Env:             []corev1.EnvVar{{Name: "WATCH_NAMESPACE", Value: ns}},
-		ImagePullPolicy: corev1.PullIfNotPresent,
+		ImagePullPolicy: corev1.PullAlways,
 		SecurityContext: &corev1.SecurityContext{AllowPrivilegeEscalation: ptr.To(false)},
 		Resources: corev1.ResourceRequirements{
 			Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("500m"), corev1.ResourceMemory: resource.MustParse("500Mi")},

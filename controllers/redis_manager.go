@@ -820,10 +820,18 @@ func (r *RedkeyClusterReconciler) doFastScaling(ctx context.Context, redkeyClust
 			return true, err
 		}
 
+		err = robin.SetAndPersistRobinStatus(ctx, r.Client, redkeyCluster, redkeyv1.RobinStatusScalingUp)
+		if err != nil {
+			r.logError(redkeyCluster.NamespacedName(), err, "Error updating/persisting Robin status", "status", redkeyv1.RobinStatusScalingUp)
+			return true, err
+		}
+
 		return true, nil
 	case redkeyv1.SubstatusEndingFastScaling:
 		// Rebuilding the cluster after recreating all node pods. Check if the cluster is ready to end the Fast scaling.
 		logger := r.getHelperLogger(redkeyCluster.NamespacedName())
+
+		r.logInfo(redkeyCluster.NamespacedName(), "Finishing fast scaling")
 		robin, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
 		if err != nil {
 			r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin to check its readiness")

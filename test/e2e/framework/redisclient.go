@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	// . "github.com/onsi/ginkgo/v2"
+
 	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
 	"github.com/inditextech/redkeyoperator/internal/redis"
 	appsv1 "k8s.io/api/apps/v1"
@@ -192,7 +194,7 @@ func EnsureClusterExistsOrCreate(
 						{
 							Name:            "robin",
 							Image:           robinImage,
-							ImagePullPolicy: corev1.PullIfNotPresent,
+							ImagePullPolicy: corev1.PullAlways,
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: 8080,
@@ -438,10 +440,11 @@ func WaitForReadyWithTrace(
 					return nil, trace, err
 				}
 
-				for _, c := range rc.Status.Conditions {
-					// Check conditions just in case polling is too fast
-					trace = append(trace, c.Type)
-				}
+				// for _, c := range rc.Status.Conditions {
+				// 	fmt.Fprintf(GinkgoWriter, "WAIT CONTIDTION for %s: %v\n", key.Name, c)
+				// 	// Check conditions just in case polling is too fast
+				// 	// trace = append(trace, c.Type)
+				// }
 
 				trace = append(trace, rc.Status.Status)
 				return rc.DeepCopy(), trace, nil

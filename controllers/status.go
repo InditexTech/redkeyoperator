@@ -58,7 +58,7 @@ func (r *RedkeyClusterReconciler) updateClusterStatus(ctx context.Context, redke
 		// Update Robin status
 		// Do not update if we are switching to Initializing status because Robin needs some
 		// time to be ready to accept API requests.
-		if redkeyCluster.Status.Status != redkeyv1.StatusInitializing {
+		if redkeyCluster.Status.Status != redkeyv1.StatusInitializing && redkeyCluster.Spec.Primaries > 0 {
 			logger := r.getHelperLogger(redkeyCluster.NamespacedName())
 			robin, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
 			if err != nil {

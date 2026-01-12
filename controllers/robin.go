@@ -84,6 +84,7 @@ func (r *RedkeyClusterReconciler) handleRobinConfig(ctx context.Context, req ctr
 	}
 
 	// Robin configmap changed: update configmap
+	r.logInfo(req.NamespacedName, "Detected robin configmap change")
 
 	// Serialize robin configuration to YAML
 	configYAML, err := yaml.Marshal(declaredConfig)
