@@ -140,6 +140,12 @@ func (r *RedkeyClusterReconciler) handleRobinDeployment(ctx context.Context, req
 		replicas := int32(1)
 		deployment.Spec.Replicas = &replicas
 		changed = true
+
+		// Update replicas in robin configuration
+		err = robin.PersistRobinReplicas(ctx, r.Client, redkeyCluster, int(redkeyCluster.Spec.Primaries), int(redkeyCluster.Spec.ReplicasPerPrimary))
+		if err != nil {
+			r.logError(redkeyCluster.NamespacedName(), err, "Error persisting Robin primaries/replicasPerPrimary")
+		}
 	}
 
 	if !changed {
