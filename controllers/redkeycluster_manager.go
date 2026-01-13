@@ -419,7 +419,6 @@ func (r *RedkeyClusterReconciler) refreshClusterNodesInfo(ctx context.Context, r
 		return err
 	}
 	clusterNodes, err := robin.GetClusterNodes()
-	r.logInfo(redkeyCluster.NamespacedName(), "Cluster nodes retrieved from Robin", "nodes", clusterNodes)
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error getting cluster nodes from Robin")
 		return err

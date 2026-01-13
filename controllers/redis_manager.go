@@ -1007,10 +1007,10 @@ func (r *RedkeyClusterReconciler) scaleDownCluster(ctx context.Context, redkeyCl
 	existingPrimaryNodes := len(clusterNodes.GetPrimaryNodes())
 	existingReplicaNodes := len(clusterNodes.GetReplicaNodes())
 	expectedPrimaryNodes := int(redkeyCluster.Spec.Primaries)
-	expectedRelicaNodes := int(redkeyCluster.Spec.Primaries * redkeyCluster.Spec.ReplicasPerPrimary)
-	if existingPrimaryNodes != expectedPrimaryNodes || existingReplicaNodes != expectedRelicaNodes {
-		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for Robin to scale the cluster", "expected primary nodes", expectedPrimaryNodes,
-			"existing primary nodes", existingPrimaryNodes, "expected replica nodes", expectedRelicaNodes,
+	expectedReplicaNodes := int(redkeyCluster.Spec.Primaries * redkeyCluster.Spec.ReplicasPerPrimary)
+	if existingPrimaryNodes != expectedPrimaryNodes || existingReplicaNodes != expectedReplicaNodes {
+		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for Robin to scale the cluster", "expecte primary nodes", expectedPrimaryNodes,
+			"existing primary nodes", existingPrimaryNodes, "expected replica nodes", expectedReplicaNodes,
 			"existing replica nodes", existingReplicaNodes)
 		return true, nil // Requeue
 	}

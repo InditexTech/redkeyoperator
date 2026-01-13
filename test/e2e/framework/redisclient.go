@@ -559,8 +559,8 @@ func createAndInsertDataIntoCluster(pods *corev1.PodList) error {
 	}
 
 	for i := 0; i < EXPECTEDKEYS; i++ {
-		key := fmt.Sprintf("%v-%v", randomValue(), randomValue())
-		value := fmt.Sprintf("%v-%v", randomValue(), randomValue())
+		key := fmt.Sprintf("%v-%v", i, randomValue())
+		value := fmt.Sprintf("%v-%v", i, randomValue())
 		cmd = fmt.Sprintf("redis-cli -c set %v %v", key, value)
 		_, _, err := remoteCommand(pod.Namespace, pod.Name, cmd)
 		if err != nil {
