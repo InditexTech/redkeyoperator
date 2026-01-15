@@ -779,7 +779,7 @@ func ValidateRedkeyClusterPrimaryReplica(
 
 func InsertDataIntoCluster(ctx context.Context, k8sClient client.Client, nsName types.NamespacedName, redkeyCluster *redkeyv1.RedkeyCluster) (bool, error) {
 	selectedPods := &corev1.PodList{}
-	// Wait for ready status of redis-cluster
+	// Wait for ready status of redkey-cluster
 	_, err := WaitForReady(ctx, k8sClient, nsName)
 	if err != nil {
 		return false, err

@@ -67,7 +67,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 
 	BeforeEach(func() {
 		var err error
-		namespace, err = framework.CreateNamespace(ctx, k8sClient, fmt.Sprintf("redis-e2e-%d", GinkgoParallelProcess()))
+		namespace, err = framework.CreateNamespace(ctx, k8sClient, fmt.Sprintf("redkey-e2e-%d", GinkgoParallelProcess()))
 		if err != nil {
 			fmt.Fprintf(GinkgoWriter, "Error creating namespace: %e", err)
 		}
@@ -84,7 +84,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 		It("deploys and becomes healthy", func() {
 			dep := &appsv1.Deployment{}
 			Eventually(func() bool {
-				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace.Name, Name: "redis-operator"}, dep)
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace.Name, Name: "redkey-operator"}, dep)
 				return err == nil && dep.Status.AvailableReplicas >= 1
 			}, defaultWait*2, defaultPoll).Should(BeTrue())
 		})
@@ -882,7 +882,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 		const base = "heal" // prefix for all clusters
 
 		scaleOperator := func(replicas int32) {
-			depKey := types.NamespacedName{Namespace: namespace.Name, Name: "redis-operator"}
+			depKey := types.NamespacedName{Namespace: namespace.Name, Name: "redkey-operator"}
 			dep := &appsv1.Deployment{}
 			Expect(k8sClient.Get(ctx, depKey, dep)).To(Succeed())
 
