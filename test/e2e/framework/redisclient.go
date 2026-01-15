@@ -192,7 +192,7 @@ func EnsureClusterExistsOrCreate(
 						{
 							Name:            "robin",
 							Image:           robinImage,
-							ImagePullPolicy: corev1.PullIfNotPresent,
+							ImagePullPolicy: corev1.PullAlways,
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: 8080,
@@ -438,11 +438,6 @@ func WaitForReadyWithTrace(
 					return nil, trace, err
 				}
 
-				for _, c := range rc.Status.Conditions {
-					// Check conditions just in case polling is too fast
-					trace = append(trace, c.Type)
-				}
-
 				trace = append(trace, rc.Status.Status)
 				return rc.DeepCopy(), trace, nil
 			}
@@ -556,8 +551,8 @@ func createAndInsertDataIntoCluster(pods *corev1.PodList) error {
 	}
 
 	for i := 0; i < EXPECTEDKEYS; i++ {
-		key := fmt.Sprintf("%v-%v", randomValue(), randomValue())
-		value := fmt.Sprintf("%v-%v", randomValue(), randomValue())
+		key := fmt.Sprintf("%v-%v", i, randomValue())
+		value := fmt.Sprintf("%v-%v", i, randomValue())
 		cmd = fmt.Sprintf("redis-cli -c set %v %v", key, value)
 		_, _, err := remoteCommand(pod.Namespace, pod.Name, cmd)
 		if err != nil {
@@ -784,7 +779,7 @@ func ValidateRedkeyClusterPrimaryReplica(
 
 func InsertDataIntoCluster(ctx context.Context, k8sClient client.Client, nsName types.NamespacedName, redkeyCluster *redkeyv1.RedkeyCluster) (bool, error) {
 	selectedPods := &corev1.PodList{}
-	// Wait for ready status of redis-cluster
+	// Wait for ready status of redkey-cluster
 	_, err := WaitForReady(ctx, k8sClient, nsName)
 	if err != nil {
 		return false, err

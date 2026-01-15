@@ -8,20 +8,20 @@ metadata:
   annotations:
     amiga-admin: ""
     paas-details: |
-      {"workloads":[{"kind":"StatefulSet", "name":"redis-cluster-test"}]}
+      {"workloads":[{"kind":"StatefulSet", "name":"redkey-cluster-test"}]}
     technology: redis_7.4.0
     nodes-extra-annotations: |
       {"log-format": "lineformat"}
     nodes-extra-labels: |
       {"log-scrape": "true"}
   labels:
-    app: redis-cluster-test
+    app: redkey-cluster-test
     slot: test
     technology: redis_7.4.0
     version: 7.4.0
-    redkey-cluster-name: redis-cluster-test
+    redkey-cluster-name: redkey-cluster-test
     redis.redkeycluster.operator/component: redis
-  name: redis-cluster-test
+  name: redkey-cluster-test
 spec:
   config: |
     save ""
@@ -32,7 +32,7 @@ spec:
   image: redis/redis-stack-server:7.4.0-v3
   labels:
     application: redis-app
-    deployment: redis-cluster-test
+    deployment: redkey-cluster-test
     slot: test
     technology: redis_7.4.0
     version: 7.4.0

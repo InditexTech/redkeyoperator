@@ -5,7 +5,7 @@
 #!/bin/bash
 
 # Global variable for cluster name
-REDIS_CLUSTER_NAME="redis-cluster-test"
+REDIS_CLUSTER_NAME="redkey-cluster-test"
 
 # Function: Print usage information and exit
 function usage() {
@@ -357,7 +357,7 @@ function operator_process_scale {
 
     local namespace="$1"
     local replicas="$2"
-    local operator="redis-operator"
+    local operator="redkey-operator"
 
     # Ensure replicas is either 0 or 1
     if [[ "$replicas" -ne 0 && "$replicas" -ne 1 ]]; then
@@ -374,13 +374,13 @@ function operator_process_scale {
 
     if [[ "$replicas" -eq 0 ]]; then
         # Wait for the operator to scale down
-        if ! kubectl wait --for=delete --timeout=5m pod -l control-plane=redis-operator -n "$namespace"; then
+        if ! kubectl wait --for=delete --timeout=5m pod -l control-plane=redkey-operator -n "$namespace"; then
             echo "Failed to wait for operator pod deletion in namespace '$namespace'." >&2
             return 1
         fi
     else 
         # Wait for the operator to scale up
-        if ! kubectl wait --for=condition=ready --timeout=5m pod -l control-plane=redis-operator -n "$namespace"; then
+        if ! kubectl wait --for=condition=ready --timeout=5m pod -l control-plane=redkey-operator -n "$namespace"; then
             echo "Failed to wait for operator pod readiness in namespace '$namespace'." >&2
             return 1
         fi

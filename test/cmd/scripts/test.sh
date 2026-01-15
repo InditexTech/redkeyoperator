@@ -9,7 +9,7 @@ set -o nounset
 set -o pipefail
 
 REPLICAS="${1:-10}"
-REDIS_CLUSTER_NAME="${2:-redis-cluster-test}"
+REDIS_CLUSTER_NAME="${2:-redkey-cluster-test}"
 MINUTES="${3:-10}"
 LOCAL="${4:-false}"
 
@@ -55,16 +55,16 @@ for TEST_FILE in "${TEST_FILES[@]}"; do
     echo "[TEST: $TEST_FILE] Applying operator manifests in $NAMESPACE"
     kubectl apply -f "$OPERATOR_MANIFEST_DIR" -n "$NAMESPACE"
 
-    echo "[TEST: $TEST_FILE] Waiting for redis-operator pod"
-    kubectl wait --for=condition=ready --timeout=5m pod -l control-plane=redis-operator -n "$NAMESPACE"
+    echo "[TEST: $TEST_FILE] Waiting for redkey-operator pod"
+    kubectl wait --for=condition=ready --timeout=5m pod -l control-plane=redkey-operator -n "$NAMESPACE"
 
     echo "[TEST: $TEST_FILE] Running test script (logging to $TEST_LOG_FILE)"
     if "$TEST_SCRIPT_DIR/$TEST_FILE" "$REPLICAS" "$NAMESPACE" "$REDIS_CLUSTER_NAME" "$LOCAL" "$MINUTES" 2>&1 | tee "$TEST_LOG_FILE"; then
       echo "[TEST: $TEST_FILE] ✅ SUCCESS"
     else
       echo "[TEST: $TEST_FILE] ❌ FAILED"
-      echo "[TEST: $TEST_FILE] Capturing redis-operator logs"
-      kubectl logs deployment/redis-operator -n "$NAMESPACE" > "$LOG_DIR/operator-$NAMESPACE.log" 2>&1
+      echo "[TEST: $TEST_FILE] Capturing redkey-operator logs"
+      kubectl logs deployment/redkey-operator -n "$NAMESPACE" > "$LOG_DIR/operator-$NAMESPACE.log" 2>&1
     fi
 
     echo "[TEST: $TEST_FILE] Deleting namespace $NAMESPACE"

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /*
-  Test that imitates a redis-cluster that was causing rebalancing errors:
+  Test that imitates a redkey-cluster that was causing rebalancing errors:
   - Value Size: 1Byte - 300KBytes
   - Timeout: 30s
   - Some deletes
