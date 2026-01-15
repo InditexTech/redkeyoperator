@@ -420,13 +420,6 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeUpgrading(ctx context.Context, re
 		return err
 	}
 
-	// Reset node
-	err = redkeyRobin.ClusterResetNode(currentPartition)
-	if err != nil {
-		r.logError(redkeyCluster.NamespacedName(), err, "Error from Robin forgeting the node", "node index", currentPartition)
-		return err
-	}
-
 	err = r.updateClusterSubStatus(ctx, redkeyCluster, redkeyv1.SubstatusRollingConfig, strconv.Itoa(currentPartition))
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error updating substatus")
@@ -460,6 +453,20 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeRollingUpdate(ctx context.Context
 		return err
 	}
 
+	// Get the current partition
+	currentPartition, err := strconv.Atoi(redkeyCluster.Status.Substatus.UpgradingPartition)
+	if err != nil {
+		r.logError(redkeyCluster.NamespacedName(), err, "Error getting Upgrading Partition from RedkeyCluster object")
+		return err
+	}
+
+	// Reset node
+	err = redkeyRobin.ClusterResetNode(currentPartition)
+	if err != nil {
+		r.logError(redkeyCluster.NamespacedName(), err, "Error from Robin forgeting the node", "node index", currentPartition)
+		return err
+	}
+
 	// Check all cluster nodes are ready from Robin.
 	clusterNodes, err := redkeyRobin.GetClusterNodes()
 	if err != nil {
@@ -480,23 +487,6 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeRollingUpdate(ctx context.Context
 	if !check {
 		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for cluster readiness", "errors", errors, "warnings", warnings)
 		return nil // Cluster not ready --> keep waiting
-	}
-
-	// Get the current partition and update Upgrading Partition in RedkeyCluster Status if starting iterating over partitions.
-	var currentPartition int
-	if redkeyCluster.Status.Substatus.UpgradingPartition == "" {
-		currentPartition = int(*(existingStatefulSet.Spec.Replicas)) - 1
-		err := r.updateClusterSubStatus(ctx, redkeyCluster, redkeyv1.SubstatusSlowUpgrading, strconv.Itoa(currentPartition))
-		if err != nil {
-			r.logError(redkeyCluster.NamespacedName(), err, "Error updating substatus")
-			return err
-		}
-	} else {
-		currentPartition, err = strconv.Atoi(redkeyCluster.Status.Substatus.UpgradingPartition)
-		if err != nil {
-			r.logError(redkeyCluster.NamespacedName(), err, "Error getting Upgrading Partition from RedkeyCluster object")
-			return err
-		}
 	}
 
 	// If first partition reached, we can move to the next step.
