@@ -405,7 +405,7 @@ func doSimpleGet(url string) ([]byte, error) {
 
 func doPut(url string, payload []byte) ([]byte, error) {
 	client := &http.Client{
-		Timeout: time.Second * 10,
+		Timeout: time.Second * 20,
 	}
 
 	req, err := http.NewRequest(http.MethodPut, url, bytes.NewBuffer(payload))
