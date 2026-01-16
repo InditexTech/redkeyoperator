@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2024 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Primary-Replica Clusters
 
 Starting with the release 0.2.34, Redkey Operator supports primary-replica architecture of Redkey Cluster. This architecture increases resiliency of Redkey clusters as each primary has one or more replicas and in case of a primary goes down, its replica (or one of its replicas) can take over the role of its primary and continue to serve without a downtime and data loss in practice. Theoretically, there will be a small downtime and a possibility of a data loss if a data on a primary gets updated and primary go down before the data change propagate to its replicas but these are negligible.

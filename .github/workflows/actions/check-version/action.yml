@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
+# SPDX-License-Identifier: Apache-2.0
+
 name: Check if new version is greater than last repository released version
 
 inputs:

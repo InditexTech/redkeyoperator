@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2025 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
+# SPDX-License-Identifier: Apache-2.0
 # Warns and then closes issues and PRs that have had no activity for a specified amount of time.
 name: Close stale issues
 

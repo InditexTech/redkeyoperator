@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2024 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Operator Guide - Table of Contents
 
 * [Operator deployment](operator-deployment.md)

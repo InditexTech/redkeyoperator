@@ -1,15 +1,21 @@
-This closes #
+<!--
+SPDX-FileCopyrightText: 2025 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
 
-## Summary Of Changes
+SPDX-License-Identifier: Apache-2.0
+-->
 
-## Additional Context
+## Summary
 
-## Local Testing
+Briefly describe the purpose of this PR and what changes it introduces.
 
-Please ensure you run the unit and integration tests before approving the PR.
+## Checklist
 
-To run the unit and integration tests:
+- [ ] Commits are **signed** (`git commit -S`)
+- [ ] Commit messages follow **Conventional Commits**
+- [ ] Documentation has been updated (if needed)
+- [ ] I have read and agree to the project’s [Code of Conduct](../CODE_OF_CONDUCT.md)
+- [ ] I have signed the [Contributor License Agreement (CLA)](../CONTRIBUTING.md)
 
-```
-$ make test-cov test-e2e-cov
-```
+## Additional context
+
+Add any screenshots, test output, or notes for reviewers here.

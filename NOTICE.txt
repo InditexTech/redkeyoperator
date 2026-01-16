@@ -1,8 +1,8 @@
 Redkey Operator
 
-©2025 Inditex. All Rights Reserved. See LICENSE.txt for license information.
+SPDX-FileCopyrightText: 2025 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
+SPDX-License-Identifier: Apache-2.0
 
-NOTICES:
 --------
 
 This document includes a list of open source components used in Redkey Operator, including those that have been modified.

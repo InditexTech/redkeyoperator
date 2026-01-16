@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2024 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
 ![Redkey Operator icon](docs/images/redkey-logo-50.png)
 # Redkey Operator for Kubernetes
 

@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2024 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
 # Support
 
 Welcome to the support section of our open-source project! We’re excited to have you involved and want to ensure you have the best possible experience while using or contributing to this project.

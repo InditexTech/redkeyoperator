@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2024 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Profiling Guide
 
 The **Redkey Operator** must manage the Redkey Clusters the *most efficient way possible*. **Standard Go profiling tools** are used to analyze resource usage to help debugging high resources consumption problems and optimizing.
