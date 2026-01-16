@@ -231,6 +231,11 @@ func (r *RedkeyClusterReconciler) overrideRobinDeployment(req ctrl.Request, redk
 
 func (r *RedkeyClusterReconciler) createRobinDeployment(req ctrl.Request, redkeyCluster *redkeyv1.RedkeyCluster, labels map[string]string) *v1.Deployment {
 	var replicas = int32(1)
+	// Create deployment with 0 replicas if the cluster has 0 primaries
+	// to avoid pod errors due to missing redis nodes.
+	if redkeyCluster.Spec.Primaries == 0 {
+		replicas = 0
+	}
 	d := &v1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      req.Name + "-robin",
