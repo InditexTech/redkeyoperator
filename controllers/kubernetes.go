@@ -52,7 +52,7 @@ func (r *RedkeyClusterReconciler) checkAndCreateK8sObjects(ctx context.Context, 
 	immediateRequeue = immediateRequeue || immediateRequeueT
 
 	// Robin deployment check
-	immediateRequeueT, err = r.checkAndCreateRobin(ctx, req, redkeyCluster)
+	immediateRequeueT, _ = r.checkAndCreateRobin(ctx, req, redkeyCluster)
 	immediateRequeue = immediateRequeue || immediateRequeueT
 
 	// Service check
