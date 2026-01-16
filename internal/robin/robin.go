@@ -386,7 +386,11 @@ func (r *Robin) GetClusterStatus() (string, error) {
 }
 
 func doSimpleGet(url string) ([]byte, error) {
-	resp, err := http.Get(url)
+	client := &http.Client{
+		Timeout: time.Second * 10,
+	}
+
+	resp, err := client.Get(url)
 	if err != nil {
 		return nil, err
 	}
@@ -400,7 +404,9 @@ func doSimpleGet(url string) ([]byte, error) {
 }
 
 func doPut(url string, payload []byte) ([]byte, error) {
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: time.Second * 20,
+	}
 
 	req, err := http.NewRequest(http.MethodPut, url, bytes.NewBuffer(payload))
 	req.Header.Set("Content-Type", "application/json")
@@ -425,8 +431,15 @@ func doPut(url string, payload []byte) ([]byte, error) {
 func CompareConfigurations(a, b *Configuration) bool {
 	a2 := new(Configuration)
 	*a2 = *a
+
+	// Normalize nil vs empty slice for RedisInfoKeys. This is needed because comparing a nil slice with an empty slice returns false.
+	if len(b.Redis.Metrics.RedisInfoKeys) == 0 {
+		a2.Redis.Metrics.RedisInfoKeys = []string{}
+	}
+
 	a2.Redis.Cluster.Status = b.Redis.Cluster.Status
 	a2.Redis.Cluster.Primaries = b.Redis.Cluster.Primaries
+	a2.Redis.Cluster.ReplicasPerPrimary = b.Redis.Cluster.ReplicasPerPrimary
 	return reflect.DeepEqual(a2, b)
 }
 

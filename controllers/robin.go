@@ -83,7 +83,8 @@ func (r *RedkeyClusterReconciler) handleRobinConfig(ctx context.Context, req ctr
 		return nil // No changes detected, no more to do here
 	}
 
-	// Robin configmap changed: update configmap
+	// Robin config changed: update configmap
+	r.logInfo(req.NamespacedName, "Robin's configuration has changed, updating ConfigMap")
 
 	// Serialize robin configuration to YAML
 	configYAML, err := yaml.Marshal(declaredConfig)
@@ -139,6 +140,12 @@ func (r *RedkeyClusterReconciler) handleRobinDeployment(ctx context.Context, req
 		replicas := int32(1)
 		deployment.Spec.Replicas = &replicas
 		changed = true
+
+		// Update replicas in robin configuration
+		err = robin.PersistRobinReplicas(ctx, r.Client, redkeyCluster, int(redkeyCluster.Spec.Primaries), int(redkeyCluster.Spec.ReplicasPerPrimary))
+		if err != nil {
+			r.logError(redkeyCluster.NamespacedName(), err, "Error persisting Robin primaries/replicasPerPrimary")
+		}
 	}
 
 	if !changed {

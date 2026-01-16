@@ -20,7 +20,7 @@ test=$3
 newRedisCluster=$4
 typeRedisCluster=$5
 
-readonly name="redis-cluster"
+readonly name="redkey-cluster"
 
 #######################################
 # Initialize a new RedkeyCluster validating if exist one installed in the k8 cluster.
@@ -578,13 +578,13 @@ validateLabels() {
     local defaultRedisClusterNameLabel="redkey-cluster-name"
     local defaultRedisClusterOperatorLabel="redis.redkeycluster.operator/component"
     # get RedkeyCluster labels
-    local rkclLabels=$(getLabels "kubectl get rkcl redis-cluster -o custom-columns=':spec.labels' -n $namespace")
+    local rkclLabels=$(getLabels "kubectl get rkcl redkey-cluster -o custom-columns=':spec.labels' -n $namespace")
     # get ConfigMap labels
-    local cmLabels=$(getLabels "kubectl get cm redis-cluster -o custom-columns=':metadata.labels' -n $namespace")
+    local cmLabels=$(getLabels "kubectl get cm redkey-cluster -o custom-columns=':metadata.labels' -n $namespace")
     # get Service labels
-    local svcLabels=$(getLabels "kubectl get svc redis-cluster -o custom-columns=':metadata.labels' -n $namespace")
+    local svcLabels=$(getLabels "kubectl get svc redkey-cluster -o custom-columns=':metadata.labels' -n $namespace")
     # get StateFulSet labels
-    local stsLabels=$(getLabels "kubectl get sts redis-cluster -o custom-columns=':metadata.labels' -n $namespace")
+    local stsLabels=$(getLabels "kubectl get sts redkey-cluster -o custom-columns=':metadata.labels' -n $namespace")
 
     local existLabel=0
     local result=0
@@ -757,14 +757,14 @@ deleteRedisCluster() {
     local resultMessage="INFO:: RedkeyCluster was deleted correctly"
     echo '##########################################'
     echo 'INFO:: getting data and objects to delete in the current cluster'
-    pvcsToDelete=$(kubectl get pvc -l='redkey-cluster-name=redis-cluster' -o custom-columns=':metadata.name' -n $namespace)
+    pvcsToDelete=$(kubectl get pvc -l='redkey-cluster-name=redkey-cluster' -o custom-columns=':metadata.name' -n $namespace)
     rkclPersistent=$(kubectl get rkcl -l='app=redis' -o custom-columns=':metadata.name' -n $namespace)
-    rkclEphemeral=$(kubectl get rkcl -l='tier=redis-cluster' -o custom-columns=':metadata.name' -n $namespace)
+    rkclEphemeral=$(kubectl get rkcl -l='tier=redkey-cluster' -o custom-columns=':metadata.name' -n $namespace)
 
     if [ -z "$rkclPersistent" ] && [ -z "$rkclEphemeral" ]; then
         echo "INFO:: No rkcl to delete."
     else
-        kubectl delete rkcl redis-cluster
+        kubectl delete rkcl redkey-cluster
         result=$?
         if [[ "$result" != "0" ]]; then
             resultMessage="Failure: Script failed"

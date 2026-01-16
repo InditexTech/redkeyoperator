@@ -420,13 +420,6 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeUpgrading(ctx context.Context, re
 		return err
 	}
 
-	// Reset node
-	err = redkeyRobin.ClusterResetNode(currentPartition)
-	if err != nil {
-		r.logError(redkeyCluster.NamespacedName(), err, "Error from Robin forgeting the node", "node index", currentPartition)
-		return err
-	}
-
 	err = r.updateClusterSubStatus(ctx, redkeyCluster, redkeyv1.SubstatusRollingConfig, strconv.Itoa(currentPartition))
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error updating substatus")
@@ -460,6 +453,20 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeRollingUpdate(ctx context.Context
 		return err
 	}
 
+	// Get the current partition
+	currentPartition, err := strconv.Atoi(redkeyCluster.Status.Substatus.UpgradingPartition)
+	if err != nil {
+		r.logError(redkeyCluster.NamespacedName(), err, "Error getting Upgrading Partition from RedkeyCluster object")
+		return err
+	}
+
+	// Reset node
+	err = redkeyRobin.ClusterResetNode(currentPartition)
+	if err != nil {
+		r.logError(redkeyCluster.NamespacedName(), err, "Error from Robin forgeting the node", "node index", currentPartition)
+		return err
+	}
+
 	// Check all cluster nodes are ready from Robin.
 	clusterNodes, err := redkeyRobin.GetClusterNodes()
 	if err != nil {
@@ -480,23 +487,6 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeRollingUpdate(ctx context.Context
 	if !check {
 		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for cluster readiness", "errors", errors, "warnings", warnings)
 		return nil // Cluster not ready --> keep waiting
-	}
-
-	// Get the current partition and update Upgrading Partition in RedkeyCluster Status if starting iterating over partitions.
-	var currentPartition int
-	if redkeyCluster.Status.Substatus.UpgradingPartition == "" {
-		currentPartition = int(*(existingStatefulSet.Spec.Replicas)) - 1
-		err := r.updateClusterSubStatus(ctx, redkeyCluster, redkeyv1.SubstatusSlowUpgrading, strconv.Itoa(currentPartition))
-		if err != nil {
-			r.logError(redkeyCluster.NamespacedName(), err, "Error updating substatus")
-			return err
-		}
-	} else {
-		currentPartition, err = strconv.Atoi(redkeyCluster.Status.Substatus.UpgradingPartition)
-		if err != nil {
-			r.logError(redkeyCluster.NamespacedName(), err, "Error getting Upgrading Partition from RedkeyCluster object")
-			return err
-		}
 	}
 
 	// If first partition reached, we can move to the next step.
@@ -820,10 +810,18 @@ func (r *RedkeyClusterReconciler) doFastScaling(ctx context.Context, redkeyClust
 			return true, err
 		}
 
+		err = robin.SetAndPersistRobinStatus(ctx, r.Client, redkeyCluster, redkeyv1.RobinStatusScalingUp)
+		if err != nil {
+			r.logError(redkeyCluster.NamespacedName(), err, "Error updating/persisting Robin status", "status", redkeyv1.RobinStatusScalingUp)
+			return true, err
+		}
+
 		return true, nil
 	case redkeyv1.SubstatusEndingFastScaling:
 		// Rebuilding the cluster after recreating all node pods. Check if the cluster is ready to end the Fast scaling.
 		logger := r.getHelperLogger(redkeyCluster.NamespacedName())
+
+		r.logInfo(redkeyCluster.NamespacedName(), "Finishing fast scaling")
 		robin, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
 		if err != nil {
 			r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin to check its readiness")
@@ -999,10 +997,10 @@ func (r *RedkeyClusterReconciler) scaleDownCluster(ctx context.Context, redkeyCl
 	existingPrimaryNodes := len(clusterNodes.GetPrimaryNodes())
 	existingReplicaNodes := len(clusterNodes.GetReplicaNodes())
 	expectedPrimaryNodes := int(redkeyCluster.Spec.Primaries)
-	expectedRelicaNodes := int(redkeyCluster.Spec.Primaries * redkeyCluster.Spec.ReplicasPerPrimary)
-	if existingPrimaryNodes != expectedPrimaryNodes || existingReplicaNodes != expectedRelicaNodes {
+	expectedReplicaNodes := int(redkeyCluster.Spec.Primaries * redkeyCluster.Spec.ReplicasPerPrimary)
+	if existingPrimaryNodes != expectedPrimaryNodes || existingReplicaNodes != expectedReplicaNodes {
 		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for Robin to scale the cluster", "expected primary nodes", expectedPrimaryNodes,
-			"existing primary nodes", existingPrimaryNodes, "expected replica nodes", expectedRelicaNodes,
+			"existing primary nodes", existingPrimaryNodes, "expected replica nodes", expectedReplicaNodes,
 			"existing replica nodes", existingReplicaNodes)
 		return true, nil // Requeue
 	}

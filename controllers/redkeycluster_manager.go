@@ -34,7 +34,7 @@ const (
 	UpgradingDefaultTimeout   time.Duration = 30
 	ScalingDefaultTimeout     time.Duration = 30
 	ReadyRequeueTimeout       time.Duration = 30
-	ErrorRequeueTimeout       time.Duration = 30
+	ErrorRequeueTimeout       time.Duration = 5
 	MaintenanceRequeueTimeout time.Duration = 30
 )
 
@@ -89,6 +89,7 @@ func (r *RedkeyClusterReconciler) ReconcileClusterObject(ctx context.Context, re
 		err = r.clusterScaledToZeroPrimaries(ctx, redkeyCluster)
 		if err != nil {
 			r.logError(redkeyCluster.NamespacedName(), err, "Error managing cluster scaled to 0 primaries")
+			return ctrl.Result{RequeueAfter: time.Second * ErrorRequeueTimeout}, err
 		}
 
 		// Requeue to recheck, reconciliation ends here!
