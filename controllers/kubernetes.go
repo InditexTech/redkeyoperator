@@ -25,7 +25,7 @@ import (
 )
 
 func (r *RedkeyClusterReconciler) checkAndCreateK8sObjects(ctx context.Context, req ctrl.Request, redkeyCluster *redkeyv1.RedkeyCluster) (bool, error) {
-	var immediateRequeue bool = false
+	var immediateRequeue, immediateRequeueT bool = false, false
 	var err error = nil
 	var configMap *corev1.ConfigMap
 
@@ -37,23 +37,27 @@ func (r *RedkeyClusterReconciler) checkAndCreateK8sObjects(ctx context.Context, 
 	}
 
 	// ConfigMap check
-	if configMap, immediateRequeue, err = r.checkAndCreateConfigMap(ctx, req, redkeyCluster); err != nil {
-		return immediateRequeue, err
+	if configMap, immediateRequeueT, err = r.checkAndCreateConfigMap(ctx, req, redkeyCluster); err != nil {
+		return immediateRequeueT, err
 	}
+	immediateRequeue = immediateRequeue || immediateRequeueT
 
 	// PodDisruptionBudget check
 	r.checkAndManagePodDisruptionBudget(ctx, req, redkeyCluster)
 
 	// StatefulSet check
-	if immediateRequeue, err = r.checkAndCreateStatefulSet(ctx, req, redkeyCluster, configMap); err != nil {
-		return immediateRequeue, err
+	if immediateRequeueT, err = r.checkAndCreateStatefulSet(ctx, req, redkeyCluster, configMap); err != nil {
+		return immediateRequeueT, err
 	}
+	immediateRequeue = immediateRequeue || immediateRequeueT
 
 	// Robin deployment check
-	r.checkAndCreateRobin(ctx, req, redkeyCluster)
+	immediateRequeueT, err = r.checkAndCreateRobin(ctx, req, redkeyCluster)
+	immediateRequeue = immediateRequeue || immediateRequeueT
 
 	// Service check
-	immediateRequeue, err = r.checkAndCreateService(ctx, req, redkeyCluster)
+	immediateRequeueT, err = r.checkAndCreateService(ctx, req, redkeyCluster)
+	immediateRequeue = immediateRequeue || immediateRequeueT
 
 	return immediateRequeue, err
 }
