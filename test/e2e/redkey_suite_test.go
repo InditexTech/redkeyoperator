@@ -110,10 +110,11 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				Expect(rc.Spec.Primaries).To(Equal(target))
 			},
 
-			Entry("up → 3", SpecTimeout(simpleTestDuration), int32(0), int32(3)),
-			Entry("up → 5", SpecTimeout(simpleTestDuration), int32(3), int32(5)),
-			Entry("down → 3", SpecTimeout(simpleTestDuration), int32(5), int32(3)),
-			Entry("down → 0", SpecTimeout(simpleTestDuration), int32(3), int32(0)),
+			Entry("scale up 0 → 3", SpecTimeout(simpleTestDuration), int32(0), int32(3)),
+			Entry("scale up 3 → 5", SpecTimeout(simpleTestDuration), int32(3), int32(5)),
+			Entry("scale down 5 → 3", SpecTimeout(simpleTestDuration), int32(5), int32(3)),
+			Entry("scale down 3 → 0", SpecTimeout(simpleTestDuration), int32(3), int32(0)),
+			Entry("scale up 0 → 3", SpecTimeout(simpleTestDuration), int32(0), int32(3)),
 		)
 	})
 
