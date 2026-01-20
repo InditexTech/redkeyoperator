@@ -26,7 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (r *RedkeyClusterReconciler) checkAndCreateRobin(ctx context.Context, req ctrl.Request, redkeyCluster *redkeyv1.RedkeyCluster) error {
+func (r *RedkeyClusterReconciler) checkAndCreateRobin(ctx context.Context, req ctrl.Request, redkeyCluster *redkeyv1.RedkeyCluster) (bool, error) {
 	// Populate robin spec if not provided. This to handle the case where the user removes the robin spec of an existing cluster. The robin objects will be deleted.
 	if redkeyCluster.Spec.Robin == nil {
 		redkeyCluster.Spec.Robin = &redkeyv1.RobinSpec{
@@ -37,13 +37,13 @@ func (r *RedkeyClusterReconciler) checkAndCreateRobin(ctx context.Context, req c
 
 	// Robin configmap
 	if err := r.handleRobinConfig(ctx, req, redkeyCluster); err != nil {
-		return err
+		return false, err
 	}
 
 	// Robin deployment
-	r.handleRobinDeployment(ctx, req, redkeyCluster)
+	immediateRequeue := r.handleRobinDeployment(ctx, req, redkeyCluster)
 
-	return nil
+	return immediateRequeue, nil
 }
 
 func (r *RedkeyClusterReconciler) handleRobinConfig(ctx context.Context, req ctrl.Request, redkeyCluster *redkeyv1.RedkeyCluster) error {
@@ -106,14 +106,14 @@ func (r *RedkeyClusterReconciler) handleRobinConfig(ctx context.Context, req ctr
 	return nil
 }
 
-func (r *RedkeyClusterReconciler) handleRobinDeployment(ctx context.Context, req ctrl.Request, redkeyCluster *redkeyv1.RedkeyCluster) {
+func (r *RedkeyClusterReconciler) handleRobinDeployment(ctx context.Context, req ctrl.Request, redkeyCluster *redkeyv1.RedkeyCluster) (immediateRequeue bool) {
 	// Get robin deployment
 	deployment, err := r.FindExistingDeployment(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: redkeyCluster.Name + "-robin", Namespace: redkeyCluster.Namespace}})
 
 	// Robin deployment template not provided: delete deployment if exists
 	if redkeyCluster.Spec.Robin.Template == nil {
 		r.deleteRobinObject(ctx, deployment, redkeyCluster, "deployment")
-		return
+		return false
 	}
 
 	// Robin deployment not found: create deployment
@@ -121,13 +121,13 @@ func (r *RedkeyClusterReconciler) handleRobinDeployment(ctx context.Context, req
 		// Return if the error is not a NotFound error
 		if !errors.IsNotFound(err) {
 			r.logError(redkeyCluster.NamespacedName(), err, "Getting robin deployment failed")
-			return
+			return false
 		}
 
 		// Create Robin Deployment
 		robinDeployment := r.createRobinDeployment(req, redkeyCluster, redkeyCluster.GetLabels())
 		r.createRobinObject(ctx, robinDeployment, redkeyCluster, "deployment")
-		return
+		return false
 	}
 
 	// Robin deployment found: check if it needs to be updated
@@ -149,12 +149,14 @@ func (r *RedkeyClusterReconciler) handleRobinDeployment(ctx context.Context, req
 	}
 
 	if !changed {
-		return
+		return needsScaleUp
 	}
 
 	// Robin deployment changed: update deployment
 	deployment.Spec.Template = patchedPodTemplateSpec
 	r.updateRobinObject(ctx, deployment, redkeyCluster, "deployment")
+
+	return needsScaleUp
 }
 
 func (r *RedkeyClusterReconciler) createRobinObject(ctx context.Context, obj client.Object, redkeyCluster *redkeyv1.RedkeyCluster, kind string) error {
@@ -231,6 +233,11 @@ func (r *RedkeyClusterReconciler) overrideRobinDeployment(req ctrl.Request, redk
 
 func (r *RedkeyClusterReconciler) createRobinDeployment(req ctrl.Request, redkeyCluster *redkeyv1.RedkeyCluster, labels map[string]string) *v1.Deployment {
 	var replicas = int32(1)
+	// Create deployment with 0 replicas if the cluster has 0 primaries
+	// to avoid pod errors due to missing redis nodes.
+	if redkeyCluster.Spec.Primaries == 0 {
+		replicas = 0
+	}
 	d := &v1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      req.Name + "-robin",
