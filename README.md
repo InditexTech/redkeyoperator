@@ -41,8 +41,9 @@ The importance of the [purgeKeysOnRebalance](./docs/purge-keys-on-rebalance.md) 
 
 ## Versions
 
-- Go version: v1.24.6
-- Operator SDK version: v1.37.0
+- Go version (https://github.com/golang/go): v1.25.6
+- Operator SDK version (https://github.com/operator-framework/operator-sdk): v1.42.0
+- Kubernetes Controller Tools version (https://github.com/kubernetes-sigs/controller-tools): v0.20.0
 
 ## License
 

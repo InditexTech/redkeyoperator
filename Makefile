@@ -7,9 +7,14 @@ SHELL := /bin/bash
 
 name           := redkey-cluster-operator
 version        := 1.3.0
-golang_version := 1.24.6
+golang_version := 1.25.6
 delve_version  := 1.25
 package        := github.com/inditextech/$(name)
+
+## Tool Versions
+KUSTOMIZE_VERSION ?= v5.8.0
+CONTROLLER_TOOLS_VERSION ?= v0.20.0
+OPERATOR_SDK_VERSION ?= v1.42.0
 
 # .............................................................................
 # DONT TOUCH THIS SECTION
@@ -96,10 +101,6 @@ IMG_ROBIN ?= localhost:5001/redkey-robin:$(PROFILE_ROBIN)
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
 BUNDLE_IMG ?= controller-bundle:$(version)
-
-# Set the Operator SDK version to use. By default, what is installed on the system is used.
-# This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.
-OPERATOR_SDK_VERSION ?= v1.37.0
 
 CHANNELS ?= alpha,beta
 
@@ -327,10 +328,6 @@ $(LOCALBIN): ## Ensure that the directory exists
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
-
-## Tool Versions
-KUSTOMIZE_VERSION ?= v5.3.0
-CONTROLLER_TOOLS_VERSION ?= v0.17.2
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize
