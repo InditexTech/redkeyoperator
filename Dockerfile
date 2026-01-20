@@ -31,14 +31,15 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -o manager ./c
 
 ### Final stage
 
-# Use Red Hat Universal Base Image 9 Minimal to package the manager binary.
-# Refer to https://www.redhat.com/en/blog/introducing-red-hat-universal-base-image for more details.
-FROM redhat/ubi9-minimal:9.1.0
+# Use a smaller base image for the final stage
+FROM debian:trixie-slim AS final
+
+# Install some useful tools
+RUN apt update && apt upgrade -y && apt install -y curl procps
 
 LABEL org.opencontainers.image.source="https://github.com/inditextech/redkeyoperator"
 
-RUN microdnf update -y && microdnf install procps -y
-
+# Copy the built binary from the builder stage, use a non-root user and set entrypoint
 WORKDIR /
 COPY --from=builder /workspace/manager .
 USER 65532:65532
