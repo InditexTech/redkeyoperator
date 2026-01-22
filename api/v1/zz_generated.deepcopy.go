@@ -460,7 +460,7 @@ func (in *RobinSpec) DeepCopyInto(out *RobinSpec) {
 	*out = *in
 	if in.Template != nil {
 		in, out := &in.Template, &out.Template
-		*out = new(corev1.PodTemplateSpec)
+		*out = new(PartialPodTemplateSpec)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Config != nil {

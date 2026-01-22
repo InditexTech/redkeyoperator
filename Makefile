@@ -269,6 +269,8 @@ deploy: deploy-manager ##		Deploy the manager into the K8s cluster specified by 
 
 undeploy: undeploy-manager ##		Undeploy the manager from the K8s cluster specified by kubectl default context.
 
+redeploy: undeploy-manager deploy-manager ##		Redeploy the manager into the K8s cluster specified by kubectl default context.
+
 deploy-manager: process-manifests ##		Deploy the manager into the K8s cluster specified by kubectl default context.
 	$(info $(M) applying Manager manifests)
 	kubectl apply -f deployment/manager.yaml

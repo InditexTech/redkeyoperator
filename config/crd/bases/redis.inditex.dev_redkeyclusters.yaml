@@ -4112,6 +4112,7 @@ spec:
                     properties:
                       metadata:
                         type: object
+                        x-kubernetes-preserve-unknown-fields: true
                       spec:
                         properties:
                           activeDeadlineSeconds:
@@ -5240,9 +5241,6 @@ spec:
                               - name
                               type: object
                             type: array
-                            x-kubernetes-list-map-keys:
-                            - name
-                            x-kubernetes-list-type: map
                           dnsConfig:
                             properties:
                               nameservers:
@@ -5954,9 +5952,9 @@ spec:
                               - name
                               type: object
                             type: array
-                            x-kubernetes-list-map-keys:
-                            - name
-                            x-kubernetes-list-type: map
+                          fsGroup:
+                            format: int64
+                            type: integer
                           hostAliases:
                             items:
                               properties:
@@ -5971,16 +5969,11 @@ spec:
                               - ip
                               type: object
                             type: array
-                            x-kubernetes-list-map-keys:
-                            - ip
-                            x-kubernetes-list-type: map
                           hostIPC:
                             type: boolean
                           hostNetwork:
                             type: boolean
                           hostPID:
-                            type: boolean
-                          hostUsers:
                             type: boolean
                           hostname:
                             type: string
@@ -5993,9 +5986,6 @@ spec:
                               type: object
                               x-kubernetes-map-type: atomic
                             type: array
-                            x-kubernetes-list-map-keys:
-                            - name
-                            x-kubernetes-list-type: map
                           initContainers:
                             items:
                               properties:
@@ -6678,22 +6668,11 @@ spec:
                               - name
                               type: object
                             type: array
-                            x-kubernetes-list-map-keys:
-                            - name
-                            x-kubernetes-list-type: map
                           nodeName:
                             type: string
                           nodeSelector:
                             additionalProperties:
                               type: string
-                            type: object
-                            x-kubernetes-map-type: atomic
-                          os:
-                            properties:
-                              name:
-                                type: string
-                            required:
-                            - name
                             type: object
                           overhead:
                             additionalProperties:
@@ -6719,74 +6698,12 @@ spec:
                               - conditionType
                               type: object
                             type: array
-                            x-kubernetes-list-type: atomic
-                          resourceClaims:
-                            items:
-                              properties:
-                                name:
-                                  type: string
-                                resourceClaimName:
-                                  type: string
-                                resourceClaimTemplateName:
-                                  type: string
-                              required:
-                              - name
-                              type: object
-                            type: array
-                            x-kubernetes-list-map-keys:
-                            - name
-                            x-kubernetes-list-type: map
-                          resources:
-                            properties:
-                              claims:
-                                items:
-                                  properties:
-                                    name:
-                                      type: string
-                                    request:
-                                      type: string
-                                  required:
-                                  - name
-                                  type: object
-                                type: array
-                                x-kubernetes-list-map-keys:
-                                - name
-                                x-kubernetes-list-type: map
-                              limits:
-                                additionalProperties:
-                                  anyOf:
-                                  - type: integer
-                                  - type: string
-                                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                  x-kubernetes-int-or-string: true
-                                type: object
-                              requests:
-                                additionalProperties:
-                                  anyOf:
-                                  - type: integer
-                                  - type: string
-                                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                  x-kubernetes-int-or-string: true
-                                type: object
-                            type: object
                           restartPolicy:
                             type: string
                           runtimeClassName:
                             type: string
                           schedulerName:
                             type: string
-                          schedulingGates:
-                            items:
-                              properties:
-                                name:
-                                  type: string
-                              required:
-                              - name
-                              type: object
-                            type: array
-                            x-kubernetes-list-map-keys:
-                            - name
-                            x-kubernetes-list-type: map
                           securityContext:
                             properties:
                               appArmorProfile:
@@ -6866,12 +6783,15 @@ spec:
                                     type: string
                                 type: object
                             type: object
+                          securityGroups:
+                            items:
+                              format: int64
+                              type: integer
+                            type: array
                           serviceAccount:
                             type: string
                           serviceAccountName:
                             type: string
-                          setHostnameAsFQDN:
-                            type: boolean
                           shareProcessNamespace:
                             type: boolean
                           subdomain:
@@ -6895,7 +6815,6 @@ spec:
                                   type: string
                               type: object
                             type: array
-                            x-kubernetes-list-type: atomic
                           topologySpreadConstraints:
                             items:
                               properties:
@@ -6950,10 +6869,6 @@ spec:
                               - whenUnsatisfiable
                               type: object
                             type: array
-                            x-kubernetes-list-map-keys:
-                            - topologyKey
-                            - whenUnsatisfiable
-                            x-kubernetes-list-type: map
                           volumes:
                             items:
                               properties:
@@ -7735,13 +7650,21 @@ spec:
                               - name
                               type: object
                             type: array
-                            x-kubernetes-list-map-keys:
-                            - name
-                            x-kubernetes-list-type: map
-                        required:
-                        - containers
+                          windowsOptions:
+                            properties:
+                              gmsaCredentialSpec:
+                                type: string
+                              gmsaCredentialSpecName:
+                                type: string
+                              hostProcess:
+                                type: boolean
+                              runAsUserName:
+                                type: string
+                            type: object
                         type: object
+                        x-kubernetes-preserve-unknown-fields: true
                     type: object
+                    x-kubernetes-preserve-unknown-fields: true
                 type: object
               storage:
                 type: string
