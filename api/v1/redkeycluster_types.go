@@ -250,7 +250,7 @@ type RedkeyClusterSpec struct {
 // RobinSpec defines the desired state of Robin configuration for RedkeyCluster.
 type RobinSpec struct {
 	Template *PartialPodTemplateSpec `json:"template,omitempty"`
-	Config   *RobinConfig        `json:"config,omitempty"`
+	Config   *RobinConfig            `json:"config,omitempty"`
 }
 
 type RobinConfig struct {

@@ -216,7 +216,7 @@ func (r *RedkeyClusterReconciler) deleteRobinObject(ctx context.Context, obj cli
 func (r *RedkeyClusterReconciler) overrideRobinDeployment(req ctrl.Request, redkeyCluster *redkeyv1.RedkeyCluster, podTemplateSpec corev1.PodTemplateSpec) (corev1.PodTemplateSpec, bool) {
 	// Convert PartialPodTemplateSpec to PodTemplateSpec
 	partialTemplate := r.convertPartialPodTemplateToFull(redkeyCluster.Spec.Robin.Template)
-	
+
 	// Apply the override
 	patchedPodTemplateSpec, err := redis.ApplyPodTemplateSpecOverride(podTemplateSpec, partialTemplate)
 	if err != nil {
