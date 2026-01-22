@@ -1258,7 +1258,7 @@ func (r *RedkeyClusterReconciler) completeClusterScaleUp(ctx context.Context, re
 			return true, err
 		}
 		if status != redkeyv1.RobinStatusReady {
-			r.logInfo(redkeyCluster.NamespacedName(), "Waiting for Robin to end scaling up...")
+			r.logInfo(redkeyCluster.NamespacedName(), "Waiting for Robin to end scaling up...", "robin cluster status", status)
 			return true, nil // Cluster scaling not completed -> requeue
 		}
 		r.logInfo(redkeyCluster.NamespacedName(), "Robin reports cluster is ready after scaling up")
