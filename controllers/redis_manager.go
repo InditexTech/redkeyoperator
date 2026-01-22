@@ -285,6 +285,17 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeScalingUp(ctx context.Context, re
 		}
 	}
 
+	// Check cluster status to know if Robin has already met the new node.
+	clusterStatus, err := redkeyRobin.GetClusterStatus()
+	if err != nil {
+		r.logError(redkeyCluster.NamespacedName(), err, "Error getting cluster status from Robin")
+		return err
+	}
+	if clusterStatus != redkeyv1.RobinStatusReady {
+		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for cluster to be Ready in Robin", "currentStatus", clusterStatus)
+		return nil // Cluster not ready --> keep waiting
+	}
+
 	// Check all cluster nodes are ready from Robin.
 	clusterNodes, err := redkeyRobin.GetClusterNodes()
 	if err != nil {
@@ -294,17 +305,6 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeScalingUp(ctx context.Context, re
 	if len(clusterNodes.Nodes) != int(*existingStatefulSet.Spec.Replicas) {
 		r.logInfo(redkeyCluster.NamespacedName(), "Not all cluster nodes are yet ready from Robin")
 		return nil // Not all nodes ready --> Keep waiting
-	}
-
-	// Check cluster health.
-	check, errors, warnings, err := redkeyRobin.ClusterCheck()
-	if err != nil {
-		r.logError(redkeyCluster.NamespacedName(), err, "Error checking the cluster readiness over Robin")
-		return err
-	}
-	if !check {
-		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for cluster readiness", "errors", errors, "warnings", warnings)
-		return nil // Cluster not ready --> keep waiting
 	}
 
 	// Update substatus.
@@ -339,6 +339,17 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeUpgrading(ctx context.Context, re
 		return err
 	}
 
+	// Get cluster status to know if the cluster is ready.
+	clusterStatus, err := redkeyRobin.GetClusterStatus()
+	if err != nil {
+		r.logError(redkeyCluster.NamespacedName(), err, "Error getting cluster status from Robin")
+		return err
+	}
+	if clusterStatus != redkeyv1.RobinStatusReady {
+		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for cluster to be Ready in Robin", "currentStatus", clusterStatus)
+		return nil // Cluster not ready --> keep waiting
+	}
+
 	// Check all cluster nodes are ready from Robin.
 	clusterNodes, err := redkeyRobin.GetClusterNodes()
 	if err != nil {
@@ -348,17 +359,6 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeUpgrading(ctx context.Context, re
 	if len(clusterNodes.Nodes) != int(*existingStatefulSet.Spec.Replicas) {
 		r.logInfo(redkeyCluster.NamespacedName(), "Not all cluster nodes are yet ready from Robin")
 		return nil // Not all nodes ready --> Keep waiting
-	}
-
-	// Check cluster health.
-	check, errors, warnings, err := redkeyRobin.ClusterCheck()
-	if err != nil {
-		r.logError(redkeyCluster.NamespacedName(), err, "Error checking the cluster readiness over Robin")
-		return err
-	}
-	if !check {
-		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for cluster readiness", "errors", errors, "warnings", warnings)
-		return nil // Cluster not ready --> keep waiting
 	}
 
 	// Get the current partition and update Upgrading Partition in RedkeyCluster Status if starting iterating over partitions.
@@ -467,6 +467,17 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeRollingUpdate(ctx context.Context
 		return err
 	}
 
+	// Get cluster status to know if Robin has already resetted the node.
+	clusterStatus, err := redkeyRobin.GetClusterStatus()
+	if err != nil {
+		r.logError(redkeyCluster.NamespacedName(), err, "Error getting cluster status from Robin")
+		return err
+	}
+	if clusterStatus != redkeyv1.RobinStatusReady {
+		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for cluster to be Ready in Robin", "currentStatus", clusterStatus)
+		return nil // Cluster not ready --> keep waiting
+	}
+
 	// Check all cluster nodes are ready from Robin.
 	clusterNodes, err := redkeyRobin.GetClusterNodes()
 	if err != nil {
@@ -476,17 +487,6 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeRollingUpdate(ctx context.Context
 	if len(clusterNodes.Nodes) != int(*existingStatefulSet.Spec.Replicas) {
 		r.logInfo(redkeyCluster.NamespacedName(), "Not all cluster nodes are yet ready from Robin")
 		return nil // Not all nodes ready --> Keep waiting
-	}
-
-	// Check cluster health.
-	check, errors, warnings, err := redkeyRobin.ClusterCheck()
-	if err != nil {
-		r.logError(redkeyCluster.NamespacedName(), err, "Error checking the cluster readiness over Robin")
-		return err
-	}
-	if !check {
-		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for cluster readiness", "errors", errors, "warnings", warnings)
-		return nil // Cluster not ready --> keep waiting
 	}
 
 	// If first partition reached, we can move to the next step.
@@ -538,6 +538,17 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeEnd(ctx context.Context, redkeyCl
 		return err
 	}
 
+	// Get cluster status to know if Robin is ready after the last rolling update.
+	clusterStatus, err := redkeyRobin.GetClusterStatus()
+	if err != nil {
+		r.logError(redkeyCluster.NamespacedName(), err, "Error getting cluster status from Robin")
+		return err
+	}
+	if clusterStatus != redkeyv1.RobinStatusReady {
+		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for cluster to be Ready in Robin", "currentStatus", clusterStatus)
+		return nil // Cluster not ready --> keep waiting
+	}
+
 	// Check all cluster nodes are ready from Robin.
 	clusterNodes, err := redkeyRobin.GetClusterNodes()
 	if err != nil {
@@ -547,17 +558,6 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeEnd(ctx context.Context, redkeyCl
 	if len(clusterNodes.Nodes) != int(*existingStatefulSet.Spec.Replicas) {
 		r.logInfo(redkeyCluster.NamespacedName(), "Not all cluster nodes are yet ready from Robin")
 		return nil // Not all nodes ready --> Keep waiting
-	}
-
-	// Check cluster health.
-	check, errors, warnings, err := redkeyRobin.ClusterCheck()
-	if err != nil {
-		r.logError(redkeyCluster.NamespacedName(), err, "Error checking the cluster readiness over Robin")
-		return err
-	}
-	if !check {
-		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for cluster readiness", "errors", errors, "warnings", warnings)
-		return nil // Cluster not ready --> keep waiting
 	}
 
 	// Move slots from extra node to node 0.
@@ -634,6 +634,17 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeScalingDown(ctx context.Context, 
 			r.logError(redkeyCluster.NamespacedName(), err, "Error updating Robin primaries/replicasPerPrimary")
 			return err
 		}
+	}
+
+	// Check cluster status to know if Robin has already scaled down the cluster.
+	clusterStatus, err := redkeyRobin.GetClusterStatus()
+	if err != nil {
+		r.logError(redkeyCluster.NamespacedName(), err, "Error getting cluster status from Robin")
+		return err
+	}
+	if clusterStatus != redkeyv1.RobinStatusReady {
+		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for cluster to be Ready in Robin", "currentStatus", clusterStatus)
+		return nil // Cluster not ready --> keep waiting
 	}
 
 	// Check all cluster nodes are ready from Robin.
@@ -826,6 +837,15 @@ func (r *RedkeyClusterReconciler) doFastScaling(ctx context.Context, redkeyClust
 		if err != nil {
 			r.logError(redkeyCluster.NamespacedName(), err, "Error getting Robin to check its readiness")
 			return true, err
+		}
+		clusterStatus, err := robin.GetClusterStatus()
+		if err != nil {
+			r.logError(redkeyCluster.NamespacedName(), err, "Error getting cluster status from Robin")
+			return true, err
+		}
+		if clusterStatus != redkeyv1.RobinStatusReady {
+			r.logInfo(redkeyCluster.NamespacedName(), "Waiting for cluster to be Ready in Robin", "currentStatus", clusterStatus)
+			return true, nil
 		}
 		check, errors, warnings, err := robin.ClusterCheck()
 		if err != nil {
