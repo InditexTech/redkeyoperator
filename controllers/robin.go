@@ -97,10 +97,10 @@ func (r *RedkeyClusterReconciler) handleRobinConfig(ctx context.Context, req ctr
 
 	// Add checksum to the deployment annotations to force the deployment rollout
 	if redkeyCluster.Spec.Robin.Template != nil {
-		if redkeyCluster.Spec.Robin.Template.Annotations == nil {
-			redkeyCluster.Spec.Robin.Template.Annotations = make(map[string]string)
+		if redkeyCluster.Spec.Robin.Template.Metadata.Annotations == nil {
+			redkeyCluster.Spec.Robin.Template.Metadata.Annotations = make(map[string]string)
 		}
-		redkeyCluster.Spec.Robin.Template.Annotations["checksum/config"] = fmt.Sprintf("%x", md5.Sum([]byte(string(configYAML))))
+		redkeyCluster.Spec.Robin.Template.Metadata.Annotations["checksum/config"] = fmt.Sprintf("%x", md5.Sum([]byte(string(configYAML))))
 	}
 
 	return nil
@@ -214,8 +214,11 @@ func (r *RedkeyClusterReconciler) deleteRobinObject(ctx context.Context, obj cli
 }
 
 func (r *RedkeyClusterReconciler) overrideRobinDeployment(req ctrl.Request, redkeyCluster *redkeyv1.RedkeyCluster, podTemplateSpec corev1.PodTemplateSpec) (corev1.PodTemplateSpec, bool) {
+	// Convert PartialPodTemplateSpec to PodTemplateSpec
+	partialTemplate := r.convertPartialPodTemplateToFull(redkeyCluster.Spec.Robin.Template)
+
 	// Apply the override
-	patchedPodTemplateSpec, err := redis.ApplyPodTemplateSpecOverride(podTemplateSpec, *redkeyCluster.Spec.Robin.Template)
+	patchedPodTemplateSpec, err := redis.ApplyPodTemplateSpecOverride(podTemplateSpec, partialTemplate)
 	if err != nil {
 		ctrl.Log.Error(err, "Error applying pod template spec override")
 		return podTemplateSpec, false
@@ -245,7 +248,7 @@ func (r *RedkeyClusterReconciler) createRobinDeployment(req ctrl.Request, redkey
 			Labels:    labels,
 		},
 		Spec: v1.DeploymentSpec{
-			Template: *redkeyCluster.Spec.Robin.Template,
+			Template: r.convertPartialPodTemplateToFull(redkeyCluster.Spec.Robin.Template),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{redis.RedkeyClusterLabel: req.Name, r.getStatefulSetSelectorLabel(redkeyCluster): "robin"},
 			},
@@ -258,7 +261,9 @@ func (r *RedkeyClusterReconciler) createRobinDeployment(req ctrl.Request, redkey
 	maps.Copy(d.Spec.Template.Labels, labels)
 	d.Spec.Template.Labels[redis.RedkeyClusterLabel] = req.Name
 	d.Spec.Template.Labels[redis.RedkeyClusterComponentLabel] = "robin"
-	maps.Copy(d.Spec.Template.Labels, redkeyCluster.Spec.Robin.Template.Labels)
+	if redkeyCluster.Spec.Robin.Template.Metadata.Labels != nil {
+		maps.Copy(d.Spec.Template.Labels, redkeyCluster.Spec.Robin.Template.Metadata.Labels)
+	}
 
 	for i, container := range d.Spec.Template.Spec.Containers {
 		if container.Resources.Requests == nil {
@@ -276,6 +281,47 @@ func (r *RedkeyClusterReconciler) createRobinDeployment(req ctrl.Request, redkey
 	}
 
 	return d
+}
+
+func (r *RedkeyClusterReconciler) convertPartialPodTemplateToFull(partial *redkeyv1.PartialPodTemplateSpec) corev1.PodTemplateSpec {
+	return corev1.PodTemplateSpec{
+		ObjectMeta: partial.Metadata,
+		Spec: corev1.PodSpec{
+			Containers:                    partial.Spec.Containers,
+			InitContainers:                partial.Spec.InitContainers,
+			EphemeralContainers:           partial.Spec.EphemeralContainers,
+			RestartPolicy:                 partial.Spec.RestartPolicy,
+			TerminationGracePeriodSeconds: partial.Spec.TerminationGracePeriodSeconds,
+			DNSPolicy:                     partial.Spec.DNSPolicy,
+			NodeSelector:                  partial.Spec.NodeSelector,
+			ServiceAccountName:            partial.Spec.ServiceAccountName,
+			NodeName:                      partial.Spec.NodeName,
+			HostNetwork:                   partial.Spec.HostNetwork,
+			HostPID:                       partial.Spec.HostPID,
+			HostIPC:                       partial.Spec.HostIPC,
+			ShareProcessNamespace:         partial.Spec.ShareProcessNamespace,
+			SecurityContext:               partial.Spec.SecurityContext,
+			ImagePullSecrets:              partial.Spec.ImagePullSecrets,
+			Hostname:                      partial.Spec.Hostname,
+			Subdomain:                     partial.Spec.Subdomain,
+			Affinity:                      partial.Spec.Affinity,
+			SchedulerName:                 partial.Spec.SchedulerName,
+			Tolerations:                   partial.Spec.Tolerations,
+			HostAliases:                   partial.Spec.HostAliases,
+			PriorityClassName:             partial.Spec.PriorityClassName,
+			Priority:                      partial.Spec.Priority,
+			DNSConfig:                     partial.Spec.DNSConfig,
+			ReadinessGates:                partial.Spec.ReadinessGates,
+			RuntimeClassName:              partial.Spec.RuntimeClassName,
+			EnableServiceLinks:            partial.Spec.EnableServiceLinks,
+			PreemptionPolicy:              partial.Spec.PreemptionPolicy,
+			Overhead:                      partial.Spec.Overhead,
+			TopologySpreadConstraints:     partial.Spec.TopologySpreadConstraints,
+			Volumes:                       partial.Spec.Volumes,
+			ActiveDeadlineSeconds:         partial.Spec.ActiveDeadlineSeconds,
+			AutomountServiceAccountToken:  partial.Spec.AutomountServiceAccountToken,
+		},
+	}
 }
 
 func (r *RedkeyClusterReconciler) getRobinConfiguration(req ctrl.Request, spec redkeyv1.RedkeyClusterSpec) robin.Configuration {

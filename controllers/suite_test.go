@@ -171,10 +171,10 @@ var _ = Describe("Reconciler", func() {
 
 			It("Pod template labels are passed", func() {
 				rcluster := &redkeyv1.RedkeyCluster{}
-				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: cluster.Name, Namespace: "default"}, cluster)
+				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: cluster.Name, Namespace: "default"}, rcluster)
 				log.Log.Info("ncluster", "cluster", rcluster)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(len(rcluster.Spec.Robin.Template.GetObjectMeta().GetLabels())).To(Equal(2))
+				Expect(len(rcluster.Spec.Robin.Template.Metadata.Labels)).To(Equal(2))
 			})
 			It("Configmap is deleted when passing finalizers", func() {
 				err := k8sClient.Delete(context.Background(), cluster)
@@ -250,12 +250,12 @@ func CreateRedkeyCluster() *redkeyv1.RedkeyCluster {
 
 	`,
 			Robin: &redkeyv1.RobinSpec{
-				Template: &corev1.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{
+				Template: &redkeyv1.PartialPodTemplateSpec{
+					Metadata: metav1.ObjectMeta{
 						Name:   "monitor",
 						Labels: map[string]string{"l1": "l1", "l2": "l2"},
 					},
-					Spec: corev1.PodSpec{
+					Spec: redkeyv1.PartialPodSpec{
 						Containers: []corev1.Container{{
 							Image:   "test:1.4.36-alpine",
 							Name:    "test",
