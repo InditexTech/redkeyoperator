@@ -99,12 +99,12 @@ spec:
   #         port: 9090
   #         targetPort: 9090
   #         protocol: TCP
-  #  statefulSet:
-  #    metadata:
-  #      annotations:
-  #        traffic.inditex.dev/weight: "10"
-  #      labels:
-  #        inditex.dev/test: "test"
+  #   statefulSet:
+  #     metadata:
+  #       annotations:
+  #         traffic.inditex.dev/weight: "10"
+  #       labels:
+  #         inditex.dev/test: "test"
   #     spec:
   #       template:
   #         metadata:
