@@ -71,11 +71,11 @@ const (
 
 	SubstatusFastUpgrading        = "FastUpgrading"
 	SubstatusEndingFastUpgrading  = "EndingFastUpgrading"
-	SubstatusSlowUpgrading        = "SlowUpgrading"
+	SubstatusEmptyingNode         = "EmptyingNode"
 	SubstatusUpgradingScalingUp   = "ScalingUp"
 	SubstatusUpgradingScalingDown = "ScalingDown"
 	SubstatusEndingSlowUpgrading  = "EndingSlowUpgrading"
-	SubstatusRollingConfig        = "RollingConfig"
+	SubstatusRollingUpdate        = "RollingUpdate"
 
 	SubstatusFastScaling       = "FastScaling"
 	SubstatusEndingFastScaling = "EndingFastScaling"
