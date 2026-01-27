@@ -654,7 +654,7 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeScalingDown(ctx context.Context, 
 		return err
 	}
 	if !check {
-		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for cluster readiness before ending the fast upgrade", "errors", errors, "warnings", warnings)
+		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for cluster readiness before ending the slow upgrade", "errors", errors, "warnings", warnings)
 		return nil // Cluster not ready --> keep waiting
 	}
 
