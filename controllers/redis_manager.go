@@ -395,9 +395,10 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeUpgrading(ctx context.Context, re
 			return err
 		}
 		if !completed {
-			r.logInfo(redkeyCluster.NamespacedName(), "Waiting to complete moving slots", "From node", currentPartition, "To node", currentPartition+1)
+			r.logInfo(redkeyCluster.NamespacedName(), "Moving slots still in progress", "From node", currentPartition, "To node", currentPartition+1)
 			return nil // Move slots not completed --> keep waiting
 		}
+		r.logInfo(redkeyCluster.NamespacedName(), "Moving slots completed", "From node", currentPartition, "To node", currentPartition+1)
 	}
 
 	// Stop Robin reconciliation
@@ -568,9 +569,10 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeEnd(ctx context.Context, redkeyCl
 		return err
 	}
 	if !completed {
-		r.logInfo(redkeyCluster.NamespacedName(), "Waiting to complete moving slots", "From node", extraNodeIndex, "To node", 0)
+		r.logInfo(redkeyCluster.NamespacedName(), "Moving slots still in progress", "From node", extraNodeIndex, "To node", 0)
 		return nil // Move slots not completed --> keep waiting
 	}
+	r.logInfo(redkeyCluster.NamespacedName(), "Moving slots completed", "From node", extraNodeIndex, "To node", 0)
 
 	// ScaleDown the cluster
 	r.logInfo(redkeyCluster.NamespacedName(), "Scaling down the cluster to remove the extra node")

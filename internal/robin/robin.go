@@ -347,10 +347,8 @@ func (r *Robin) MoveSlots(nodeIndexFrom int, nodeIndexTo int, numSlots int) (boo
 	}
 
 	if status.Status == "Completed" {
-		r.Logger.Info("Moving slots completed", "from", nodeIndexFrom, "to", nodeIndexTo, "slots", numSlots)
 		return true, nil
 	} else {
-		r.Logger.Info("Moving slots still in progress", "from", nodeIndexFrom, "to", nodeIndexTo, "slots", numSlots)
 		return false, nil
 	}
 }
