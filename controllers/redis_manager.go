@@ -255,7 +255,7 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeScalingUp(ctx context.Context, re
 		return err
 	}
 	if !nodePodsReady {
-		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for Redis node pods to become ready")
+		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for Redis node pods to become ready", "primariesRequired", existingStatefulSet.Spec.Replicas, "primariesReady", existingStatefulSet.Status.ReadyReplicas)
 		return nil // Not all pods ready -> keep waiting
 	}
 	r.logInfo(redkeyCluster.NamespacedName(), "Redis node pods are ready", "pods", existingStatefulSet.Spec.Replicas)
@@ -274,6 +274,7 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeScalingUp(ctx context.Context, re
 		return err
 	}
 	if primaries != int(redkeyCluster.Spec.Primaries+1) || replicasPerPrimary != int(redkeyCluster.Spec.ReplicasPerPrimary) {
+		r.logInfo(redkeyCluster.NamespacedName(), "Updating Robin primaries/replicasPerPrimary", "primaries", redkeyCluster.Spec.Primaries+1, "replicasPerPrimary", redkeyCluster.Spec.ReplicasPerPrimary)
 		err = robin.PersistRobinReplicas(ctx, r.Client, redkeyCluster, int(redkeyCluster.Spec.Primaries)+1, int(redkeyCluster.Spec.ReplicasPerPrimary))
 		if err != nil {
 			r.logError(redkeyCluster.NamespacedName(), err, "Error persisting Robin primaries/replicasPerPrimary")
@@ -296,17 +297,6 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeScalingUp(ctx context.Context, re
 		return nil // Cluster not ready --> keep waiting
 	}
 
-	// Check all cluster nodes are ready from Robin.
-	clusterNodes, err := redkeyRobin.GetClusterNodes()
-	if err != nil {
-		r.logError(redkeyCluster.NamespacedName(), err, "Error getting cluster nodes from Robin")
-		return err
-	}
-	if len(clusterNodes.Nodes) != int(*existingStatefulSet.Spec.Replicas) {
-		r.logInfo(redkeyCluster.NamespacedName(), "Not all cluster nodes are yet ready from Robin")
-		return nil // Not all nodes ready --> Keep waiting
-	}
-
 	// Update substatus.
 	err = r.updateClusterSubStatus(ctx, redkeyCluster, redkeyv1.SubstatusEmptyingNode, "")
 	if err != nil {
@@ -318,18 +308,6 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeScalingUp(ctx context.Context, re
 }
 
 func (r *RedkeyClusterReconciler) doSlowUpgradeEmptyNode(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster, existingStatefulSet *v1.StatefulSet) error {
-
-	// Check Redis node pods rediness.
-	nodePodsReady, err := r.allPodsReady(ctx, redkeyCluster, existingStatefulSet)
-	if err != nil {
-		r.logError(redkeyCluster.NamespacedName(), err, "Could not check for Redis node pods being ready")
-		return err
-	}
-	if !nodePodsReady {
-		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for Redis node pods to become ready")
-		return nil // Not all pods ready -> keep waiting
-	}
-	r.logInfo(redkeyCluster.NamespacedName(), "Redis node pods are ready", "pods", existingStatefulSet.Spec.Replicas)
 
 	// Get Robin.
 	logger := r.getHelperLogger(redkeyCluster.NamespacedName())
@@ -350,17 +328,6 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeEmptyNode(ctx context.Context, re
 		return nil // Cluster not ready --> keep waiting
 	}
 
-	// Check all cluster nodes are ready from Robin.
-	clusterNodes, err := redkeyRobin.GetClusterNodes()
-	if err != nil {
-		r.logError(redkeyCluster.NamespacedName(), err, "Error getting cluster nodes from Robin")
-		return err
-	}
-	if len(clusterNodes.Nodes) != int(*existingStatefulSet.Spec.Replicas) {
-		r.logInfo(redkeyCluster.NamespacedName(), "Not all cluster nodes are yet ready from Robin")
-		return nil // Not all nodes ready --> Keep waiting
-	}
-
 	// Get the current partition and update Upgrading Partition in RedkeyCluster Status if starting iterating over partitions.
 	var currentPartition int
 	if redkeyCluster.Status.Substatus.UpgradingPartition == "" {
@@ -378,10 +345,11 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeEmptyNode(ctx context.Context, re
 		}
 	}
 
-	// If first iteration over partitions: update configuration.
+	// If first iteration over partitions: update configuration. This partition is empty: no need to move slots.
 	// Else: Move slots away from partition and rolling update (don't do over the extra node to optimize).
 	if currentPartition == int(*(existingStatefulSet.Spec.Replicas))-1 {
 		// Update configuration: changes in configuration, labels and overrides are persisted before upgrading
+		r.logInfo(redkeyCluster.NamespacedName(), "Last partition: updating configuration before rolling config")
 		existingStatefulSet, err = r.upgradeClusterConfigurationUpdate(ctx, redkeyCluster)
 		if err != nil {
 			r.logError(redkeyCluster.NamespacedName(), err, "Error updating Cluster configuration")
@@ -389,6 +357,7 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeEmptyNode(ctx context.Context, re
 		}
 	} else {
 		// Move slots from partition before rolling update.
+		r.logInfo(redkeyCluster.NamespacedName(), "Moving slots from partition before rolling config", "partition", currentPartition)
 		completed, err := redkeyRobin.MoveSlots(currentPartition, currentPartition+1, 0)
 		if err != nil {
 			r.logError(redkeyCluster.NamespacedName(), err, "Error moving slots", "From node", currentPartition, "To node", currentPartition+1)
@@ -479,17 +448,6 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeRollingUpdate(ctx context.Context
 		return nil // Cluster not ready --> keep waiting
 	}
 
-	// Check all cluster nodes are ready from Robin.
-	clusterNodes, err := redkeyRobin.GetClusterNodes()
-	if err != nil {
-		r.logError(redkeyCluster.NamespacedName(), err, "Error getting cluster nodes from Robin")
-		return err
-	}
-	if len(clusterNodes.Nodes) != int(*existingStatefulSet.Spec.Replicas) {
-		r.logInfo(redkeyCluster.NamespacedName(), "Not all cluster nodes are yet ready from Robin")
-		return nil // Not all nodes ready --> Keep waiting
-	}
-
 	// If first partition reached, we can move to the next step.
 	// Else step over to the next partition.
 	if currentPartition == 0 {
@@ -519,18 +477,6 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeRollingUpdate(ctx context.Context
 
 func (r *RedkeyClusterReconciler) doSlowUpgradeEnd(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster, existingStatefulSet *v1.StatefulSet) error {
 
-	// Check Redis node pods rediness (pod from last rolling update could be not ready yet).
-	nodePodsReady, err := r.allPodsReady(ctx, redkeyCluster, existingStatefulSet)
-	if err != nil {
-		r.logError(redkeyCluster.NamespacedName(), err, "Could not check for Redis node pods being ready")
-		return err
-	}
-	if !nodePodsReady {
-		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for Redis node pods to become ready")
-		return nil // Not all pods ready -> keep waiting
-	}
-	r.logInfo(redkeyCluster.NamespacedName(), "Redis node pods are ready", "pods", existingStatefulSet.Spec.Replicas)
-
 	// Get Robin.
 	logger := r.getHelperLogger(redkeyCluster.NamespacedName())
 	redkeyRobin, err := robin.NewRobin(ctx, r.Client, redkeyCluster, logger)
@@ -548,17 +494,6 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeEnd(ctx context.Context, redkeyCl
 	if clusterStatus != redkeyv1.RobinStatusReady {
 		r.logInfo(redkeyCluster.NamespacedName(), "Waiting for cluster to be Ready in Robin", "currentStatus", clusterStatus)
 		return nil // Cluster not ready --> keep waiting
-	}
-
-	// Check all cluster nodes are ready from Robin.
-	clusterNodes, err := redkeyRobin.GetClusterNodes()
-	if err != nil {
-		r.logError(redkeyCluster.NamespacedName(), err, "Error getting cluster nodes from Robin")
-		return err
-	}
-	if len(clusterNodes.Nodes) != int(*existingStatefulSet.Spec.Replicas) {
-		r.logInfo(redkeyCluster.NamespacedName(), "Not all cluster nodes are yet ready from Robin")
-		return nil // Not all nodes ready --> Keep waiting
 	}
 
 	// Move slots from extra node to node 0.
@@ -644,7 +579,7 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeScalingDown(ctx context.Context, 
 		return nil // Not all nodes ready --> Keep waiting
 	}
 
-	// Check all cluster nodes are ready from Robin.
+	// Check cluster status from Robin.
 	check, errors, warnings, err := redkeyRobin.ClusterCheck()
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error checking the cluster readiness over Robin")
