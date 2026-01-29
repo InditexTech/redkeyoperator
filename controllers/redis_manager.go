@@ -231,8 +231,8 @@ func (r *RedkeyClusterReconciler) doSlowUpgrade(ctx context.Context, redkeyClust
 	switch redkeyCluster.Status.Substatus.Status {
 	case redkeyv1.SubstatusUpgradingScalingUp:
 		err = r.doSlowUpgradeScalingUp(ctx, redkeyCluster, existingStatefulSet)
-	case redkeyv1.SubstatusEmptyingNode:
-		err = r.doSlowUpgradeEmptyNode(ctx, redkeyCluster, existingStatefulSet)
+	case redkeyv1.SubstatusResharding:
+		err = r.doSlowUpgradeResharding(ctx, redkeyCluster, existingStatefulSet)
 	case redkeyv1.SubstatusEndingSlowUpgrading:
 		err = r.doSlowUpgradeEnd(ctx, redkeyCluster, existingStatefulSet)
 	case redkeyv1.SubstatusUpgradingScalingDown:
@@ -298,7 +298,7 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeScalingUp(ctx context.Context, re
 	}
 
 	// Update substatus.
-	err = r.updateClusterSubStatus(ctx, redkeyCluster, redkeyv1.SubstatusEmptyingNode, "")
+	err = r.updateClusterSubStatus(ctx, redkeyCluster, redkeyv1.SubstatusResharding, "")
 	if err != nil {
 		r.logError(redkeyCluster.NamespacedName(), err, "Error updating substatus")
 		return err
@@ -307,7 +307,7 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeScalingUp(ctx context.Context, re
 	return nil
 }
 
-func (r *RedkeyClusterReconciler) doSlowUpgradeEmptyNode(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster, existingStatefulSet *v1.StatefulSet) error {
+func (r *RedkeyClusterReconciler) doSlowUpgradeResharding(ctx context.Context, redkeyCluster *redkeyv1.RedkeyCluster, existingStatefulSet *v1.StatefulSet) error {
 
 	// Get Robin.
 	logger := r.getHelperLogger(redkeyCluster.NamespacedName())
@@ -332,7 +332,7 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeEmptyNode(ctx context.Context, re
 	var currentPartition int
 	if redkeyCluster.Status.Substatus.UpgradingPartition == "" {
 		currentPartition = int(*(existingStatefulSet.Spec.Replicas)) - 1
-		err = r.updateClusterSubStatus(ctx, redkeyCluster, redkeyv1.SubstatusEmptyingNode, strconv.Itoa(currentPartition))
+		err = r.updateClusterSubStatus(ctx, redkeyCluster, redkeyv1.SubstatusResharding, strconv.Itoa(currentPartition))
 		if err != nil {
 			r.logError(redkeyCluster.NamespacedName(), err, "Error updating substatus")
 			return err
@@ -458,7 +458,7 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeRollingUpdate(ctx context.Context
 		}
 	} else {
 		nextPartition := currentPartition - 1
-		err = r.updateClusterSubStatus(ctx, redkeyCluster, redkeyv1.SubstatusEmptyingNode, strconv.Itoa(nextPartition))
+		err = r.updateClusterSubStatus(ctx, redkeyCluster, redkeyv1.SubstatusResharding, strconv.Itoa(nextPartition))
 		if err != nil {
 			r.logError(redkeyCluster.NamespacedName(), err, "Error updating substatus")
 			return err
