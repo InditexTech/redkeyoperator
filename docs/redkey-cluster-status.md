@@ -167,12 +167,12 @@ redis-cluster-ephemeral   3           0          true        true        redis:8
 These SubStatus have been defined:
 
 * **ScalingUp**: The Operator add one pod that is added as a Primary node to the Redkey Cluster. This node will be used to move slots from the existing nodes before recreating them.
-* **SlowUpgrading**: A node is being empty, moving all its slots (and keys) to another node.
-* **RollingConfig**: The empty node is being recreated, recreating its pod and asking to Robin to refresh the cluster.
+* **Resharding**: A node is being resharded, moving all its slots (and keys) to another node.
+* **RollingUpdate**: The resharded node is being recreated, recreating its pod and asking to Robin to refresh the cluster.
 * **EndingSlowUpgrading**: Move the slots (and keys) from the extra node.
 * **ScalingDown**: The extra node added to the cluster is removed.
 
-When Slow upgrading a Redkey Cluster the upgrade is executed from partition to partition, aaplying the **SlowUpgrading** and **RollingConfig** SubStatus to each partition.
+When Slow upgrading a Redkey Cluster the upgrade is executed from partition to partition, applying the **Resharding** and **RollingUpdate** SubStatus to each partition.
 
 Current partition can be shown using `kubectl get rkcl -o wide`.
 
@@ -186,22 +186,15 @@ redis-cluster-ephemeral   3           0          true        false       redis:8
 redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Ready                
 redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading               
 redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   ScalingUp   
-redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   SlowUpgrading   
-redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   SlowUpgrading   
-redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   SlowUpgrading   3
-redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   RollingConfig   3
-redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   SlowUpgrading   2
-redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   SlowUpgrading   2
-redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   SlowUpgrading   2
-redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   RollingConfig   2
-redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   RollingConfig   2
-redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   SlowUpgrading   1
-redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   SlowUpgrading   1
-redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   RollingConfig   1
-redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   RollingConfig   1
-redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   SlowUpgrading   0
-redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   RollingConfig   0
-redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   EndingSlowUpgrading   0
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   Resharding   
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   Resharding   3
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   RollingUpdate   3
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   Resharding   2
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   RollingUpdate   2
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   Resharding   1
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   RollingUpdate   1
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   Resharding   0
+redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   RollingUpdate   0
 redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   EndingSlowUpgrading   0
 redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Upgrading   ScalingDown           0
 redis-cluster-ephemeral   3           0          true        false       redis:8-bookworm                                            Ready    
