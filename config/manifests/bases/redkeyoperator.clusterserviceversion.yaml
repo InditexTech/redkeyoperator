@@ -1,0 +1,82 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: |-
+      [
+        {
+          "apiVersion": "redis.inditex.dev/v1",
+          "kind": "RedkeyCluster",
+          "metadata": {
+            "name": "redis-cluster-example"
+          },
+          "spec": {
+            "primaries": 3,
+            "ephemeral": true,
+            "accessModes": ["ReadWriteOnce"],
+            "image": "redis:8-bookworm",
+            "purgeKeysOnRebalance": true,
+            "resources": {
+              "limits": {
+                "cpu": "100m",
+                "memory": "128Mi"
+              }
+            }
+          }
+        }
+      ]
+    capabilities: Basic Install
+  name: redkeyoperator.v0.0.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: RedkeyCluster is the Schema for the redkeyclusters API
+      displayName: Redkey Cluster
+      kind: RedkeyCluster
+      name: redkeyclusters.redis.inditex.dev
+      specDescriptors:
+      - description: ReplicasPerPrimary specifies how many replicas should be attached
+          to each Redis Primary node
+        displayName: Number of replicas per Primary Node
+        path: replicasPerPrimary
+      version: v1
+  description: Seamless Redkey Cluster Management on Kubernetes
+  displayName: Redkey Operator
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - redis
+  - valkey
+  - cluster
+  - real-time-data
+  - kubernetes
+  - k8s
+  - ocp
+  links:
+  - name: redkeyoperator
+    url: https://redkeyoperator.domain
+  maintainers:
+  - email: paasteam@inditex.com
+    name: PaaSTeam
+  maturity: alpha
+  minKubeVersion: 1.24.0
+  provider:
+    name: InditexTech
+    url: https://github.com/InditexTech
+  version: 0.0.0
