@@ -13,8 +13,8 @@ package        := github.com/inditextech/$(name)
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.8.0
-CONTROLLER_TOOLS_VERSION ?= v0.20.0
 OPERATOR_SDK_VERSION ?= v1.42.0
+CONTROLLER_TOOLS_VERSION ?= v0.18.0
 
 # .............................................................................
 # DONT TOUCH THIS SECTION
