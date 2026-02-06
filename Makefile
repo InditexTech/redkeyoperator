@@ -196,7 +196,7 @@ clean: ## Clean the build artifacts and Go cache
 manifests: kustomize controller-gen ##	Generate ClusterRole and CustomResourceDefinition objects.
 	$(info $(M) generating config CRD base manifest files from code)
 	$(CONTROLLER_GEN) rbac:roleName=redkey-operator-role crd:maxDescLen=0 paths="./..." output:crd:artifacts:config=config/crd/bases
-	$(info $(M) setting operator version annotation in CRD kustomization file)
+	$(info $(M) setting operator-version annotation in CRD kustomization file)
 	cd config/crd && \
 	$(KUSTOMIZE) edit set annotation inditex.dev/operator-version:${version};
 
