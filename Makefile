@@ -94,13 +94,27 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
+# CONTAINER_TOOL defines the container tool to be used for building images.
+# Be aware that the target commands are only tested with Docker which is
+# scaffolded by default. However, you might want to replace it to use other
+# tools. (i.e. podman)
+CONTAINER_TOOL ?= docker
+
+# IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
+# This variable is used to construct full image tags for bundle and catalog images.
+#
+# For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
+# inditex.dev/sample-bundle:$VERSION and inditex.dev/sample-catalog:$VERSION.
+IMAGE_TAG_BASE ?= localhost:5001/redkey-operator
+ROBIN_IMAGE_TAG_BASE ?= localhost:5001/redkey-robin
+
 # Image URL to use for building/pushing image targets
-IMG ?= localhost:5001/redkey-operator:$(PROFILE)
-IMG_ROBIN ?= localhost:5001/redkey-robin:$(PROFILE_ROBIN)
+IMG ?= $(IMAGE_TAG_BASE):$(version)
+IMG_ROBIN ?= $(ROBIN_IMAGE_TAG_BASE):$(PROFILE_ROBIN)
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
-BUNDLE_IMG ?= controller-bundle:$(version)
+BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:$(version)
 
 CHANNELS ?= alpha,beta
 
@@ -232,13 +246,13 @@ run: ##	Execute the program locally
 docker-build: test ##	Build operator docker image from source or an empty image to copy the binary if default profile (uses `${IMG}` image name)
 	$(info $(M) building operator docker image)
 	if [ ${PROFILE} != "debug" ]; then \
-		docker build -t ${IMG} --build-arg GOLANG_VERSION=${golang_version} . ; \
+		$(CONTAINER_TOOL) build -t ${IMG} --build-arg GOLANG_VERSION=${golang_version} . ; \
 	else \
-		docker build -t ${IMG} -f debug.Dockerfile --build-arg GOLANG_VERSION=${golang_version} --build-arg DELVE_VERSION=${delve_version} . ; \
+		$(CONTAINER_TOOL) build -t ${IMG} -f debug.Dockerfile --build-arg GOLANG_VERSION=${golang_version} --build-arg DELVE_VERSION=${delve_version} . ; \
 	fi
-docker-push: ##	Push operator docker image (uses `${IMG}` image name).
+docker-push: ##	Push operator $(CONTAINER_TOOL) image (uses `${IMG}` image name).
 	$(info $(M) pushing operator docker image)
-	docker push ${IMG}
+	$(CONTAINER_TOOL) push ${IMG}
 
 ##@ Deployment
 install: create-namespace process-manifests-crd ##		Install CRD into the K8s cluster specified by kubectl default context (Kustomize is installed if not present).
@@ -460,11 +474,51 @@ bundle: kustomize manifests ## Generate the files for bundle.
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
-	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+	$(CONTAINER_TOOL) build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 bundle-push: ## Push the bundle image.
-	docker push $(BUNDLE_IMG)
+	$(CONTAINER_TOOL) push $(BUNDLE_IMG)
 
+.PHONY: opm
+OPM = $(LOCALBIN)/opm
+opm: ## Download opm locally if necessary.
+ifeq (,$(wildcard $(OPM)))
+ifeq (,$(shell which opm 2>/dev/null))
+	@{ \
+	set -e ;\
+	mkdir -p $(dir $(OPM)) ;\
+	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
+	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/v1.55.0/$${OS}-$${ARCH}-opm ;\
+	chmod +x $(OPM) ;\
+	}
+else
+OPM = $(shell which opm)
+endif
+endif
+
+# A comma-separated list of bundle images (e.g. make catalog-build BUNDLE_IMGS=example.com/operator-bundle:v0.1.0,example.com/operator-bundle:v0.2.0).
+# These images MUST exist in a registry and be pull-able.
+BUNDLE_IMGS ?= $(BUNDLE_IMG)
+
+# The image tag given to the resulting catalog image (e.g. make catalog-build CATALOG_IMG=example.com/operator-catalog:v0.2.0).
+CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:v$(version)
+
+# Set CATALOG_BASE_IMG to an existing catalog image tag to add $BUNDLE_IMGS to that image.
+ifneq ($(origin CATALOG_BASE_IMG), undefined)
+FROM_INDEX_OPT := --from-index $(CATALOG_BASE_IMG)
+endif
+
+# Build a catalog image by adding bundle images to an empty catalog using the operator package manager tool, 'opm'.
+# This recipe invokes 'opm' in 'semver' bundle add mode. For more information on add modes, see:
+# https://github.com/operator-framework/community-operators/blob/7f1438c/docs/packaging-operator.md#updating-your-existing-operator
+.PHONY: catalog-build
+catalog-build: opm ## Build a catalog image.
+	$(OPM) index add --container-tool $(CONTAINER_TOOL) --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
+
+# Push the catalog image.
+.PHONY: catalog-push
+catalog-push: ## Push a catalog image.
+	$(MAKE) docker-push IMG=$(CATALOG_IMG)
 
 ##@ Test
 
