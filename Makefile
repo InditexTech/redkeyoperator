@@ -204,6 +204,7 @@ clean: ## Clean the build artifacts and Go cache
 	rm -f bundle.Dockerfile
 	rm -rf ./deployment
 	rm -rf ./certs
+	rm -rf .local
 	$(GO) clean --modcache
 
 ##@ Development
