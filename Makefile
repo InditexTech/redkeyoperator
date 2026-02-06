@@ -193,9 +193,12 @@ clean: ## Clean the build artifacts and Go cache
 	$(GO) clean --modcache
 
 ##@ Development
-manifests: controller-gen ##	Generate ClusterRole and CustomResourceDefinition objects.
+manifests: kustomize controller-gen ##	Generate ClusterRole and CustomResourceDefinition objects.
 	$(info $(M) generating config CRD base manifest files from code)
 	$(CONTROLLER_GEN) rbac:roleName=redkey-operator-role crd:maxDescLen=0 paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(info $(M) setting operator version annotation in CRD kustomization file)
+	cd config/crd && \
+	$(KUSTOMIZE) edit set annotation inditex.dev/operator-version:${version};
 
 generate: controller-gen ##	Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
@@ -262,8 +265,6 @@ process-manifests: kustomize process-manifests-crd ##		Generate the kustomized y
 process-manifests-crd: kustomize manifests ##	Generate the kustomized yamls into the `deployment` directory to deploy the CRD.
 	$(info $(M) generating CRD deploying manifest files)
 	mkdir -p deployment
-	cd config/crd && \
-	$(KUSTOMIZE) edit set annotation inditex.dev/operator-version:${version};
 	$(KUSTOMIZE) build config/crd > deployment/redis.inditex.dev_redkeyclusters.yaml
 	@echo "CRD manifest generated successfully"
 
