@@ -455,6 +455,8 @@ bundle: kustomize manifests ## Generate the files for bundle.
 	cd config/manager && $(KUSTOMIZE) edit set image redkey-operator=$(IMAGE_REF)
 	$(KUSTOMIZE) build config | $(OPERATOR_SDK) generate bundle -q --overwrite --channels $(CHANNELS) --version $(version) $(BUNDLE_METADATA_OPTS)
 	$(OPERATOR_SDK) bundle validate ./bundle
+	# Remove the images section from the kustomization.yaml added when kustomizing.
+	cd config/manager && sed -i '/^images:$$/,/^[^ -]/{ /^images:$$/d; /^- name: redkey-operator$$/,/^  newTag:/d; }' kustomization.yaml && sed -i '/^images:$$/d' kustomization.yaml
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
