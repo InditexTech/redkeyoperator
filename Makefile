@@ -6,7 +6,7 @@
 SHELL := /bin/bash
 
 name           := redkey-cluster-operator
-version        := 1.3.0
+version        := 0.1.0
 golang_version := 1.25.6
 delve_version  := 1.25
 package        := github.com/inditextech/$(name)
@@ -262,6 +262,8 @@ process-manifests: kustomize process-manifests-crd ##		Generate the kustomized y
 process-manifests-crd: kustomize manifests ##	Generate the kustomized yamls into the `deployment` directory to deploy the CRD.
 	$(info $(M) generating CRD deploying manifest files)
 	mkdir -p deployment
+	cd config/crd && \
+	$(KUSTOMIZE) edit set annotation inditex.dev/operator-version:${version};
 	$(KUSTOMIZE) build config/crd > deployment/redis.inditex.dev_redkeyclusters.yaml
 	@echo "CRD manifest generated successfully"
 

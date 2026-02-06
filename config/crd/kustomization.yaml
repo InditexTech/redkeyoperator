@@ -6,6 +6,5 @@ kind: Kustomization
 
 resources:
 - bases/redis.inditex.dev_redkeyclusters.yaml
-
-patches:
-- path: ./patches/operator-crd-patch.yaml
+commonAnnotations:
+  inditex.dev/operator-version: 0.1.0
