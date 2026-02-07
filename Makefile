@@ -5,11 +5,11 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
-name           := redkey-cluster-operator
-version        := 0.1.0
-golang_version := 1.25.6
-delve_version  := 1.25
-package        := github.com/inditextech/$(name)
+NAME           := redkey-cluster-operator
+VERSION        := 0.1.0
+GOLANG_VERSION := 1.25.6
+DELVE_VERSION  := 1.25
+PACKAGE        := github.com/inditextech/$(NAME)
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.8.0
@@ -33,7 +33,7 @@ SRC = $(shell find . -path ./vendor -prune -o -name '*.go' -print)
 M = $(shell printf "\033[34;1m▶\033[0m")
 
 MODULE=$(shell go list -m)
-GO_COMPILE_FLAGS='-X $(MODULE)/cmd/server.GitCommit=$(COMMIT) -X $(MODULE)/cmd/server.BuildDate=$(DATE) -X $(MODULE)/cmd/server.VersionBuild=$(version)'
+GO_COMPILE_FLAGS='-X $(MODULE)/cmd/server.GitCommit=$(COMMIT) -X $(MODULE)/cmd/server.BuildDate=$(DATE) -X $(MODULE)/cmd/server.VersionBuild=$(VERSION)'
 
 # Auxiliar programs
 SED = sed
@@ -109,12 +109,12 @@ IMAGE_TAG_BASE ?= localhost:5001/redkey-operator
 ROBIN_IMAGE_TAG_BASE ?= localhost:5001/redkey-robin
 
 # Image URL to use for building/pushing image targets
-IMG ?= $(IMAGE_TAG_BASE):$(version)
+IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
 IMG_ROBIN ?= $(ROBIN_IMAGE_TAG_BASE):$(PROFILE_ROBIN)
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
-BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:$(version)
+BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:$(VERSION)
 
 CHANNELS ?= alpha,beta
 
@@ -158,7 +158,7 @@ deps: ## Installs dependencies
 
 .PHONY: version
 version:: ## Print the current version of the project.
-	@echo "$(version)"
+	@echo "$(VERSION)"
 
 .PHONY: version-next
 version-next:: ## Bump to next development version
@@ -213,7 +213,7 @@ manifests: kustomize controller-gen ##	Generate ClusterRole and CustomResourceDe
 	$(CONTROLLER_GEN) rbac:roleName=redkey-operator-role crd:maxDescLen=0 paths="./..." output:crd:artifacts:config=config/crd/bases
 	$(info $(M) setting operator-version annotation in CRD kustomization file)
 	cd config/crd && \
-	$(KUSTOMIZE) edit set annotation inditex.dev/operator-version:${version};
+	$(KUSTOMIZE) edit set annotation inditex.dev/operator-version:$(VERSION);
 
 generate: controller-gen ##	Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
@@ -247,9 +247,9 @@ run: ##	Execute the program locally
 docker-build: test ##	Build operator docker image from source or an empty image to copy the binary if default profile (uses `${IMG}` image name)
 	$(info $(M) building operator docker image)
 	if [ ${PROFILE} != "debug" ]; then \
-		$(CONTAINER_TOOL) build -t ${IMG} --build-arg GOLANG_VERSION=${golang_version} . ; \
+		$(CONTAINER_TOOL) build -t ${IMG} --build-arg GOLANG_VERSION=$(GOLANG_VERSION) . ; \
 	else \
-		$(CONTAINER_TOOL) build -t ${IMG} -f debug.Dockerfile --build-arg GOLANG_VERSION=${golang_version} --build-arg DELVE_VERSION=${delve_version} . ; \
+		$(CONTAINER_TOOL) build -t ${IMG} -f debug.Dockerfile --build-arg GOLANG_VERSION=$(GOLANG_VERSION) --build-arg DELVE_VERSION=$(DELVE_VERSION) . ; \
 	fi
 docker-push: ##	Push operator $(CONTAINER_TOOL) image (uses `${IMG}` image name).
 	$(info $(M) pushing operator docker image)
@@ -468,7 +468,7 @@ bundle: kustomize manifests ## Generate the files for bundle.
 	rm -rf bundle/metadata/*
 	$(OPERATOR_SDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image redkey-operator=$(IMAGE_REF)
-	$(KUSTOMIZE) build config | $(OPERATOR_SDK) generate bundle -q --overwrite --channels $(CHANNELS) --version $(version) $(BUNDLE_METADATA_OPTS)
+	$(KUSTOMIZE) build config | $(OPERATOR_SDK) generate bundle -q --overwrite --channels $(CHANNELS) --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 	$(OPERATOR_SDK) bundle validate ./bundle
 	# Remove the images section from the kustomization.yaml added when kustomizing.
 	cd config/manager && sed -i '/^images:$$/,/^[^ -]/{ /^images:$$/d; /^- name: redkey-operator$$/,/^  newTag:/d; }' kustomization.yaml && sed -i '/^images:$$/d' kustomization.yaml
@@ -502,7 +502,7 @@ endif
 BUNDLE_IMGS ?= $(BUNDLE_IMG)
 
 # The image tag given to the resulting catalog image (e.g. make catalog-build CATALOG_IMG=example.com/operator-catalog:v0.2.0).
-CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:v$(version)
+CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:v$(VERSION)
 
 # Set CATALOG_BASE_IMG to an existing catalog image tag to add $BUNDLE_IMGS to that image.
 ifneq ($(origin CATALOG_BASE_IMG), undefined)
