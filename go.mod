@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 module github.com/inditextech/redkeyoperator
 
-go 1.25.6
+go 1.25.7
 
 require (
 	github.com/go-logr/logr v1.4.2

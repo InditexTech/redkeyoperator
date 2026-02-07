@@ -108,7 +108,7 @@ Contributions are welcome! Please read our [contributing guidelines](./CONTRIBUT
 
 ## Versions
 
-- Go version (https://github.com/golang/go): v1.25.6
+- Go version (https://github.com/golang/go): v1.25.7
 - Operator SDK version (https://github.com/operator-framework/operator-sdk): v1.42.0
 - Kubernetes Controller Tools version (https://github.com/kubernetes-sigs/controller-tools): v0.18.0
 

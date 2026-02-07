@@ -7,7 +7,7 @@ SHELL := /bin/bash
 
 NAME           := redkey-cluster-operator
 VERSION        := 0.1.0
-GOLANG_VERSION := 1.25.6
+GOLANG_VERSION := 1.25.7
 DELVE_VERSION  := 1.25
 PACKAGE        := github.com/inditextech/$(NAME)
 
