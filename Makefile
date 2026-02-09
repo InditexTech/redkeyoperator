@@ -109,7 +109,7 @@ IMAGE_TAG_BASE ?= localhost:5001/redkey-operator
 ROBIN_IMAGE_TAG_BASE ?= localhost:5001/redkey-robin
 
 # Image URL to use for building/pushing image targets
-IMG ?= $(IMAGE_TAG_BASE):$(PROFILE)
+IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
 IMG_ROBIN ?= $(ROBIN_IMAGE_TAG_BASE):$(PROFILE_ROBIN)
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
