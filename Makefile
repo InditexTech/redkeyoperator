@@ -68,6 +68,8 @@ ifeq ($(filter $(PROFILE_ROBIN),$(PROFILES_ROBIN)), )
 $(error The PROFILE_ROBIN specified ($(PROFILE)) is not supported)
 endif
 
+CHANNELS ?= alpha,beta,stable
+
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "preview,fast,stable")
 # To re-generate a bundle for other specific channels without changing the standard setup, you can:
@@ -82,6 +84,7 @@ endif
 # To re-generate a bundle for any other default channel without changing the default setup, you can:
 # - use the DEFAULT_CHANNEL as arg of the bundle target (e.g make bundle DEFAULT_CHANNEL=stable)
 # - use environment variables to overwrite this value (e.g export DEFAULT_CHANNEL="stable")
+DEFAULT_CHANNEL ?= stable
 ifneq ($(origin DEFAULT_CHANNEL), undefined)
 BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
 endif
@@ -115,8 +118,6 @@ IMG_ROBIN ?= $(ROBIN_IMAGE_TAG_BASE):$(PROFILE_ROBIN)
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
 BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:$(VERSION)
-
-CHANNELS ?= alpha,beta
 
 # Image REF in bundle image
 # Can be overwritten with make bundle IMAGE_REF=<some-registry>/<project-name-bundle>:<tag>
