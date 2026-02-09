@@ -10,7 +10,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: inditextech/redkeyoperator
+  IMAGE_NAME: inditextech/redkey-operator
 
 jobs:
   release:
