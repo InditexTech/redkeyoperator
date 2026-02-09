@@ -72,7 +72,7 @@ spec:
   - name: redkeyoperator
     url: https://redkeyoperator.domain
   maintainers:
-  - email: paasteam@inditex.com
+  - email: lddpaas@inditex.com
     name: PaaSTeam
   maturity: alpha
   minKubeVersion: 1.24.0
