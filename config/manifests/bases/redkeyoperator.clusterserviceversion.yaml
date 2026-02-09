@@ -28,7 +28,7 @@ metadata:
           }
         }
       ]
-    capabilities: Full Lifecycle
+    capabilities: Auto Pilot
     categories: Database
   name: redkeyoperator.v0.0.0
   namespace: placeholder
