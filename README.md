@@ -78,13 +78,13 @@ cd redkeyoperator
 make install
 ```
 
-3. Deploy the operator in the cluster (replace `${VERSION}` with the desired version, e.g., `0.1.0`):
+3. Deploy the operator in the cluster (replace `${VERSION}` with the desired version, e.g., `0.1.0`; check the repo releases for available versions):
 
 ```bash
 make deploy IMG=ghcr.io/inditextech/redkey-operator:${VERSION}
 ```
 
-4. Create a Redkey Cluster (replace `${VERSION}` with the desired version, e.g., `0.1.0`):
+4. Create a Redkey Cluster (replace `${VERSION}` with the desired version, e.g., `0.1.0`; check the [Redkey Robin](https://github.com/InditexTech/redkeyrobin) repo releases for available versions):
 
 ```bash
 make apply-rkcl IMG_ROBIN=ghcr.io/inditextech/redkey-robin:${VERSION}
