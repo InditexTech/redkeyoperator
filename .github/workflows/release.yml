@@ -26,7 +26,7 @@ jobs:
           fetch-depth: 0
       - name: Check bundle generation 🧪
         run: |
-            make bundle
+            make bundle IMAGE_TAG_BASE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
             git diff  --ignore-matching-lines='.*createdAt:.*' --exit-code
 
       - name: 📝 Load Operator version
