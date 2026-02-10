@@ -1,6 +1,3 @@
-# SPDX-FileCopyrightText: 2025 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
-# SPDX-License-Identifier: Apache-2.0
-
 apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
@@ -8,7 +5,7 @@ metadata:
     alm-examples: |-
       [
         {
-          "apiVersion": "redis.inditex.dev/v1",
+          "apiVersion": "redkey.inditex.dev/v1",
           "kind": "RedkeyCluster",
           "metadata": {
             "name": "redis-cluster-example"
@@ -39,7 +36,7 @@ spec:
     - description: RedkeyCluster is the Schema for the redkeyclusters API
       displayName: Redkey Cluster
       kind: RedkeyCluster
-      name: redkeyclusters.redis.inditex.dev
+      name: redkeyclusters.redkey.inditex.dev
       specDescriptors:
       - description: ReplicasPerPrimary specifies how many replicas should be attached
           to each Redis Primary node

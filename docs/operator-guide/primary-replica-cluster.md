@@ -13,7 +13,7 @@ Clusters with primary-replica architecture can be created by adding `replciasPer
 The minimum configuration for the correct operation of this function is:
 
 ```yaml
-apiVersion: redis.inditex.dev/v1
+apiVersion: redkey.inditex.dev/v1
 kind: RedkeyCluster
 ...
 spec:
@@ -27,7 +27,7 @@ The `primaries` definition is the total number of Redis primary nodes in the clu
 If this feature is enabled, this additional configuration should be added to `redis.conf` to improve efficiency.
 
 ```yaml
-apiVersion: redis.inditex.dev/v1
+apiVersion: redkey.inditex.dev/v1
 kind: RedkeyCluster
 ...
 spec:
@@ -48,7 +48,7 @@ spec:
 ## Examples
 
 ```yaml
-apiVersion: redis.inditex.dev/v1
+apiVersion: redkey.inditex.dev/v1
 kind: RedkeyCluster
 ...
 spec:
@@ -61,7 +61,7 @@ spec:
 Redkey Operator will create 6 pods, 3 primaries and 3 replicas (one for each primary).
 
 ```yaml
-apiVersion: redis.inditex.dev/v1
+apiVersion: redkey.inditex.dev/v1
 kind: RedkeyCluster
 ...
 spec:
@@ -73,7 +73,7 @@ spec:
 Redkey Operator will create 15 pods, 5 primaries and 10 replicas (two for each primary).
 
 ```yaml
-apiVersion: redis.inditex.dev/v1
+apiVersion: redkey.inditex.dev/v1
 kind: RedkeyCluster
 ...
 spec:
@@ -85,7 +85,7 @@ spec:
 Redkey Operator will create 5 pods, 5 primaries and no replicas.
 
 ```yaml
-apiVersion: redis.inditex.dev/v1
+apiVersion: redkey.inditex.dev/v1
 kind: RedkeyCluster
 ...
 spec:

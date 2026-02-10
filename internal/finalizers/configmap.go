@@ -25,5 +25,5 @@ func (ef *ConfigMapCleanupFinalizer) DeleteMethod(ctx context.Context, redis *re
 }
 
 func (ef *ConfigMapCleanupFinalizer) GetId() string {
-	return "redis.inditex.dev/configmap-cleanup"
+	return "redkey.inditex.dev/configmap-cleanup"
 }

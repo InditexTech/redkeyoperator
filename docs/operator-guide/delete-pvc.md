@@ -21,7 +21,7 @@ Starting with Redkey Operator release 0.2.33, Redkey Operator supports deletion 
 ## Example
 
 ```yaml
-apiVersion: redis.inditex.dev/v1
+apiVersion: redkey.inditex.dev/v1
 kind: RedkeyCluster
 ...
 spec:

@@ -31,7 +31,7 @@ func (c *rkclClient) List(ctx context.Context, opts metav1.ListOptions) (*redkey
 	result := redkeyv1.RedkeyClusterList{}
 	err := c.restClient.
 		Get().
-		AbsPath("/apis/redis.inditex.dev/redisv1").
+		AbsPath("/apis/redkey.inditex.dev/redisv1").
 		Namespace(c.ns).
 		Resource("redkeyclusters").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -45,7 +45,7 @@ func (c *rkclClient) Get(ctx context.Context, name string, opts metav1.GetOption
 	result := redkeyv1.RedkeyCluster{}
 	err := c.restClient.
 		Get().
-		AbsPath("/apis/redis.inditex.dev/v1").
+		AbsPath("/apis/redkey.inditex.dev/v1").
 		Namespace(c.ns).
 		Resource("redkeyclusters").
 		Name(name).
@@ -58,7 +58,7 @@ func (c *rkclClient) Get(ctx context.Context, name string, opts metav1.GetOption
 func (c *rkclClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.restClient.Get().
-		AbsPath("/apis/redis.inditex.dev/v1").
+		AbsPath("/apis/redkey.inditex.dev/v1").
 		Namespace(c.ns).
 		Resource("redkeyclusters").
 		VersionedParams(&opts, scheme.ParameterCodec).

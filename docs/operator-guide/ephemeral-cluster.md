@@ -13,7 +13,7 @@ Ephemeral mode, also known as Zero Persistent Volume Claims (PVCs), disables per
 For a new cluster configuration, set the property `ephemeral: true` and apply the configuration. See the following snippet:
 
 ```yaml
-apiVersion: redis.inditex.dev/v1
+apiVersion: redkey.inditex.dev/v1
 kind: RedkeyCluster
 metadata:
   name: redis-cluster

@@ -259,11 +259,11 @@ docker-push: ##	Push operator $(CONTAINER_TOOL) image (uses `${IMG}` image name)
 ##@ Deployment
 install: create-namespace process-manifests-crd ##		Install CRD into the K8s cluster specified by kubectl default context (Kustomize is installed if not present).
 	$(info $(M) applying CRD manifest file)
-	kubectl apply -f deployment/redis.inditex.dev_redkeyclusters.yaml
+	kubectl apply -f deployment/redkey.inditex.dev_redkeyclusters.yaml
 
 uninstall: process-manifests-crd ##		Uninstall CRD from the K8s cluster specified by kubectl default context (Kustomize is installed if not present).
 	$(info $(M) deleting CRD)
-	kubectl delete -f deployment/redis.inditex.dev_redkeyclusters.yaml
+	kubectl delete -f deployment/redkey.inditex.dev_redkeyclusters.yaml
 
 process-manifests: kustomize process-manifests-crd ##		Generate the kustomized yamls into the `deployment` directory to deploy the manager.
 	$(info $(M) generating Manager deploying manifest files using ${PROFILE} profile)
@@ -281,7 +281,7 @@ process-manifests: kustomize process-manifests-crd ##		Generate the kustomized y
 process-manifests-crd: kustomize manifests ##	Generate the kustomized yamls into the `deployment` directory to deploy the CRD.
 	$(info $(M) generating CRD deploying manifest files)
 	mkdir -p deployment
-	$(KUSTOMIZE) build config/crd > deployment/redis.inditex.dev_redkeyclusters.yaml
+	$(KUSTOMIZE) build config/crd > deployment/redkey.inditex.dev_redkeyclusters.yaml
 	@echo "CRD manifest generated successfully"
 
 deploy: deploy-manager ##		Deploy the manager into the K8s cluster specified by kubectl default context.

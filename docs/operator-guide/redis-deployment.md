@@ -13,7 +13,7 @@ Redkey operator CRD defines a new resource type `RedkeyCluster`.
 Below you'll find an example of manifest conforming to the resource definition that will deploy a Redkey cluster:
 
 ```yaml
-apiVersion: redis.inditex.dev/v1
+apiVersion: redkey.inditex.dev/v1
 kind: RedkeyCluster
 metadata:
   name: redkeycluster-sample

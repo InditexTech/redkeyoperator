@@ -233,7 +233,7 @@ func CreateRedkeyCluster() *redkeyv1.RedkeyCluster {
 	cluster := &redkeyv1.RedkeyCluster{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "RedkeyCluster",
-			APIVersion: "redis.inditex.dev/redisv1",
+			APIVersion: "redkey.inditex.dev/redisv1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "redkeycluster-sample",

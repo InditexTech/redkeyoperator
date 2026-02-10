@@ -68,7 +68,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - redis.inditex.dev
+  - redkey.inditex.dev
   resources:
   - redkeyclusters
   verbs:
@@ -80,13 +80,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - redis.inditex.dev
+  - redkey.inditex.dev
   resources:
   - redkeyclusters/finalizers
   verbs:
   - update
 - apiGroups:
-  - redis.inditex.dev
+  - redkey.inditex.dev
   resources:
   - redkeyclusters/status
   verbs:

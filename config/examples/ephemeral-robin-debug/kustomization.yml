@@ -11,6 +11,6 @@ patches:
     name: redis-cluster-ephemeral
 
 resources:
- - redis_v1_redkeycluster-ephemeral.yaml
+ - redkey_v1_redkeycluster-ephemeral.yaml
 
 namespace: redkey-operator

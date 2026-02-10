@@ -45,7 +45,7 @@ const (
 	defaultConfig                 = `save ""
 appendonly no
 maxmemory 70mb`
-	finalizerName  = "redis.inditex.dev/configmap-cleanup"
+	finalizerName  = "redkey.inditex.dev/configmap-cleanup"
 	pollInterval   = 5 * time.Second
 	defaultTimeout = 60 * time.Minute
 
