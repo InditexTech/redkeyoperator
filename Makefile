@@ -39,7 +39,8 @@ GO_COMPILE_FLAGS='-X $(MODULE)/cmd/server.GitCommit=$(COMMIT) -X $(MODULE)/cmd/s
 SED = sed
 
 # Test coverage files
-TEST_COVERAGE_PROFILE_OUTPUT = .local/coverage.out
+TEST_COVERAGE_PROFILE_OUTPUT = ./local
+TEST_COVERAGE_PROFILE_OUTPUT_FILE = coverage.out
 TEST_E2E_OUTPUT = .local/results.json
 TEST_REPORT_OUTPUT = .local/test_report.ndjson
 TEST_REPORT_OUTPUT_E2E = .local/test_report_e2e.ndjson
@@ -577,5 +578,5 @@ test-e2e-cov: process-manifests-crd ginkgo  ## Execute e2e application test with
 	$(info $(M) running e2e tests with coverage $(GINKGO_ENV))
 	@mkdir -p $(dir $(TEST_COVERAGE_PROFILE_OUTPUT))
 	$(GINKGO_ENV) ginkgo \
-	     -cover -covermode=count -coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT) \
+	     -cover -covermode=count -coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT_FILE) -output-dir=$(TEST_COVERAGE_PROFILE_OUTPUT) \
 		$(GINKGO_OPTS) $(GINKGO_PACKAGES)
