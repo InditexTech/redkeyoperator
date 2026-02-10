@@ -1,5 +1,5 @@
 <!--
-SPDX-FileCopyrightText: 2024 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
+SPDX-FileCopyrightText: 2025 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
 
 SPDX-License-Identifier: CC-BY-SA-4.0
 -->
@@ -21,7 +21,7 @@ Starting with Redkey Operator release 0.2.33, Redkey Operator supports deletion 
 ## Example
 
 ```yaml
-apiVersion: redis.inditex.dev/v1
+apiVersion: redkey.inditex.dev/v1
 kind: RedkeyCluster
 ...
 spec:

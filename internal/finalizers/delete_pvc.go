@@ -22,5 +22,5 @@ func (ef *DeletePVCFinalizer) DeleteMethod(ctx context.Context, redis *redkeyv1.
 }
 
 func (ef *DeletePVCFinalizer) GetId() string {
-	return "redis.inditex.dev/delete-pvc"
+	return "redkey.inditex.dev/delete-pvc"
 }

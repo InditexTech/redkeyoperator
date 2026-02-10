@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2025 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
 # SPDX-License-Identifier: Apache-2.0
 
-apiVersion: redis.inditex.dev/v1
+apiVersion: redkey.inditex.dev/v1
 kind: RedkeyCluster
 metadata:
   labels:

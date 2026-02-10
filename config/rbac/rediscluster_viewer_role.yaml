@@ -11,7 +11,7 @@ metadata:
   name: redkeycluster-viewer-role
 rules:
 - apiGroups:
-  - redis.inditex.dev
+  - redkey.inditex.dev
   resources:
   - redkeyclusters
   verbs:
@@ -19,7 +19,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - redis.inditex.dev
+  - redkey.inditex.dev
   resources:
   - redkeyclusters/status
   verbs:

@@ -46,6 +46,7 @@ config/init-test/tests.yaml
 
 # Bundle temporary files
 bundle
+bundle_*
 bundle.Dockerfile
 
 # Certificates

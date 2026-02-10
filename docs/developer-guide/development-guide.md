@@ -1,5 +1,5 @@
 <!--
-SPDX-FileCopyrightText: 2024 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
+SPDX-FileCopyrightText: 2025 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
 
 SPDX-License-Identifier: CC-BY-SA-4.0
 -->
@@ -59,7 +59,7 @@ make install
 make deploy
 ```
 
-3. Deploy an example Redkey Cluster from `config/examples` folder. Just so you know, a Redkey Robin image is required; for example, see [Redkey Robin](https://github.com/InditexTech/redkeyrobin).
+3. Deploy an example Redkey Cluster from `config/examples` folder. Just so you know, a Redkey Robin image is required; to know how it can be built, see [Redkey Robin](https://github.com/InditexTech/redkeyrobin).
 
 ```shell
 # Create a rkcl/redis-cluster-ephemeral: 3 nodes, ephemeral: true and purgeKeysOnRebalance: true.

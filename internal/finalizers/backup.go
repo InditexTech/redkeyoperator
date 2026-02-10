@@ -20,5 +20,5 @@ func (ef *BackupFinalizer) DeleteMethod(ctx context.Context, redis *redkeyv1.Red
 }
 
 func (ef *BackupFinalizer) GetId() string {
-	return "redis.inditex.dev/rdb-backup"
+	return "redkey.inditex.dev/rdb-backup"
 }

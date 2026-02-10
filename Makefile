@@ -5,16 +5,16 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
-name           := redkey-cluster-operator
-version        := 1.3.0
-golang_version := 1.25.6
-delve_version  := 1.25
-package        := github.com/inditextech/$(name)
+NAME           := redkey-cluster-operator
+VERSION        := 0.1.0
+GOLANG_VERSION := 1.25.7
+DELVE_VERSION  := 1.25
+PACKAGE        := github.com/inditextech/$(NAME)
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.8.0
-CONTROLLER_TOOLS_VERSION ?= v0.20.0
 OPERATOR_SDK_VERSION ?= v1.42.0
+CONTROLLER_TOOLS_VERSION ?= v0.18.0
 
 # .............................................................................
 # DONT TOUCH THIS SECTION
@@ -33,7 +33,7 @@ SRC = $(shell find . -path ./vendor -prune -o -name '*.go' -print)
 M = $(shell printf "\033[34;1m▶\033[0m")
 
 MODULE=$(shell go list -m)
-GO_COMPILE_FLAGS='-X $(MODULE)/cmd/server.GitCommit=$(COMMIT) -X $(MODULE)/cmd/server.BuildDate=$(DATE) -X $(MODULE)/cmd/server.VersionBuild=$(version)'
+GO_COMPILE_FLAGS='-X $(MODULE)/cmd/server.GitCommit=$(COMMIT) -X $(MODULE)/cmd/server.BuildDate=$(DATE) -X $(MODULE)/cmd/server.VersionBuild=$(VERSION)'
 
 # Auxiliar programs
 SED = sed
@@ -68,6 +68,8 @@ ifeq ($(filter $(PROFILE_ROBIN),$(PROFILES_ROBIN)), )
 $(error The PROFILE_ROBIN specified ($(PROFILE)) is not supported)
 endif
 
+CHANNELS ?= alpha,beta,stable
+
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "preview,fast,stable")
 # To re-generate a bundle for other specific channels without changing the standard setup, you can:
@@ -82,6 +84,7 @@ endif
 # To re-generate a bundle for any other default channel without changing the default setup, you can:
 # - use the DEFAULT_CHANNEL as arg of the bundle target (e.g make bundle DEFAULT_CHANNEL=stable)
 # - use environment variables to overwrite this value (e.g export DEFAULT_CHANNEL="stable")
+DEFAULT_CHANNEL ?= stable
 ifneq ($(origin DEFAULT_CHANNEL), undefined)
 BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
 endif
@@ -94,15 +97,27 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
+# CONTAINER_TOOL defines the container tool to be used for building images.
+# Be aware that the target commands are only tested with Docker which is
+# scaffolded by default. However, you might want to replace it to use other
+# tools. (i.e. podman)
+CONTAINER_TOOL ?= docker
+
+# IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
+# This variable is used to construct full image tags for bundle and catalog images.
+#
+# For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
+# inditex.dev/sample-bundle:$VERSION and inditex.dev/sample-catalog:$VERSION.
+IMAGE_TAG_BASE ?= localhost:5001/redkey-operator
+ROBIN_IMAGE_TAG_BASE ?= localhost:5001/redkey-robin
+
 # Image URL to use for building/pushing image targets
-IMG ?= localhost:5001/redkey-operator:$(PROFILE)
-IMG_ROBIN ?= localhost:5001/redkey-robin:$(PROFILE_ROBIN)
+IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
+IMG_ROBIN ?= $(ROBIN_IMAGE_TAG_BASE):$(PROFILE_ROBIN)
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
-BUNDLE_IMG ?= controller-bundle:$(version)
-
-CHANNELS ?= alpha,beta
+BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:$(VERSION)
 
 # Image REF in bundle image
 # Can be overwritten with make bundle IMAGE_REF=<some-registry>/<project-name-bundle>:<tag>
@@ -144,7 +159,7 @@ deps: ## Installs dependencies
 
 .PHONY: version
 version:: ## Print the current version of the project.
-	@echo "$(version)"
+	@echo "$(VERSION)"
 
 .PHONY: version-next
 version-next:: ## Bump to next development version
@@ -190,12 +205,16 @@ clean: ## Clean the build artifacts and Go cache
 	rm -f bundle.Dockerfile
 	rm -rf ./deployment
 	rm -rf ./certs
+	rm -rf .local
 	$(GO) clean --modcache
 
 ##@ Development
-manifests: controller-gen ##	Generate ClusterRole and CustomResourceDefinition objects.
+manifests: kustomize controller-gen ##	Generate ClusterRole and CustomResourceDefinition objects.
 	$(info $(M) generating config CRD base manifest files from code)
 	$(CONTROLLER_GEN) rbac:roleName=redkey-operator-role crd:maxDescLen=0 paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(info $(M) setting operator-version annotation in CRD kustomization file)
+	cd config/crd && \
+	$(KUSTOMIZE) edit set annotation inditex.dev/operator-version:$(VERSION);
 
 generate: controller-gen ##	Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
@@ -229,22 +248,22 @@ run: ##	Execute the program locally
 docker-build: test ##	Build operator docker image from source or an empty image to copy the binary if default profile (uses `${IMG}` image name)
 	$(info $(M) building operator docker image)
 	if [ ${PROFILE} != "debug" ]; then \
-		docker build -t ${IMG} --build-arg GOLANG_VERSION=${golang_version} . ; \
+		$(CONTAINER_TOOL) build -t ${IMG} --build-arg GOLANG_VERSION=$(GOLANG_VERSION) . ; \
 	else \
-		docker build -t ${IMG} -f debug.Dockerfile --build-arg GOLANG_VERSION=${golang_version} --build-arg DELVE_VERSION=${delve_version} . ; \
+		$(CONTAINER_TOOL) build -t ${IMG} -f debug.Dockerfile --build-arg GOLANG_VERSION=$(GOLANG_VERSION) --build-arg DELVE_VERSION=$(DELVE_VERSION) . ; \
 	fi
-docker-push: ##	Push operator docker image (uses `${IMG}` image name).
+docker-push: ##	Push operator $(CONTAINER_TOOL) image (uses `${IMG}` image name).
 	$(info $(M) pushing operator docker image)
-	docker push ${IMG}
+	$(CONTAINER_TOOL) push ${IMG}
 
 ##@ Deployment
 install: create-namespace process-manifests-crd ##		Install CRD into the K8s cluster specified by kubectl default context (Kustomize is installed if not present).
 	$(info $(M) applying CRD manifest file)
-	kubectl apply -f deployment/redis.inditex.dev_redkeyclusters.yaml
+	kubectl apply -f deployment/redkey.inditex.dev_redkeyclusters.yaml
 
 uninstall: process-manifests-crd ##		Uninstall CRD from the K8s cluster specified by kubectl default context (Kustomize is installed if not present).
 	$(info $(M) deleting CRD)
-	kubectl delete -f deployment/redis.inditex.dev_redkeyclusters.yaml
+	kubectl delete -f deployment/redkey.inditex.dev_redkeyclusters.yaml
 
 process-manifests: kustomize process-manifests-crd ##		Generate the kustomized yamls into the `deployment` directory to deploy the manager.
 	$(info $(M) generating Manager deploying manifest files using ${PROFILE} profile)
@@ -262,7 +281,7 @@ process-manifests: kustomize process-manifests-crd ##		Generate the kustomized y
 process-manifests-crd: kustomize manifests ##	Generate the kustomized yamls into the `deployment` directory to deploy the CRD.
 	$(info $(M) generating CRD deploying manifest files)
 	mkdir -p deployment
-	$(KUSTOMIZE) build config/crd > deployment/redis.inditex.dev_redkeyclusters.yaml
+	$(KUSTOMIZE) build config/crd > deployment/redkey.inditex.dev_redkeyclusters.yaml
 	@echo "CRD manifest generated successfully"
 
 deploy: deploy-manager ##		Deploy the manager into the K8s cluster specified by kubectl default context.
@@ -450,16 +469,58 @@ bundle: kustomize manifests ## Generate the files for bundle.
 	rm -rf bundle/metadata/*
 	$(OPERATOR_SDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image redkey-operator=$(IMAGE_REF)
-	$(KUSTOMIZE) build config | $(OPERATOR_SDK) generate bundle -q --overwrite --channels $(CHANNELS) --version $(version) $(BUNDLE_METADATA_OPTS)
+	$(KUSTOMIZE) build config | $(OPERATOR_SDK) generate bundle -q --overwrite --channels $(CHANNELS) --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 	$(OPERATOR_SDK) bundle validate ./bundle
+	# Remove the images section from the kustomization.yaml added when kustomizing.
+	cd config/manager && sed -i '/^images:$$/,/^[^ -]/{ /^images:$$/d; /^- name: redkey-operator$$/,/^  newTag:/d; }' kustomization.yaml && sed -i '/^images:$$/d' kustomization.yaml
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
-	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+	$(CONTAINER_TOOL) build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 bundle-push: ## Push the bundle image.
-	docker push $(BUNDLE_IMG)
+	$(CONTAINER_TOOL) push $(BUNDLE_IMG)
 
+.PHONY: opm
+OPM = $(LOCALBIN)/opm
+opm: ## Download opm locally if necessary.
+ifeq (,$(wildcard $(OPM)))
+ifeq (,$(shell which opm 2>/dev/null))
+	@{ \
+	set -e ;\
+	mkdir -p $(dir $(OPM)) ;\
+	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
+	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/v1.55.0/$${OS}-$${ARCH}-opm ;\
+	chmod +x $(OPM) ;\
+	}
+else
+OPM = $(shell which opm)
+endif
+endif
+
+# A comma-separated list of bundle images (e.g. make catalog-build BUNDLE_IMGS=example.com/operator-bundle:v0.1.0,example.com/operator-bundle:v0.2.0).
+# These images MUST exist in a registry and be pull-able.
+BUNDLE_IMGS ?= $(BUNDLE_IMG)
+
+# The image tag given to the resulting catalog image (e.g. make catalog-build CATALOG_IMG=example.com/operator-catalog:v0.2.0).
+CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:v$(VERSION)
+
+# Set CATALOG_BASE_IMG to an existing catalog image tag to add $BUNDLE_IMGS to that image.
+ifneq ($(origin CATALOG_BASE_IMG), undefined)
+FROM_INDEX_OPT := --from-index $(CATALOG_BASE_IMG)
+endif
+
+# Build a catalog image by adding bundle images to an empty catalog using the operator package manager tool, 'opm'.
+# This recipe invokes 'opm' in 'semver' bundle add mode. For more information on add modes, see:
+# https://github.com/operator-framework/community-operators/blob/7f1438c/docs/packaging-operator.md#updating-your-existing-operator
+.PHONY: catalog-build
+catalog-build: opm ## Build a catalog image.
+	$(OPM) index add --container-tool $(CONTAINER_TOOL) --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
+
+# Push the catalog image.
+.PHONY: catalog-push
+catalog-push: ## Push a catalog image.
+	$(MAKE) docker-push IMG=$(CATALOG_IMG)
 
 ##@ Test
 
