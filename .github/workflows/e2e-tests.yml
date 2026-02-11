@@ -69,17 +69,13 @@ jobs:
     - name: 📚  Install Ginkgo CLI
       run: go install github.com/onsi/ginkgo/v2/ginkgo@latest
     
-    - name: 📚 CRD installation
+    - name: 📚 Install CRD
       run: make install
 
     - name: ✅  Run E2E test suite
-      env:
-        TEST_PARALLEL_PROCESSES: ${{ github.event.inputs.test_parallel_process || 2 }}
       run: |
-        make test-e2e-cov \
-          IMG=${{ env.LOCAL_REGISTRY }}:${{ env.LOCAL_REGISTRY_PORT }}/redkey-operator:${{ env.OPERATOR_VERSION }} \
-          TEST_PARALLEL_PROCESS=${TEST_PARALLEL_PROCESSES} \
-          GOMAXPROCS=${TEST_PARALLEL_PROCESSES}
+        make test-e2e \
+          IMG=${{ env.LOCAL_REGISTRY }}:${{ env.LOCAL_REGISTRY_PORT }}/redkey-operator:${{ env.OPERATOR_VERSION }}
 
     - name: 🧹  Delete KinD cluster (always)
       if: always()
