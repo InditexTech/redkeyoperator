@@ -12,7 +12,7 @@ on:
     inputs:
       test_parallel_process:
         description: Number of parallel processes for the E2E test suite
-        default: '2'
+        default: '4'
         required: false
 
 concurrency:
@@ -21,13 +21,11 @@ concurrency:
 
 env:
   OPERATOR_NAME: redkey-operator
-  OPERATOR_VERSION: 0.1.0
+  OPERATOR_VERSION: test-e2e
   KUBECONFIG: ${{ github.workspace }}/.kube/config
   LOCAL_CLUSTER_NAME: local-cluster-test
   LOCAL_REGISTRY: local-registry-hosting
   LOCAL_REGISTRY_PORT: 5001
-  REDIS_STACK_SERVER: redis/redis-stack-server
-  REDIS_STACK_SERVER_VERSION: 7.4.0-v3
 
 jobs:
   e2e:
@@ -47,12 +45,6 @@ jobs:
         go-version-file: go.mod
         cache: true
 
-    - name: 🐳  Prepare Buildx builder
-      uses: docker/setup-buildx-action@v3
-      with:
-        install: true
-        driver-opts: image=moby/buildkit:v0.21.0
-
     - name: 🔧  Install kubectl
       uses: azure/setup-kubectl@v3
       with:
@@ -67,29 +59,12 @@ jobs:
         registry_name: ${{ env.LOCAL_REGISTRY }}
         registry_port: ${{ env.LOCAL_REGISTRY_PORT }}
 
-    - name: 🏗️  Build operator image and load into KinD
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        tags: ${{ env.OPERATOR_NAME }}:${{ env.OPERATOR_VERSION }}
-        load: true
-        push: false
-        cache-from: type=local,src=/tmp/.buildx-cache
-        cache-to:   type=local,dest=/tmp/.buildx-cache,mode=max
+    - name: 🏗️  Build operator image
+      run: |
+        make docker-build IMG=${{ env.LOCAL_REGISTRY }}:${{ env.LOCAL_REGISTRY_PORT }}/redkey-operator:${{ env.OPERATOR_VERSION }}
 
     - name: 📥 Load operator image into KinD
-      run: kind load docker-image --name ${{ env.LOCAL_CLUSTER_NAME }} ${{ env.OPERATOR_NAME }}:${{ env.OPERATOR_VERSION }}
-
-    - name: 📦  Pull dependency images & load into KinD
-      run: |
-        for img in \
-          ${{ env.REDIS_STACK_SERVER }}:7.2.0-v10 \
-          ${{ env.REDIS_STACK_SERVER }}:${{ env.REDIS_STACK_SERVER_VERSION }} \
-          alpine:3.21.3
-        do
-          docker pull "$img"
-          kind load docker-image --name ${{ env.LOCAL_CLUSTER_NAME }} "$img"
-        done
+      run: kind load docker-image --name ${{ env.LOCAL_CLUSTER_NAME }} ${{ env.LOCAL_REGISTRY }}:${{ env.LOCAL_REGISTRY_PORT }}/redkey-operator:${{ env.OPERATOR_VERSION }}
 
     - name: 📚  Install Ginkgo CLI
       run: go install github.com/onsi/ginkgo/v2/ginkgo@latest
@@ -102,7 +77,7 @@ jobs:
         TEST_PARALLEL_PROCESSES: ${{ github.event.inputs.test_parallel_process || 2 }}
       run: |
         make test-e2e-cov \
-          OPERATOR_IMAGE=${{ env.OPERATOR_NAME }}:${{ env.OPERATOR_VERSION }} \
+          IMG=${{ env.LOCAL_REGISTRY }}:${{ env.LOCAL_REGISTRY_PORT }}/redkey-operator:${{ env.OPERATOR_VERSION }} \
           TEST_PARALLEL_PROCESS=${TEST_PARALLEL_PROCESSES} \
           GOMAXPROCS=${TEST_PARALLEL_PROCESSES}
 
