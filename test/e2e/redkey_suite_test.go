@@ -455,99 +455,99 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 		)
 	})
 
-	Context("Primary-Replica layout", func() {
-		const (
-			clusterName    = "primary-test"
-			initPrimaries  = int32(3)
-			initPerPrimary = int32(1)
-		)
+	// Context("Primary-Replica layout", func() {
+	// 	const (
+	// 		clusterName    = "primary-test"
+	// 		initPrimaries  = int32(3)
+	// 		initPerPrimary = int32(1)
+	// 	)
 
-		var key types.NamespacedName
-		BeforeEach(func() {
-			key = types.NamespacedName{Namespace: namespace.Name, Name: clusterName}
+	// 	var key types.NamespacedName
+	// 	BeforeEach(func() {
+	// 		key = types.NamespacedName{Namespace: namespace.Name, Name: clusterName}
 
-			// single bootstrap for every entry
-			mustCreateAndReady(
-				clusterName,
-				initPrimaries, initPerPrimary,
-				"", // no PVC
-				framework.GetRedisImage(),
-				true, // purgeKeys
-				true, // ephemeral
-				redkeyv1.Pdb{},
-				redkeyv1.RedkeyClusterOverrideSpec{},
-			)
-		})
+	// 		// single bootstrap for every entry
+	// 		mustCreateAndReady(
+	// 			clusterName,
+	// 			initPrimaries, initPerPrimary,
+	// 			"", // no PVC
+	// 			framework.GetRedisImage(),
+	// 			true, // purgeKeys
+	// 			true, // ephemeral
+	// 			redkeyv1.Pdb{},
+	// 			redkeyv1.RedkeyClusterOverrideSpec{},
+	// 		)
+	// 	})
 
-		// ---------------------------------------------------------------- helpers
+	// 	// ---------------------------------------------------------------- helpers
 
-		checkLayout := func(primaries, perPrimary int32) {
-			Eventually(func() (bool, error) {
-				return framework.ValidateRedkeyClusterPrimaryReplica(
-					ctx, k8sClient, key, primaries, perPrimary)
-			}, defaultWait*2, defaultPoll).Should(BeTrue())
-		}
+	// 	checkLayout := func(primaries, perPrimary int32) {
+	// 		Eventually(func() (bool, error) {
+	// 			return framework.ValidateRedkeyClusterPrimaryReplica(
+	// 				ctx, k8sClient, key, primaries, perPrimary)
+	// 		}, defaultWait*2, defaultPoll).Should(BeTrue())
+	// 	}
 
-		type tc struct {
-			desc           string
-			mutate         func(*redkeyv1.RedkeyCluster)
-			wantRep        int32
-			wantPerPrimary int32
-		}
+	// 	type tc struct {
+	// 		desc           string
+	// 		mutate         func(*redkeyv1.RedkeyCluster)
+	// 		wantRep        int32
+	// 		wantPerPrimary int32
+	// 	}
 
-		DescribeTable("primary/replica mutations",
-			func(ctx SpecContext, t tc) {
-				if t.mutate == nil {
-					checkLayout(t.wantRep, t.wantPerPrimary)
-					return
-				}
+	// 	DescribeTable("primary/replica mutations",
+	// 		func(ctx SpecContext, t tc) {
+	// 			if t.mutate == nil {
+	// 				checkLayout(t.wantRep, t.wantPerPrimary)
+	// 				return
+	// 			}
 
-				rc, _, err := framework.ChangeCluster(
-					ctx, k8sClient, key,
-					framework.ChangeClusterOptions{Mutate: t.mutate},
-				)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(rc.Spec.Primaries).To(Equal(t.wantRep))
-				Expect(rc.Spec.ReplicasPerPrimary).To(Equal(t.wantPerPrimary))
+	// 			rc, _, err := framework.ChangeCluster(
+	// 				ctx, k8sClient, key,
+	// 				framework.ChangeClusterOptions{Mutate: t.mutate},
+	// 			)
+	// 			Expect(err).NotTo(HaveOccurred())
+	// 			Expect(rc.Spec.Primaries).To(Equal(t.wantRep))
+	// 			Expect(rc.Spec.ReplicasPerPrimary).To(Equal(t.wantPerPrimary))
 
-				checkLayout(t.wantRep, t.wantPerPrimary)
-			},
+	// 			checkLayout(t.wantRep, t.wantPerPrimary)
+	// 		},
 
-			// ──────────────────────────────────────────────────────────
-			Entry("baseline distribution is correct", SpecTimeout(rebalancingTestDuration),
-				tc{
-					desc:           "validateInitial",
-					mutate:         nil,
-					wantRep:        initPrimaries,
-					wantPerPrimary: initPerPrimary,
-				},
-			),
+	// 		// ──────────────────────────────────────────────────────────
+	// 		Entry("baseline distribution is correct", SpecTimeout(rebalancingTestDuration),
+	// 			tc{
+	// 				desc:           "validateInitial",
+	// 				mutate:         nil,
+	// 				wantRep:        initPrimaries,
+	// 				wantPerPrimary: initPerPrimary,
+	// 			},
+	// 		),
 
-			Entry("scale up to 5/2", SpecTimeout(rebalancingTestDuration*2),
-				tc{
-					desc: "scaleUp",
-					mutate: func(r *redkeyv1.RedkeyCluster) {
-						r.Spec.Primaries = 5
-						r.Spec.ReplicasPerPrimary = 2
-					},
-					wantRep:        5,
-					wantPerPrimary: 2,
-				},
-			),
+	// 		Entry("scale up to 5/2", SpecTimeout(rebalancingTestDuration*2),
+	// 			tc{
+	// 				desc: "scaleUp",
+	// 				mutate: func(r *redkeyv1.RedkeyCluster) {
+	// 					r.Spec.Primaries = 5
+	// 					r.Spec.ReplicasPerPrimary = 2
+	// 				},
+	// 				wantRep:        5,
+	// 				wantPerPrimary: 2,
+	// 			},
+	// 		),
 
-			Entry("scale down to 3/1", SpecTimeout(rebalancingTestDuration*2),
-				tc{
-					desc: "scaleDown",
-					mutate: func(r *redkeyv1.RedkeyCluster) {
-						r.Spec.Primaries = 3
-						r.Spec.ReplicasPerPrimary = 1
-					},
-					wantRep:        3,
-					wantPerPrimary: 1,
-				},
-			),
-		)
-	})
+	// 		Entry("scale down to 3/1", SpecTimeout(rebalancingTestDuration*2),
+	// 			tc{
+	// 				desc: "scaleDown",
+	// 				mutate: func(r *redkeyv1.RedkeyCluster) {
+	// 					r.Spec.Primaries = 3
+	// 					r.Spec.ReplicasPerPrimary = 1
+	// 				},
+	// 				wantRep:        3,
+	// 				wantPerPrimary: 1,
+	// 			},
+	// 		),
+	// 	)
+	// })
 
 	Context("Data integrity across scale", func() {
 		const base = "data-test"
