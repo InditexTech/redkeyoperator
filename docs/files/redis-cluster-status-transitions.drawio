@@ -1,0 +1,360 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36" version="26.2.14">
+  <diagram name="Página-1" id="2VvjCBkx8VA0-5QefvtA">
+    <mxGraphModel grid="0" page="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" pageScale="1" pageWidth="1169" pageHeight="1654" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--1" value="" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillStyle=solid;fillColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="466" y="81" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--2" value="No status" style="ellipse;whiteSpace=wrap;html=1;fillColor=#93D2DA;" vertex="1" parent="1">
+          <mxGeometry x="421" y="145" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--3" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="aAkpJWbWGLXDjZrMgsH--1" target="aAkpJWbWGLXDjZrMgsH--2">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="621" y="485" as="sourcePoint" />
+            <mxPoint x="671" y="435" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--4" value="&lt;div style=&quot;font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; line-height: 19px; white-space-collapse: preserve;&quot;&gt;&lt;span&gt;&lt;font&gt;&lt;span style=&quot;&quot;&gt;k&lt;/span&gt; &lt;span style=&quot;&quot;&gt;apply&lt;/span&gt; &lt;span style=&quot;&quot;&gt;-&lt;/span&gt;&lt;span style=&quot;&quot;&gt;f&lt;/span&gt; &lt;span style=&quot;&quot;&gt;redis&lt;/span&gt;.&lt;span style=&quot;&quot;&gt;yaml&lt;/span&gt;&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;" style="edgeLabel;html=1;align=left;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=default;fontColor=#000000;" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--3">
+          <mxGeometry x="-0.16" y="-1" relative="1" as="geometry">
+            <mxPoint x="-69" y="-2" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--5" value="Initializing" style="ellipse;whiteSpace=wrap;html=1;fillColor=#6DD3F4;" vertex="1" parent="1">
+          <mxGeometry x="421" y="260" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--6" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="aAkpJWbWGLXDjZrMgsH--2" target="aAkpJWbWGLXDjZrMgsH--5">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="621" y="485" as="sourcePoint" />
+            <mxPoint x="481" y="235" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--7" value="&lt;div style=&quot;font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; line-height: 19px; white-space-collapse: preserve;&quot;&gt;&lt;font&gt;&lt;span style=&quot;&quot;&gt;clusterInfo&lt;/span&gt;[&lt;span style=&quot;&quot;&gt;&quot;cluster_state&quot;&lt;/span&gt;] != &quot;ok&quot;&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; line-height: 19px; white-space-collapse: preserve;&quot;&gt;&lt;font&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&lt;span style=&quot;&quot;&gt;&amp;amp;&amp;amp; clusterInfo&lt;/span&gt;[&lt;span style=&quot;&quot;&gt;&quot;cluster_slots_ok&quot;&lt;/span&gt;] == &quot;&quot;&lt;/div&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&lt;span style=&quot;&quot;&gt;&amp;amp;&amp;amp; len&lt;/span&gt;(&lt;span style=&quot;&quot;&gt;readyNodes&lt;/span&gt;) !&lt;span style=&quot;&quot;&gt;=&lt;/span&gt; &lt;span style=&quot;&quot;&gt;redkeyCluster&lt;/span&gt;.&lt;span style=&quot;&quot;&gt;NodesNeeded&lt;/span&gt;()&lt;/div&gt;&lt;/div&gt;&lt;/font&gt;&lt;/div&gt;" style="edgeLabel;html=1;align=left;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=default;fontColor=#000000;" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--6">
+          <mxGeometry x="-0.1333" y="3" relative="1" as="geometry">
+            <mxPoint x="-163" y="1" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--8" value="Configuring" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFB570;" vertex="1" parent="1">
+          <mxGeometry x="141" y="485" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--9" value="Ready" style="ellipse;whiteSpace=wrap;html=1;fillColor=light-dark(#a6eea5, #ededed);" vertex="1" parent="1">
+          <mxGeometry x="702" y="485" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--10" value="" style="endArrow=classic;html=1;rounded=0;exitX=0;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="aAkpJWbWGLXDjZrMgsH--5" target="aAkpJWbWGLXDjZrMgsH--8">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="621" y="495" as="sourcePoint" />
+            <mxPoint x="671" y="445" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--13" value="&lt;div style=&quot;white-space-collapse: preserve; font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; line-height: 19px;&quot;&gt;clusterInfo[&quot;cluster_state&quot;] != &quot;ok&quot;&lt;/div&gt;&lt;div style=&quot;white-space-collapse: preserve; font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; line-height: 19px;&quot;&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&amp;amp;&amp;amp; clusterInfo[&quot;cluster_slots_ok&quot;] == &quot;0&quot;&lt;/div&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&amp;amp;&amp;amp; len(readyNodes) != redkeyCluster.NodesNeeded()&lt;/div&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&amp;amp;&amp;amp; redkeyCluster.Spec.Pimaries != 0&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;" style="edgeLabel;html=1;align=right;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=default;" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--10">
+          <mxGeometry x="-0.1407" y="-3" relative="1" as="geometry">
+            <mxPoint x="72" y="-4" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--11" value="" style="endArrow=classic;html=1;rounded=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;exitX=1;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="1" source="aAkpJWbWGLXDjZrMgsH--5" target="aAkpJWbWGLXDjZrMgsH--9">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="481" y="305" as="sourcePoint" />
+            <mxPoint x="671" y="445" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--14" value="&lt;div style=&quot;white-space-collapse: preserve; font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; line-height: 19px;&quot;&gt;clusterInfo[&quot;cluster_state&quot;] != &quot;ok&quot;&lt;/div&gt;&lt;div style=&quot;white-space-collapse: preserve; font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; line-height: 19px;&quot;&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&amp;amp;&amp;amp; clusterInfo[&quot;cluster_slots_ok&quot;] == &quot;0&quot;&lt;/div&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&amp;amp;&amp;amp; len(readyNodes) != redkeyCluster.NodesNeeded()&lt;/div&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&amp;amp;&amp;amp; redkeyCluster.Spec.Pimaries == 0&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;" style="edgeLabel;html=1;align=left;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=default;" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--11">
+          <mxGeometry x="-0.2064" y="-1" relative="1" as="geometry">
+            <mxPoint x="-66" y="-4" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--15" value="" style="curved=1;endArrow=classic;html=1;rounded=0;exitX=1;exitY=0;exitDx=0;exitDy=0;entryX=0;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="aAkpJWbWGLXDjZrMgsH--8" target="aAkpJWbWGLXDjZrMgsH--9">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="621" y="495" as="sourcePoint" />
+            <mxPoint x="671" y="445" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="431" y="445" />
+              <mxPoint x="611" y="455" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--16" value="&lt;div style=&quot;text-align: left; white-space-collapse: preserve; font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; line-height: 19px;&quot;&gt;clusterInfo[&quot;cluster_state&quot;] == &quot;ok&quot;&lt;/div&gt;&lt;div style=&quot;text-align: left; white-space-collapse: preserve; font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; line-height: 19px;&quot;&gt;&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212)); color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;&amp;amp;&amp;amp; clusterInfo[&quot;cluster_slots_ok&quot;] == &quot;16384&quot;&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;text-align: left; white-space-collapse: preserve; font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; line-height: 19px;&quot;&gt;&lt;span style=&quot;font-family: Helvetica; white-space-collapse: collapse;&quot;&gt;&amp;amp;&amp;amp; sts.Spec.Replilcas ==&amp;nbsp;&lt;/span&gt;clusterInfo[&quot;cluster_known_nodes&quot;]&lt;div style=&quot;font-family: Helvetica; white-space-collapse: collapse;&quot;&gt;&lt;span style=&quot;font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; white-space-collapse: preserve;&quot;&gt;&amp;amp;&amp;amp; redkeyCluster.isbalanced()&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--15">
+          <mxGeometry x="0.0297" y="1" relative="1" as="geometry">
+            <mxPoint y="23" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--17" value="" style="curved=1;endArrow=classic;html=1;rounded=0;entryX=1;entryY=1;entryDx=0;entryDy=0;exitX=0;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="1" source="aAkpJWbWGLXDjZrMgsH--9" target="aAkpJWbWGLXDjZrMgsH--8">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="601" y="525" as="sourcePoint" />
+            <mxPoint x="671" y="445" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="571" y="545" />
+              <mxPoint x="401" y="545" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--18" value="sts.Spec.Replilcas &amp;gt;&amp;nbsp;&lt;span style=&quot;font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; white-space-collapse: preserve;&quot;&gt;clusterInfo&lt;/span&gt;&lt;span style=&quot;font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; white-space-collapse: preserve;&quot;&gt;[&lt;/span&gt;&lt;span style=&quot;font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; white-space-collapse: preserve;&quot;&gt;&quot;cluster_known_nodes&quot;&lt;/span&gt;&lt;span style=&quot;font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; white-space-collapse: preserve;&quot;&gt;]&lt;/span&gt;&lt;div&gt;&lt;span style=&quot;font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; white-space-collapse: preserve;&quot;&gt;|| !redkeyCluster.isbalanced()&lt;/span&gt;&lt;/div&gt;" style="edgeLabel;html=1;align=left;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=default;fontSize=11;fontColor=#000000;" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--17">
+          <mxGeometry x="0.0384" y="4" relative="1" as="geometry">
+            <mxPoint x="-158" y="-8" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--19" value="ScalingDown" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFF2CC;" vertex="1" parent="1">
+          <mxGeometry x="60" y="802" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--20" value="ScalingUp" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFCC;" vertex="1" parent="1">
+          <mxGeometry x="380" y="802" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--21" value="Upgrading" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFCCCC;" vertex="1" parent="1">
+          <mxGeometry x="621" y="878" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--25" value="Ready" style="ellipse;whiteSpace=wrap;html=1;fillColor=light-dark(#a6eea5, #ededed);" vertex="1" parent="1">
+          <mxGeometry x="220" y="642" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--26" value="Ready" style="ellipse;whiteSpace=wrap;html=1;fillColor=light-dark(#a6eea5, #ededed);" vertex="1" parent="1">
+          <mxGeometry x="621" y="638" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--27" value="" style="endArrow=classic;html=1;rounded=0;exitX=0;exitY=1;exitDx=0;exitDy=0;entryX=0.375;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="aAkpJWbWGLXDjZrMgsH--25" target="aAkpJWbWGLXDjZrMgsH--19">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="420" y="652" as="sourcePoint" />
+            <mxPoint x="140" y="832" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--32" value="rkcl.NodesNeeded&lt;div&gt;&amp;lt;&lt;/div&gt;&lt;div&gt;sts.Spec.Replicas&lt;/div&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--27">
+          <mxGeometry x="-0.1506" y="1" relative="1" as="geometry">
+            <mxPoint x="-56" y="-15" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--28" value="" style="endArrow=classic;html=1;rounded=0;entryX=0.333;entryY=1;entryDx=0;entryDy=0;entryPerimeter=0;exitX=0.633;exitY=0.025;exitDx=0;exitDy=0;exitPerimeter=0;" edge="1" parent="1" source="aAkpJWbWGLXDjZrMgsH--19" target="aAkpJWbWGLXDjZrMgsH--25">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="420" y="652" as="sourcePoint" />
+            <mxPoint x="470" y="602" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--33" value="rkcl.NodesNeeded&lt;div&gt;==&lt;/div&gt;&lt;div&gt;sts.Spec.Replicas&lt;/div&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--28">
+          <mxGeometry x="0.0747" y="-3" relative="1" as="geometry">
+            <mxPoint x="9" y="42" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--29" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.367;exitY=0;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.667;entryY=1;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="aAkpJWbWGLXDjZrMgsH--20" target="aAkpJWbWGLXDjZrMgsH--25">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="470" y="602" as="sourcePoint" />
+            <mxPoint x="420" y="652" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--34" value="rkcl.NodesNeeded&lt;div&gt;==&lt;/div&gt;&lt;div&gt;sts.Spec.Replicas&lt;/div&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--29">
+          <mxGeometry x="-0.1688" y="-1" relative="1" as="geometry">
+            <mxPoint x="-25" y="31" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--30" value="" style="endArrow=classic;html=1;rounded=0;entryX=0.625;entryY=-0.025;entryDx=0;entryDy=0;exitX=1;exitY=1;exitDx=0;exitDy=0;entryPerimeter=0;" edge="1" parent="1" source="aAkpJWbWGLXDjZrMgsH--25" target="aAkpJWbWGLXDjZrMgsH--20">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="470" y="602" as="sourcePoint" />
+            <mxPoint x="408" y="841" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--31" value="rkcl.NodesNeeded&lt;div&gt;&amp;gt;&lt;/div&gt;&lt;div&gt;sts.Spec.Replicas&lt;/div&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--30">
+          <mxGeometry x="0.0596" y="1" relative="1" as="geometry">
+            <mxPoint x="42" y="-25" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--37" value="" style="curved=1;endArrow=classic;html=1;rounded=0;exitX=0.642;exitY=1.025;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.667;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="aAkpJWbWGLXDjZrMgsH--26" target="aAkpJWbWGLXDjZrMgsH--21">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="381" y="648" as="sourcePoint" />
+            <mxPoint x="431" y="598" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="721" y="748" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--39" value="&lt;div style=&quot;font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; line-height: 19px; white-space-collapse: preserve;&quot;&gt;Any of:&lt;/div&gt;&lt;div style=&quot;font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; line-height: 19px; white-space-collapse: preserve;&quot;&gt;- sts.&lt;span&gt;Spec&lt;/span&gt;.&lt;span&gt;UpdateStrategy&lt;/span&gt;.&lt;span&gt;RollingUpdate&lt;/span&gt;.&lt;span&gt;Partition &amp;gt; 0&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&lt;span style=&quot;font-family: &amp;quot;Droid Sans Mono&amp;quot;, &amp;quot;monospace&amp;quot;, monospace; white-space-collapse: preserve;&quot;&gt;- add new label to sts.&lt;/span&gt;&lt;span style=&quot;background-color: transparent; white-space-collapse: preserve;&quot;&gt;&lt;font face=&quot;Droid Sans Mono, monospace, monospace&quot;&gt;Spec.Template.Labels&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&lt;span style=&quot;background-color: transparent; white-space-collapse: preserve;&quot;&gt;&lt;font face=&quot;Droid Sans Mono, monospace, monospace&quot;&gt;- label value update in sts&lt;/font&gt;&lt;/span&gt;&lt;span style=&quot;background-color: transparent; white-space-collapse: preserve;&quot;&gt;&lt;font face=&quot;Droid Sans Mono, monospace, monospace&quot;&gt;.Spec.Template.Labels&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&lt;span style=&quot;background-color: transparent; white-space-collapse: preserve;&quot;&gt;&lt;font face=&quot;Droid Sans Mono, monospace, monospace&quot;&gt;- remove label from sts&lt;/font&gt;&lt;/span&gt;&lt;span style=&quot;background-color: transparent; white-space-collapse: preserve;&quot;&gt;&lt;font face=&quot;Droid Sans Mono, monospace, monospace&quot;&gt;.Spec.Template.Labels&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&lt;span style=&quot;background-color: transparent; white-space-collapse: preserve;&quot;&gt;&lt;font face=&quot;Droid Sans Mono, monospace, monospace&quot;&gt;- add new annotation to sts&lt;/font&gt;&lt;/span&gt;&lt;span style=&quot;background-color: transparent; white-space-collapse: preserve;&quot;&gt;&lt;font face=&quot;Droid Sans Mono, monospace, monospace&quot;&gt;.Spec.Template.Annotations&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&lt;span style=&quot;background-color: transparent; white-space-collapse: preserve;&quot;&gt;&lt;font face=&quot;Droid Sans Mono, monospace, monospace&quot;&gt;- annotation value update in sts.&lt;/font&gt;&lt;/span&gt;&lt;span style=&quot;background-color: transparent; white-space-collapse: preserve;&quot;&gt;&lt;font face=&quot;Droid Sans Mono, monospace, monospace&quot;&gt;.Spec.Template.Annotations&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&lt;span style=&quot;background-color: transparent; white-space-collapse: preserve;&quot;&gt;&lt;font face=&quot;Droid Sans Mono, monospace, monospace&quot;&gt;- redkeyCluster.isConfigChanged() (checksum)&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&lt;span style=&quot;background-color: transparent; white-space-collapse: preserve;&quot;&gt;&lt;font face=&quot;Droid Sans Mono, monospace, monospace&quot;&gt;- redkeyCluster.Spec.Resources updaed&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;line-height: 19px;&quot;&gt;&lt;span style=&quot;background-color: transparent; white-space-collapse: preserve;&quot;&gt;&lt;font face=&quot;Droid Sans Mono, monospace, monospace&quot;&gt;- redkeyCluster.Spec.Image updated&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;" style="edgeLabel;html=1;align=left;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;fontColor=#000000;fontSize=11;" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--37">
+          <mxGeometry x="-0.0847" y="-10" relative="1" as="geometry">
+            <mxPoint x="3" y="6" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--38" value="" style="curved=1;endArrow=classic;html=1;rounded=0;exitX=0.342;exitY=-0.025;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.367;entryY=0.95;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="aAkpJWbWGLXDjZrMgsH--21" target="aAkpJWbWGLXDjZrMgsH--26">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="711" y="848" as="sourcePoint" />
+            <mxPoint x="708" y="689" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="641" y="758" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--40" value="None of the conditions&lt;div&gt;for upgrading are met&lt;/div&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--38">
+          <mxGeometry x="-0.0138" y="-5" relative="1" as="geometry">
+            <mxPoint x="-57" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--44" value="c" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fontSize=9;fillColor=#E6FFCC;" vertex="1" parent="1">
+          <mxGeometry x="105" y="780" width="10" height="10" as="geometry" />
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--45" value="c" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fontSize=9;fillColor=#FFCCCC;" vertex="1" parent="1">
+          <mxGeometry x="251" y="692" width="10" height="10" as="geometry" />
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--46" value="c" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fontSize=9;fillColor=#FFCCCC;" vertex="1" parent="1">
+          <mxGeometry x="299" y="692" width="10" height="10" as="geometry" />
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--47" value="c" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fontSize=9;fillColor=#E6FFCC;" vertex="1" parent="1">
+          <mxGeometry x="446" y="780" width="10" height="10" as="geometry" />
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--48" value="c" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fontSize=9;fillColor=#E6FFCC;" vertex="1" parent="1">
+          <mxGeometry x="690" y="857" width="10" height="10" as="geometry" />
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--49" value="c" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fontSize=9;fillColor=#FFCCCC;" vertex="1" parent="1">
+          <mxGeometry x="663" y="688" width="10" height="10" as="geometry" />
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--50" value="Error" style="ellipse;whiteSpace=wrap;html=1;fillColor=#D05C53;" vertex="1" parent="1">
+          <mxGeometry x="501" y="1160" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--51" value="ScalingDown" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFF2CC;" vertex="1" parent="1">
+          <mxGeometry x="260" y="1280" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--52" value="ScalingUp" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFFFCC;" vertex="1" parent="1">
+          <mxGeometry x="741" y="1280" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--53" value="Upgrading" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFCCCC;" vertex="1" parent="1">
+          <mxGeometry x="740" y="1040" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--54" value="Ready" style="ellipse;whiteSpace=wrap;html=1;fillColor=light-dark(#a6eea5, #ededed);" vertex="1" parent="1">
+          <mxGeometry x="261" y="1040" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--56" value="" style="curved=1;endArrow=classic;html=1;rounded=0;exitX=1;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="aAkpJWbWGLXDjZrMgsH--54" target="aAkpJWbWGLXDjZrMgsH--50">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="500" y="930" as="sourcePoint" />
+            <mxPoint x="550" y="880" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="480" y="1100" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--58" value="!redkeyCluster..checkStorageConfigConsistency" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--56">
+          <mxGeometry x="-0.0925" y="-10" relative="1" as="geometry">
+            <mxPoint x="60" y="-13" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--57" value="" style="curved=1;endArrow=classic;html=1;rounded=0;exitX=0.033;exitY=0.35;exitDx=0;exitDy=0;entryX=0.7;entryY=0.975;entryDx=0;entryDy=0;exitPerimeter=0;entryPerimeter=0;" edge="1" parent="1" source="aAkpJWbWGLXDjZrMgsH--50" target="aAkpJWbWGLXDjZrMgsH--54">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="501" y="1176" as="sourcePoint" />
+            <mxPoint x="345" y="1084" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="450" y="1160" />
+              <mxPoint x="380" y="1120" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--59" value="redkeyCluster.checkStorageConfigConsistency&lt;div style=&quot;&quot;&gt;&amp;amp;&amp;amp; no upgrading needed&lt;/div&gt;&lt;div&gt;&amp;amp;&amp;amp; no scaling needed&lt;/div&gt;" style="edgeLabel;html=1;align=left;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--57">
+          <mxGeometry x="0.1729" y="2" relative="1" as="geometry">
+            <mxPoint x="-201" y="8" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--60" value="" style="curved=1;endArrow=classic;html=1;rounded=0;exitX=0.917;exitY=0.75;exitDx=0;exitDy=0;entryX=0.225;entryY=0.075;entryDx=0;entryDy=0;exitPerimeter=0;entryPerimeter=0;" edge="1" parent="1" source="aAkpJWbWGLXDjZrMgsH--50" target="aAkpJWbWGLXDjZrMgsH--52">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="612" y="1191" as="sourcePoint" />
+            <mxPoint x="768" y="1283" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="720" y="1220" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--61" value="redkeyCluster..checkStorageConfigConsistency&lt;div&gt;&amp;amp;&amp;amp; rkcl.NodesNeeded &amp;gt; sts.Spec.Replicas&lt;/div&gt;" style="edgeLabel;html=1;align=left;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--60">
+          <mxGeometry x="-0.0925" y="-10" relative="1" as="geometry">
+            <mxPoint x="-19" y="-13" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--62" value="" style="curved=1;endArrow=classic;html=1;rounded=0;exitX=0.058;exitY=0.25;exitDx=0;exitDy=0;entryX=0.783;entryY=0.925;entryDx=0;entryDy=0;exitPerimeter=0;entryPerimeter=0;" edge="1" parent="1" source="aAkpJWbWGLXDjZrMgsH--52" target="aAkpJWbWGLXDjZrMgsH--50">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="754" y="1291" as="sourcePoint" />
+            <mxPoint x="594" y="1196" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="650" y="1250" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--63" value="!redkeyCluster.checkStorageConfigConsistency&lt;div style=&quot;&quot;&gt;|| error when scaling&lt;/div&gt;" style="edgeLabel;html=1;align=left;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--62">
+          <mxGeometry x="0.1729" y="2" relative="1" as="geometry">
+            <mxPoint x="-158" y="-1" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--64" value="" style="curved=1;endArrow=classic;html=1;rounded=0;exitX=1;exitY=0;exitDx=0;exitDy=0;entryX=0.067;entryY=0.8;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="aAkpJWbWGLXDjZrMgsH--50" target="aAkpJWbWGLXDjZrMgsH--53">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="500" y="930" as="sourcePoint" />
+            <mxPoint x="550" y="880" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="670" y="1090" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--70" value="&lt;span style=&quot;&quot;&gt;redkeyCluster.checkStorageConfigConsistency&lt;/span&gt;&lt;div&gt;&lt;span style=&quot;&quot;&gt;&amp;amp;&amp;amp; upgrading needed&lt;/span&gt;&lt;/div&gt;" style="edgeLabel;html=1;align=left;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--64">
+          <mxGeometry x="-0.2652" y="-6" relative="1" as="geometry">
+            <mxPoint x="-152" y="-1" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--65" value="" style="curved=1;endArrow=classic;html=1;rounded=0;entryX=0.967;entryY=0.35;entryDx=0;entryDy=0;entryPerimeter=0;exitX=0.225;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;" edge="1" parent="1" source="aAkpJWbWGLXDjZrMgsH--53" target="aAkpJWbWGLXDjZrMgsH--50">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="760" y="1080" as="sourcePoint" />
+            <mxPoint x="613" y="1176" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="730" y="1120" />
+              <mxPoint x="670" y="1160" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--68" value="&lt;span style=&quot;color: rgba(0, 0, 0, 0); font-family: monospace; font-size: 0px; text-align: start; background-color: rgb(236, 236, 236);&quot;&gt;%3CmxGraphModel%3E%3Croot%3E%3CmxCell%20id%3D%220%22%2F%3E%3CmxCell%20id%3D%221%22%20parent%3D%220%22%2F%3E%3CmxCell%20id%3D%222%22%20value%3D%22!redkeyCluster..checkStorageConfigConsistency%22%20style%3D%22edgeLabel%3Bhtml%3D1%3Balign%3Dcenter%3BverticalAlign%3Dmiddle%3Bresizable%3D0%3Bpoints%3D%5B%5D%3B%22%20vertex%3D%221%22%20connectable%3D%220%22%20parent%3D%221%22%3E%3CmxGeometry%20x%3D%22508.14900356591306%22%20y%3D%221103.1780032584988%22%20as%3D%22geometry%22%2F%3E%3C%2FmxCell%3E%3C%2Froot%3E%3C%2FmxGraphModel%3E&lt;/span&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--65">
+          <mxGeometry x="-0.179" y="-2" relative="1" as="geometry">
+            <mxPoint x="-1" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--69" value="!redkeyCluster..checkStorageConfigConsistency&lt;div&gt;|| error when scaling up before upgrading&lt;/div&gt;" style="edgeLabel;html=1;align=left;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--65">
+          <mxGeometry x="-0.2065" y="-1" relative="1" as="geometry">
+            <mxPoint x="-45" y="21" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--66" value="" style="curved=1;endArrow=classic;html=1;rounded=0;exitX=0.758;exitY=0.1;exitDx=0;exitDy=0;entryX=0.058;entryY=0.775;entryDx=0;entryDy=0;entryPerimeter=0;exitPerimeter=0;" edge="1" parent="1" source="aAkpJWbWGLXDjZrMgsH--51" target="aAkpJWbWGLXDjZrMgsH--50">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="358" y="1284" as="sourcePoint" />
+            <mxPoint x="503" y="1190" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="425" y="1208" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--71" value="&lt;span style=&quot;text-align: left;&quot;&gt;!redkeyCluster.checkStorageConfigConsistency&lt;/span&gt;&lt;div style=&quot;text-align: left;&quot;&gt;|| error when scaling&lt;/div&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--66">
+          <mxGeometry x="-0.067" y="-11" relative="1" as="geometry">
+            <mxPoint x="-81" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--67" value="" style="curved=1;endArrow=classic;html=1;rounded=0;entryX=0.967;entryY=0.325;entryDx=0;entryDy=0;entryPerimeter=0;exitX=0.217;exitY=0.85;exitDx=0;exitDy=0;exitPerimeter=0;" edge="1" parent="1" source="aAkpJWbWGLXDjZrMgsH--50" target="aAkpJWbWGLXDjZrMgsH--51">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="522" y="1198" as="sourcePoint" />
+            <mxPoint x="372" y="1292" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="485" y="1238" />
+              <mxPoint x="425" y="1278" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--72" value="&lt;span style=&quot;text-align: left;&quot;&gt;redkeyCluster..checkStorageConfigConsistency&lt;/span&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&amp;amp;&amp;amp; rkcl.NodesNeeded &amp;lt; sts.Spec.Replicas&lt;/div&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="aAkpJWbWGLXDjZrMgsH--67">
+          <mxGeometry x="0.2103" relative="1" as="geometry">
+            <mxPoint x="79" y="13" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--73" value="c" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fontSize=9;fillColor=#E6FFCC;" vertex="1" parent="1">
+          <mxGeometry x="730" y="1079" width="10" height="10" as="geometry" />
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--74" value="c" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fontSize=9;fillColor=#E6FFCC;" vertex="1" parent="1">
+          <mxGeometry x="746" y="1270" width="10" height="10" as="geometry" />
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--75" value="c" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fontSize=9;fillColor=#E6FFCC;" vertex="1" parent="1">
+          <mxGeometry x="383" y="1276" width="10" height="10" as="geometry" />
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--77" value="Redkey cluster creation&amp;nbsp; | cluster meet | cluster rebalance" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;labelBackgroundColor=#5CA5D5;fontColor=#FFFFFF;fontSize=14;spacingTop=0;spacing=2;textShadow=1;" vertex="1" parent="1">
+          <mxGeometry x="280" y="30" width="383" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--78" value="Redkey cluster scale" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;labelBackgroundColor=#5CA5D5;fontColor=#FFFFFF;fontSize=14;spacingTop=0;spacing=2;textShadow=1;" vertex="1" parent="1">
+          <mxGeometry x="88.5" y="590" width="383" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--79" value="Redkey cluster upgrade" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;labelBackgroundColor=#5CA5D5;fontColor=#FFFFFF;fontSize=14;spacingTop=0;spacing=2;textShadow=1;" vertex="1" parent="1">
+          <mxGeometry x="489.5" y="590" width="383" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="aAkpJWbWGLXDjZrMgsH--80" value="Redkey cluster in error" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;labelBackgroundColor=#5CA5D5;fontColor=#FFFFFF;fontSize=14;spacingTop=0;spacing=2;textShadow=1;" vertex="1" parent="1">
+          <mxGeometry x="369.5" y="980" width="383" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,200 @@
+{
+  "$schema": "https://raw.githubusercontent.com/todogroup/repolinter/master/rulesets/schema.json",
+  "version": 2,
+  "axioms": {
+    "linguist": "language",
+    "licensee": "license",
+    "packagers": "packager"
+  },
+  "rules": {
+    "license-file-exists": {
+      "level": "error",
+      "rule": {
+        "type": "file-existence",
+        "options": {
+          "globsAny": ["LICENSE*", "COPYING*"],
+          "nocase": true
+        }
+      }
+    },
+    "readme-file-exists": {
+      "level": "error",
+      "rule": {
+        "type": "file-existence",
+        "options": {
+          "globsAny": ["README*"],
+          "nocase": true
+        }
+      }
+    },
+    "contributing-file-exists": {
+      "level": "error",
+      "rule": {
+        "type": "file-existence",
+        "options": {
+          "globsAny": ["{docs/,.github/,}CONTRIB*"],
+          "nocase": true
+        }
+      }
+    },
+    "code-of-conduct-file-exists": {
+      "level": "error",
+      "rule": {
+        "type": "file-existence",
+        "options": {
+          "globsAny": [
+            "{docs/,.github/,}CODEOFCONDUCT*",
+            "{docs/,.github/,}CODE-OF-CONDUCT*",
+            "{docs/,.github/,}CODE_OF_CONDUCT*"
+          ],
+          "nocase": true
+        }
+      }
+    },
+    "security-file-exists": {
+      "level": "error",
+      "rule": {
+        "type": "file-existence",
+        "options": {
+          "globsAny": ["{docs/,.github/,}SECURITY.md"]
+        }
+      }
+    },
+    "readme-references-license": {
+      "level": "off",
+      "rule": {
+        "type": "file-contents",
+        "options": {
+          "globsAll": ["README*"],
+          "content": "license",
+          "flags": "i"
+        }
+      }
+    },
+    "binaries-not-present": {
+      "level": "error",
+      "rule": {
+        "type": "file-type-exclusion",
+        "options": {
+          "type": ["/*.exe", "/.dll", "!node_modules/", "/*.bin"]
+        }
+      }
+    },
+    "test-directory-exists": {
+      "level": "off",
+      "rule": {
+        "type": "directory-existence",
+        "options": {
+          "globsAny": ["/test", "/specs"],
+          "nocase": true
+        }
+      }
+    },
+    "integrates-with-ci": {
+      "level": "error",
+      "rule": {
+        "type": "file-existence",
+        "options": {
+          "globsAny": [
+            ".gitlab-ci.yml",
+            ".travis.yml",
+            "appveyor.yml",
+            ".appveyor.yml",
+            "circle.yml",
+            ".circleci/config.yml",
+            "Jenkinsfile",
+            ".drone.yml",
+            ".github/workflows/",
+            "azure-pipelines.yml"
+          ]
+        }
+      }
+    },
+    "code-of-conduct-file-contains-email": {
+      "level": "off",
+      "rule": {
+        "type": "file-contents",
+        "options": {
+          "globsAll": [
+            "CODEOFCONDUCT",
+            "CODE-OF-CONDUCT*",
+            "CODE_OF_CONDUCT*",
+            ".github/CODEOFCONDUCT*",
+            ".github/CODE-OF-CONDUCT*",
+            ".github/CODE_OF_CONDUCT*"
+          ],
+          "content": ".+@.+..+",
+          "flags": "i",
+          "human-readable-content": "email address"
+        }
+      }
+    },
+    "source-license-headers-exist": {
+      "level": "warning",
+      "rule": {
+        "type": "file-starts-with",
+        "options": {
+          "globsAll": ["./**/*.py"],
+          "lineCount": 5,
+          "patterns": ["Copyright", "License"],
+          "flags": "i"
+        }
+      }
+    },
+    "github-issue-template-exists": {
+      "level": "error",
+      "rule": {
+        "type": "file-existence",
+        "options": {
+          "dirs": true,
+          "globsAny": ["ISSUE_TEMPLATE", ".github/ISSUE_TEMPLATE*"]
+        }
+      }
+    },
+    "github-pull-request-template-exists": {
+      "level": "off",
+      "rule": {
+        "type": "file-existence",
+        "options": {
+          "dirs": true,
+          "globsAny": [
+            "PULL_REQUEST_TEMPLATE*",
+            ".github/PULL_REQUEST_TEMPLATE*"
+          ]
+        }
+      }
+    },
+    "license-detectable-by-licensee": {
+      "level": "off",
+      "where": ["license="],
+      "rule": {
+        "type": "license-detectable-by-licensee",
+        "options": {}
+      }
+    },
+    "best-practices-badge-present": {
+      "level": "off",
+      "rule": {
+        "type": "best-practices-badge-present"
+      }
+    },
+    "internal-file-not-exists": {
+      "level": "off",
+      "rule": {
+        "type": "file-not-exists",
+        "options": {
+          "globsAll": [
+            ".secrets.baseline",
+            "sherpa-config.yml",
+            ".snyk",
+            "sonar-project.properties",
+            ".drafterconfig.yml",
+            "application-configmap.yml",
+            "application-secret.yml"
+          ],
+          "nocase": true
+        }
+      }
+    }
+  }
+}

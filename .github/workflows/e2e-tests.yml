@@ -1,0 +1,85 @@
+# SPDX-FileCopyrightText: 2025 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
+# SPDX-License-Identifier: Apache-2.0
+
+name: E2E tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths-ignore: ['docs/**']
+
+  workflow_dispatch:
+    inputs:
+      test_parallel_process:
+        description: Number of parallel processes for the E2E test suite
+        default: '1'
+        required: false
+
+concurrency:
+  group: e2e-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+env:
+  OPERATOR_NAME: redkey-operator
+  OPERATOR_VERSION: test-e2e
+  KUBECONFIG: ${{ github.workspace }}/.kube/config
+  LOCAL_CLUSTER_NAME: test-e2e-cluster
+  LOCAL_REGISTRY: test-e2e-registry
+  LOCAL_REGISTRY_PORT: 5001
+
+jobs:
+  e2e-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash -eu -o pipefail {0}
+
+    steps:
+    - name: 📥  Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🏗️  Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: go.mod
+        cache: true
+
+    - name: 🔧  Install kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: v1.30.0
+
+    - name: 🌱 Kubernetes KinD Cluster
+      id: kind
+      uses: helm/kind-action@v1
+      with:
+        cluster_name: ${{ env.LOCAL_CLUSTER_NAME }}
+        registry: true
+        registry_name: ${{ env.LOCAL_REGISTRY }}
+        registry_port: ${{ env.LOCAL_REGISTRY_PORT }}
+
+    - name: 🏗️  Build operator image
+      run: make docker-build IMG=${{ steps.kind.outputs.LOCAL_REGISTRY }}/redkey-operator:${{ env.OPERATOR_VERSION }}
+        
+    - name: 📥 Push operator image
+      run: make docker-push IMG=${{ steps.kind.outputs.LOCAL_REGISTRY }}/redkey-operator:${{ env.OPERATOR_VERSION }}
+
+    - name: 📚  Install Ginkgo CLI
+      run: go install github.com/onsi/ginkgo/v2/ginkgo@latest
+    
+    - name: 📚 Install CRD
+      run: make install
+
+    - name: ✅  Run E2E test suite
+      env:
+        TEST_PARALLEL_PROCESSES: ${{ github.event.inputs.test_parallel_process || 1 }}
+      run: |
+        make test-e2e \
+          IMG=${{ steps.kind.outputs.LOCAL_REGISTRY }}/redkey-operator:${{ env.OPERATOR_VERSION }} \
+          TEST_PARALLEL_PROCESS=${{ env.TEST_PARALLEL_PROCESSES }} \
+          GOMAXPROCS=${{ env.TEST_PARALLEL_PROCESSES }}
+
+    - name: 🧹  Delete KinD cluster (always)
+      if: always()
+      run: kind delete cluster --name ${{ env.LOCAL_CLUSTER_NAME }}

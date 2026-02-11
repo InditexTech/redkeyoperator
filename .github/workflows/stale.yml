@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2025 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
+# SPDX-License-Identifier: Apache-2.0
+# Warns and then closes issues and PRs that have had no activity for a specified amount of time.
+name: Close stale issues
+
+on:
+  schedule:
+  - cron: '0 0 * * *'
+
+jobs:
+  stale:
+    name: Stale
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+    - uses: actions/stale@v9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        stale-issue-message: 'Issue is stale and will be closed in 30 days unless there is new activity'
+        stale-pr-message: 'PR is stale and will be closed in 30 days unless there is new activity'
+        stale-issue-label: 'stale'
+        exempt-issue-labels: 'stale-exempt,kind/feature-request'
+        stale-pr-label: 'stale'
+        exempt-pr-labels: 'stale-exempt'
+        remove-stale-when-updated: 'True'
+        operations-per-run: 500
+        days-before-stale: 180
+        days-before-close: 30
