@@ -23,8 +23,8 @@ env:
   OPERATOR_NAME: redkey-operator
   OPERATOR_VERSION: test-e2e
   KUBECONFIG: ${{ github.workspace }}/.kube/config
-  LOCAL_CLUSTER_NAME: local-cluster-test
-  LOCAL_REGISTRY: local-registry-hosting
+  LOCAL_CLUSTER_NAME: test-e2e-cluster
+  LOCAL_REGISTRY: test-e2e-registry
   LOCAL_REGISTRY_PORT: 5001
 
 jobs:
@@ -60,11 +60,10 @@ jobs:
         registry_port: ${{ env.LOCAL_REGISTRY_PORT }}
 
     - name: 🏗️  Build operator image
-      run: |
-        make docker-build IMG=${{ env.LOCAL_REGISTRY }}:${{ env.LOCAL_REGISTRY_PORT }}/redkey-operator:${{ env.OPERATOR_VERSION }}
-
-    - name: 📥 Load operator image into KinD
-      run: kind load docker-image --name ${{ env.LOCAL_CLUSTER_NAME }} ${{ env.LOCAL_REGISTRY }}:${{ env.LOCAL_REGISTRY_PORT }}/redkey-operator:${{ env.OPERATOR_VERSION }}
+      run: make docker-build IMG=${{ steps.kind.outputs.LOCAL_REGISTRY }}/redkey-operator:${{ env.OPERATOR_VERSION }}
+        
+    - name: 📥 Push operator image
+      run: make docker-push IMG=${{ steps.kind.outputs.LOCAL_REGISTRY }}/redkey-operator:${{ env.OPERATOR_VERSION }}
 
     - name: 📚  Install Ginkgo CLI
       run: go install github.com/onsi/ginkgo/v2/ginkgo@latest
@@ -75,7 +74,7 @@ jobs:
     - name: ✅  Run E2E test suite
       run: |
         make test-e2e \
-          IMG=${{ env.LOCAL_REGISTRY }}:${{ env.LOCAL_REGISTRY_PORT }}/redkey-operator:${{ env.OPERATOR_VERSION }}
+          IMG=${{ steps.kind.outputs.LOCAL_REGISTRY }}/redkey-operator:${{ env.OPERATOR_VERSION }}
 
     - name: 🧹  Delete KinD cluster (always)
       if: always()
