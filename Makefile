@@ -5,11 +5,11 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
-NAME           := redkey-cluster-operator
+NAME           := redkey-operator
 VERSION        := 0.1.0
+ROBIN_VERSION  := 0.1.0
 GOLANG_VERSION := 1.25.7
 DELVE_VERSION  := 1.25
-PACKAGE        := github.com/inditextech/$(NAME)
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.8.0
@@ -110,11 +110,10 @@ CONTAINER_TOOL ?= docker
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
 # inditex.dev/sample-bundle:$VERSION and inditex.dev/sample-catalog:$VERSION.
 IMAGE_TAG_BASE ?= localhost:5001/redkey-operator
-ROBIN_IMAGE_TAG_BASE ?= localhost:5001/redkey-robin
 
 # Image URL to use for building/pushing image targets
 IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
-IMG_ROBIN ?= $(ROBIN_IMAGE_TAG_BASE):$(PROFILE_ROBIN)
+IMG_ROBIN ?= ghcr.io/inditextech/redkey-robin:$(ROBIN_VERSION)
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
