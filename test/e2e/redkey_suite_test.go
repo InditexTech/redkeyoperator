@@ -443,7 +443,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				},
 			),
 
-			Entry("scale down to 1 replica", SpecTimeout(rebalancingTestDuration),
+			Entry("scale down to 1 primary", SpecTimeout(rebalancingTestDuration),
 				tc{
 					desc: "scale-down",
 					mutate: func(r *redkeyv1.RedkeyCluster) {
@@ -458,7 +458,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 	Context("Primary-Replica layout", func() {
 		const (
 			clusterName    = "primary-test"
-			initPrimaries  = int32(5)
+			initPrimaries  = int32(3)
 			initPerPrimary = int32(1)
 		)
 
@@ -523,14 +523,14 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				},
 			),
 
-			Entry("scale up to 7/2", SpecTimeout(rebalancingTestDuration*2),
+			Entry("scale up to 5/2", SpecTimeout(rebalancingTestDuration*2),
 				tc{
 					desc: "scaleUp",
 					mutate: func(r *redkeyv1.RedkeyCluster) {
-						r.Spec.Primaries = 7
+						r.Spec.Primaries = 5
 						r.Spec.ReplicasPerPrimary = 2
 					},
-					wantRep:        7,
+					wantRep:        5,
 					wantPerPrimary: 2,
 				},
 			),
