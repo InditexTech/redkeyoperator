@@ -72,9 +72,13 @@ jobs:
       run: make install
 
     - name: ✅  Run E2E test suite
+      env:
+        TEST_PARALLEL_PROCESSES: ${{ github.event.inputs.test_parallel_process || 2 }}
       run: |
         make test-e2e \
-          IMG=${{ steps.kind.outputs.LOCAL_REGISTRY }}/redkey-operator:${{ env.OPERATOR_VERSION }}
+          IMG=${{ steps.kind.outputs.LOCAL_REGISTRY }}/redkey-operator:${{ env.OPERATOR_VERSION }} \
+          TEST_PARALLEL_PROCESS=1 \
+          GOMAXPROCS=1
 
     - name: 🧹  Delete KinD cluster (always)
       if: always()
