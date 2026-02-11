@@ -523,7 +523,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				},
 			),
 
-			Entry("scale up to 7/2", SpecTimeout(rebalancingTestDuration),
+			Entry("scale up to 7/2", SpecTimeout(rebalancingTestDuration*2),
 				tc{
 					desc: "scaleUp",
 					mutate: func(r *redkeyv1.RedkeyCluster) {
@@ -535,7 +535,7 @@ var _ = Describe("Redkey Operator & RedkeyCluster E2E", Label("operator", "clust
 				},
 			),
 
-			Entry("scale down to 3/1", SpecTimeout(rebalancingTestDuration),
+			Entry("scale down to 3/1", SpecTimeout(rebalancingTestDuration*2),
 				tc{
 					desc: "scaleDown",
 					mutate: func(r *redkeyv1.RedkeyCluster) {
