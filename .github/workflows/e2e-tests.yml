@@ -12,7 +12,7 @@ on:
     inputs:
       test_parallel_process:
         description: Number of parallel processes for the E2E test suite
-        default: '4'
+        default: '2'
         required: false
 
 concurrency:
@@ -77,8 +77,8 @@ jobs:
       run: |
         make test-e2e \
           IMG=${{ steps.kind.outputs.LOCAL_REGISTRY }}/redkey-operator:${{ env.OPERATOR_VERSION }} \
-          TEST_PARALLEL_PROCESS=1 \
-          GOMAXPROCS=1
+          TEST_PARALLEL_PROCESS=${{ env.TEST_PARALLEL_PROCESSES }} \
+          GOMAXPROCS=${{ env.TEST_PARALLEL_PROCESSES }}
 
     - name: 🧹  Delete KinD cluster (always)
       if: always()
