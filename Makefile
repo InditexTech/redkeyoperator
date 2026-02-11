@@ -464,7 +464,7 @@ endif
 endif
 
 .PHONY: bundle
-bundle: kustomize manifests ## Generate the files for bundle.
+bundle: kustomize manifests operator-sdk ## Generate the files for bundle.
 	rm -rf bundle/manifests/*
 	rm -rf bundle/metadata/*
 	$(OPERATOR_SDK) generate kustomize manifests -q
