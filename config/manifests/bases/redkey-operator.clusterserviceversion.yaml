@@ -30,6 +30,7 @@ metadata:
       ]
     capabilities: Auto Pilot
     categories: Database
+    containerImage: redkey-operator:0.1.0
   name: redkey-operator.v0.0.0
   namespace: placeholder
 spec:

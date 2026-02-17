@@ -469,7 +469,7 @@ bundle: kustomize manifests operator-sdk ## Generate the files for bundle.
 	rm -rf bundle/metadata/*
 	$(OPERATOR_SDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image redkey-operator=$(IMAGE_REF)
-	$(KUSTOMIZE) build config | $(OPERATOR_SDK) generate bundle -q --overwrite --channels $(CHANNELS) --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --overwrite --channels $(CHANNELS) --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 	$(OPERATOR_SDK) bundle validate ./bundle
 	# Remove the images section from the kustomization.yaml added when kustomizing.
 	cd config/manager && sed -i '/^images:$$/,/^[^ -]/{ /^images:$$/d; /^- name: redkey-operator$$/,/^  newTag:/d; }' kustomization.yaml && sed -i '/^images:$$/d' kustomization.yaml
