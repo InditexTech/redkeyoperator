@@ -26,7 +26,7 @@ spec:
         - --leader-elect
         - --max-concurrent-reconciles
         - "10"
-        image: redkey-operator:0.3.0
+        image: redkey-operator:0.1.0
         imagePullPolicy: Always
         name: redkey-operator
         securityContext:
@@ -47,6 +47,9 @@ spec:
           limits:
             cpu: "1"
             memory: 1Gi
+          requests:
+            cpu: 200m
+            memory: 256Mi
         env:
           - name: WATCH_NAMESPACE
             valueFrom:

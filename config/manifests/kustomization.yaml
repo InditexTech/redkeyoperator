@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2025 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
+# SPDX-License-Identifier: Apache-2.0
+
+# This kustomization file is used to build the operator. It references the manager deployment, RBAC roles, and the ClusterServiceVersion manifest.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- ../manager
+- ../crd
+- ../rbac
+- bases/redkey-operator.clusterserviceversion.yaml
+
+# OperatorHub requires the container image to be specified in the ClusterServiceVersion metadata annotations. This replacement ensures that the image reference is consistent between the Deployment and the ClusterServiceVersion.
+replacements:
+  - source:
+      kind: Deployment
+      version: v1
+      name: redkey-operator
+      fieldPath: .spec.template.spec.containers.0.image
+    targets:
+      - select:
+          kind: ClusterServiceVersion
+        fieldPaths:
+          - ".metadata.annotations.containerImage"
