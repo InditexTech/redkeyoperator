@@ -30,7 +30,7 @@ metadata:
       ]
     capabilities: Auto Pilot
     categories: Database
-  name: redkeyoperator.v0.0.0
+  name: redkey-operator.v0.0.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -75,11 +75,11 @@ spec:
       deployments: null
     strategy: ""
   installModes:
-  - supported: false
+  - supported: true
     type: OwnNamespace
-  - supported: false
+  - supported: true
     type: SingleNamespace
-  - supported: false
+  - supported: true
     type: MultiNamespace
   - supported: true
     type: AllNamespaces

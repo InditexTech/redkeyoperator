@@ -11,7 +11,7 @@ layout:
 plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
-projectName: redkeyoperator
+projectName: redkey-operator
 repo: github.com/InditexTech/redkeyoperator
 resources:
 - api:

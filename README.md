@@ -102,6 +102,8 @@ Discover [Redkey Robin](./docs/redkey-robin.md).
 
 The importance of the [purgeKeysOnRebalance](./docs/purge-keys-on-rebalance.md) parameter.
 
+Deploy the Operator in Kubernetes using [Operator Lifecycle Manager (OLM)](./docs/olm.md).
+
 ## Contributing
 
 Contributions are welcome! Please read our [contributing guidelines](./CONTRIBUTING.md) to get started.
