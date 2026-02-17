@@ -47,6 +47,9 @@ spec:
           limits:
             cpu: "1"
             memory: 1Gi
+          requests:
+            cpu: 200m
+            memory: 256Mi
         env:
           - name: WATCH_NAMESPACE
             valueFrom:
