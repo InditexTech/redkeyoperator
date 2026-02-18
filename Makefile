@@ -588,3 +588,46 @@ test-e2e-cov: process-manifests-crd ginkgo  ## Execute e2e application test with
 	$(GINKGO_ENV) ginkgo \
 	     -cover -covermode=count -coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT_FILE) -output-dir=$(TEST_COVERAGE_PROFILE_OUTPUT) \
 		$(GINKGO_OPTS) $(GINKGO_PACKAGES)
+
+##@ Chaos Testing
+
+K6_IMG ?= localhost:5001/redkey-k6:dev
+CHAOS_DURATION ?= 10m
+CHAOS_SEED ?=
+CHAOS_TIMEOUT ?= 30m
+CHAOS_PACKAGES ?= ./test/chaos
+CHAOS_TEST_OUTPUT = .local/chaos-test.json
+
+.PHONY: k6-build
+k6-build:  ## Build k6 image with xk6-redis extension
+	$(info $(M) building k6 docker image with redis extension)
+	docker build -t $(K6_IMG) -f test/chaos/k6.Dockerfile test/chaos
+
+.PHONY: k6-push
+k6-push: k6-build  ## Push k6 image to local registry
+	$(info $(M) pushing k6 image)
+	docker push $(K6_IMG)
+
+.PHONY: test-chaos
+test-chaos: process-manifests-crd ginkgo k6-push  ## Execute chaos tests
+	$(info $(M) running chaos tests...)
+	@mkdir -p $(dir $(CHAOS_TEST_OUTPUT))
+	$(GINKGO_ENV) K6_IMG=$(K6_IMG) CHAOS_DURATION=$(CHAOS_DURATION) \
+		$(if $(CHAOS_SEED),CHAOS_SEED=$(CHAOS_SEED),) \
+		ginkgo \
+			--timeout=$(CHAOS_TIMEOUT) \
+			--json-report=$(CHAOS_TEST_OUTPUT) \
+			$(GINKGO_OPTS) \
+			--procs=1 \
+			$(CHAOS_PACKAGES)
+
+.PHONY: test-chaos-focus
+test-chaos-focus: process-manifests-crd ginkgo k6-push  ## Run specific chaos test by name
+	$(info $(M) running focused chaos test: $(FOCUS))
+	$(GINKGO_ENV) K6_IMG=$(K6_IMG) CHAOS_DURATION=$(CHAOS_DURATION) \
+		$(if $(CHAOS_SEED),CHAOS_SEED=$(CHAOS_SEED),) \
+		ginkgo \
+			--timeout=$(CHAOS_TIMEOUT) \
+			--focus="$(FOCUS)" \
+			--procs=1 \
+			$(CHAOS_PACKAGES)
