@@ -2,9 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 name: E2E tests
-permissions:
-  contents: read
-  packages: write
 
 on:
   pull_request:
