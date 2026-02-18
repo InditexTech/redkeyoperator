@@ -16,6 +16,9 @@ KUSTOMIZE_VERSION ?= v5.8.0
 OPERATOR_SDK_VERSION ?= v1.42.0
 CONTROLLER_TOOLS_VERSION ?= v0.18.0
 
+# Openshift platform supported version
+OPENSHIFT_VERSION="v4.11"
+
 # .............................................................................
 # DONT TOUCH THIS SECTION
 # .............................................................................
@@ -273,7 +276,7 @@ process-manifests: kustomize process-manifests-crd ##		Generate the kustomized y
 	(cd config/deploy-profiles/${PROFILE} && \
 			$(KUSTOMIZE) edit set image redkey-operator=${IMG}); \
 		$(KUSTOMIZE) build config/deploy-profiles/${PROFILE} > deployment/manager.yaml; \
-		$(SED) -i -e 's/watch-namespace/$(NAMESPACE)/' deployment/manager.yaml; \
+		$(SED) -i 's/watch-namespace/$(NAMESPACE)/' deployment/manager.yaml; \
 	rm config/deploy-profiles/${PROFILE}/kustomization.yaml
 	mv config/deploy-profiles/${PROFILE}/kustomization.yaml.orig config/deploy-profiles/${PROFILE}/kustomization.yaml
 	@echo "Manifest generated successfully"
@@ -473,6 +476,12 @@ bundle: kustomize manifests operator-sdk ## Generate the files for bundle.
 	$(OPERATOR_SDK) bundle validate ./bundle
 	# Remove the images section from the kustomization.yaml added when kustomizing.
 	cd config/manager && sed -i '/^images:$$/,/^[^ -]/{ /^images:$$/d; /^- name: redkey-operator$$/,/^  newTag:/d; }' kustomization.yaml && sed -i '/^images:$$/d' kustomization.yaml
+	sed -i "/^FROM.*/a LABEL com.redhat.openshift.versions="$(OPENSHIFT_VERSION)"" bundle.Dockerfile; \
+	sed -i "/^FROM.*/a LABEL com.redhat.delivery.operator.bundle=true" bundle.Dockerfile; \
+	sed -i "/^FROM.*/a LABEL com.redhat.delivery.backport=false" bundle.Dockerfile; \
+	sed -i "/^FROM.*/a # Labels for RedHat Openshift Platform" bundle.Dockerfile
+	sed -i "/^annotations.*/a \  com.redhat.openshift.versions: "$(OPENSHIFT_VERSION)"" bundle/metadata/annotations.yaml; \
+	sed -i "/^annotations.*/a \  # Annotations for RedHat Openshift Platform" bundle/metadata/annotations.yaml
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.

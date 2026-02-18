@@ -31,6 +31,9 @@ metadata:
     capabilities: Auto Pilot
     categories: Database
     containerImage: redkey-operator:0.1.0
+    description: Redkey Cluster Operator for Kubernetes. Manage your Redis/Valkey
+      clusters seamlessly.
+    repository: https://github.com/InditexTech/redkeyoperator
   name: redkey-operator.v0.0.0
   namespace: placeholder
 spec:
