@@ -379,6 +379,11 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeResharding(ctx context.Context, r
 
 	// RollingUpdate
 	r.logInfo(redkeyCluster.NamespacedName(), "Executing partition Rolling Update", "partition", currentPartition)
+	if currentPartition < 0 || currentPartition > math.MaxInt32 {
+		err = fmt.Errorf("invalid partition index %d: must be between 0 and %d", currentPartition, int(math.MaxInt32))
+		r.logError(redkeyCluster.NamespacedName(), err, "Partition value out of int32 range")
+		return err
+	}
 	localPartition := int32(currentPartition)
 	existingStatefulSet.Spec.UpdateStrategy = v1.StatefulSetUpdateStrategy{
 		Type:          v1.RollingUpdateStatefulSetStrategyType,
