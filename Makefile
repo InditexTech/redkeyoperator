@@ -6,7 +6,7 @@
 SHELL := /bin/bash
 
 NAME           := redkey-operator
-VERSION        := 0.2.0
+VERSION        := 0.1.0
 ROBIN_VERSION  := 0.1.0
 GOLANG_VERSION := 1.25.7
 DELVE_VERSION  := 1.25
