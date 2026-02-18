@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 name: Static code analysis and unit testing
+permissions:
+  contents: read
+
 on:
   push:
     paths-ignore: 
