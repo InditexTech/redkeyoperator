@@ -260,13 +260,13 @@ docker-push: ##	Push operator $(CONTAINER_TOOL) image (uses `${IMG}` image name)
 	$(CONTAINER_TOOL) push ${IMG}
 
 ##@ Deployment
-install: create-namespace process-manifests-crd ##		Install CRD into the K8s cluster specified by kubectl default context (Kustomize is installed if not present).
+install: process-manifests-crd ##		Install CRD into the K8s cluster specified by kubectl default context (Kustomize is installed if not present).
 	$(info $(M) applying CRD manifest file)
 	kubectl apply -f deployment/redkey.inditex.dev_redkeyclusters.yaml
 
 uninstall: process-manifests-crd ##		Uninstall CRD from the K8s cluster specified by kubectl default context (Kustomize is installed if not present).
 	$(info $(M) deleting CRD)
-	kubectl delete -f deployment/redkey.inditex.dev_redkeyclusters.yaml
+	kubectl delete --ignore-not-found -f deployment/redkey.inditex.dev_redkeyclusters.yaml
 
 process-manifests: kustomize process-manifests-crd ##		Generate the kustomized yamls into the `deployment` directory to deploy the manager.
 	$(info $(M) generating Manager deploying manifest files using ${PROFILE} profile)
@@ -287,7 +287,7 @@ process-manifests-crd: kustomize manifests ##	Generate the kustomized yamls into
 	$(KUSTOMIZE) build config/crd > deployment/redkey.inditex.dev_redkeyclusters.yaml
 	@echo "CRD manifest generated successfully"
 
-deploy: deploy-manager ##		Deploy the manager into the K8s cluster specified by kubectl default context.
+deploy: create-namespace deploy-manager ##		Deploy the manager into the K8s cluster specified by kubectl default context.
 
 undeploy: undeploy-manager ##		Undeploy the manager from the K8s cluster specified by kubectl default context.
 
@@ -299,7 +299,7 @@ deploy-manager: process-manifests ##		Deploy the manager into the K8s cluster sp
 
 undeploy-manager: process-manifests ##		Delete the manager from the K8s cluster specified by kubectl default context.
 	$(info $(M) deleting Manager)
-	kubectl delete -f deployment/manager.yaml
+	kubectl delete --ignore-not-found -f deployment/manager.yaml
 
 OPERATOR=$(shell kubectl -n ${NAMESPACE} get po -l='control-plane=redkey-operator' -o=jsonpath='{.items[0].metadata.name}')
 dev-deploy: ##		Build a new manager binary, copy the file to the operator pod and run it.
@@ -334,7 +334,7 @@ delete-rkcl: ##		Delete the sample Redkey Cluster manifest.
 	$(info $(M) deleting sample Redkey cluster)
 	$(KUSTOMIZE) build config/examples/ephemeral-robin-$(PROFILE_ROBIN) | $(SED) 's/namespace: redkey-operator/namespace: ${NAMESPACE}/' | $(SED) 's,image: redkey-robin:0.1.0,image: ${IMG_ROBIN},' | kubectl delete -f -
 
-apply-all: docker-build docker-push process-manifests install deploy apply-rkcl
+apply-all: docker-build docker-push install deploy apply-rkcl
 
 delete-all: delete-rkcl undeploy uninstall
 
