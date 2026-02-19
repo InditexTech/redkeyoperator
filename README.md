@@ -62,6 +62,7 @@ Prerrequisites:
 - A running Kubernetes cluster (v1.24+)
 - kubectl (v1.24+)
 - Make
+- Go (project configured to easily install using asdf or mise)
 
 The operator can be installed using the provided Makefile. The following steps will guide you through the installation and deployment of a sample Redkey Cluster. Redkey Operator can be installed in any namespace, but for this quick start we will use the `redkey-operator` namespace.
 

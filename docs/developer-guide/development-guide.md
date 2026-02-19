@@ -22,7 +22,7 @@ As we will see below, you can use the `make` command to deploy the components an
 
 This guide uses Kind, but feel free to use another Kubernetes cluster tool (e.g., Docker Desktop, Rancher Desktop, K3D).
 
-Deploy a k8s cluster with a repository:
+Deploy a k8s cluster with a trysted repository. You can use the following proposed script (from Kind website) or use the kind command (see the [official Kind Quick Start](https://kind.sigs.k8s.io/docs/user/quick-start/) for detailed usage guide):
 
 ``` sh
 scripts/kind-with-registry.sh
