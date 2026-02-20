@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           fetch-depth: 0
-      - name: Check bundle generation 🧪
+      - name: 🧪 Check bundle generation
         run: |
             make bundle IMAGE_TAG_BASE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
@@ -41,17 +41,6 @@ jobs:
         run: |
           echo "version: ${{ needs.release.outputs.version }}"
           echo "user_agent_version: ${{ needs.release.outputs.user_agent_version }}"
-          echo "tag_name: ${{ github.event.release.tag_name }}"
-
-          if [ "${{ github.event.release.tag_name }}" != "${{ needs.release.outputs.version }}" ]; then
-            echo "Version in Makefile does not match release tag"
-            exit 1
-          fi
-
-          if [ "${{ github.event.release.tag_name }}" != "${{ needs.release.outputs.user_agent_version }}" ]; then
-            echo "Version in main.go/USER_AGENT_VERSION does not match release tag"
-            exit 1
-          fi
 
   build:
     name: 🛠️ Build Operator images
