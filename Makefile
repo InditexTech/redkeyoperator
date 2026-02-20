@@ -535,7 +535,7 @@ docker-build-and-push-multiarch: test ## Build and push operator docker image fo
 	$(info $(M) building and pushing operator docker image for multiple architectures)
 	$(CONTAINER_TOOL) buildx build --platform linux/amd64,linux/arm64 -t ${IMG} --build-arg GOLANG_VERSION=$(GOLANG_VERSION) . --push
 
-bundle-build-and-push-multiarch: ## Build and push bundle docker image for multiple architectures (uses `${BUNDLE_IMG}` image name).
+bundle-build-and-push-multiarch: ## Build and push bundle  docker image for multiple architectures (uses `${BUNDLE_IMG}` image name).
 	$(info $(M) building and pushing bundle docker image for multiple architectures)
 	$(CONTAINER_TOOL) buildx build --platform linux/amd64,linux/arm64 -t ${BUNDLE_IMG} . --push
 
