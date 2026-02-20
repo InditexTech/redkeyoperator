@@ -3,7 +3,7 @@
 name: 🚀 Release
 permissions: read-all
 
-on: workflow_dispatch
+on: push
 
 env:
   REGISTRY: ghcr.io
