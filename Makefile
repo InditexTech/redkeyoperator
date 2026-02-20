@@ -6,7 +6,7 @@
 SHELL := /bin/bash
 
 NAME           := redkey-operator
-VERSION        := 0.1.0
+VERSION        := test
 ROBIN_VERSION  := 0.1.0
 GOLANG_VERSION := 1.25.7
 DELVE_VERSION  := 1.25
@@ -524,12 +524,20 @@ endif
 # https://github.com/operator-framework/community-operators/blob/7f1438c/docs/packaging-operator.md#updating-your-existing-operator
 .PHONY: catalog-build
 catalog-build: opm ## Build a catalog image.
-	$(OPM) index add --container-tool $(CONTAINER_TOOL) --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
+	$(OPM) index add --container-tool $(CONTAINER_TOOL) --mode replaces --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
 
 # Push the catalog image.
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
+
+docker-build-and-push-multiarch: test ## Build and push operator docker image for multiple architectures (uses `${IMG}` image name).
+	$(info $(M) building and pushing operator docker image for multiple architectures)
+	$(CONTAINER_TOOL) buildx build --platform linux/amd64,linux/arm64 -t ${IMG} --build-arg GOLANG_VERSION=$(GOLANG_VERSION) . --push
+
+bundle-build-and-push-multiarch: ## Build and push bundle docker image for multiple architectures (uses `${BUNDLE_IMG}` image name).
+	$(info $(M) building and pushing bundle docker image for multiple architectures)
+	$(CONTAINER_TOOL) buildx build --platform linux/amd64,linux/arm64 -t ${BUNDLE_IMG} . --push
 
 ##@ Test
 

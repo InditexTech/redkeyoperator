@@ -32,7 +32,7 @@ import (
 
 const (
 	USER_AGENT_NAME    = "redkey-cluster-operator"
-	USER_AGENT_VERSION = "0.1.0"
+	USER_AGENT_VERSION = "test"
 )
 
 var (
