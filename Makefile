@@ -533,11 +533,11 @@ catalog-push: ## Push a catalog image.
 
 docker-build-and-push-multiarch: test ## Build and push operator docker image for multiple architectures (uses `${IMG}` image name).
 	$(info $(M) building and pushing operator docker image for multiple architectures)
-	$(CONTAINER_TOOL) buildx build --platform linux/amd64,linux/arm64 -t ${IMG} --build-arg GOLANG_VERSION=$(GOLANG_VERSION) .
+	$(CONTAINER_TOOL) build --platform linux/amd64,linux/arm64 -t ${IMG} --build-arg GOLANG_VERSION=$(GOLANG_VERSION) . --load
 
 bundle-build-and-push-multiarch: ## Build and push bundle  docker image for multiple architectures (uses `${BUNDLE_IMG}` image name).
 	$(info $(M) building and pushing bundle docker image for multiple architectures)
-	$(CONTAINER_TOOL) buildx build --platform linux/amd64,linux/arm64 -t ${BUNDLE_IMG} .
+	$(CONTAINER_TOOL) build --platform linux/amd64,linux/arm64 -t ${BUNDLE_IMG} . --load
 
 ##@ Test
 
