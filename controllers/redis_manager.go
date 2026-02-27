@@ -164,10 +164,10 @@ func (r *RedkeyClusterReconciler) doFastUpgrade(ctx context.Context, redkeyClust
 
 		return true, nil
 	default:
-		// Fast upgrade start: If purgeKeysOnRebalance property is set to 'true' and we have no primaries. No need to iterate over the partitions.
-		// If fast upgrade is not allowed but we have no primaries, the cluster must be scaled up adding one extra
-		// node to be able to move slots and keys in order to ensure keys are preserved.
-		if redkeyCluster.Spec.PurgeKeysOnRebalance != nil && *redkeyCluster.Spec.PurgeKeysOnRebalance && redkeyCluster.Spec.ReplicasPerPrimary == 0 {
+		// Fast upgrade start: If purgeKeysOnRebalance property is set to 'true'. No need to iterate over the partitions.
+		// If fast upgrade is not allowed, the cluster must be scaled up adding one extra node to be able to move slots
+		// and keys in order to ensure keys are preserved.
+		if redkeyCluster.Spec.PurgeKeysOnRebalance != nil && *redkeyCluster.Spec.PurgeKeysOnRebalance {
 			r.logInfo(redkeyCluster.NamespacedName(), "Fast upgrade will be performed")
 
 			err := r.updateClusterSubStatus(ctx, redkeyCluster, redkeyv1.SubstatusFastUpgrading, "")
@@ -800,8 +800,8 @@ func (r *RedkeyClusterReconciler) doFastScaling(ctx context.Context, redkeyClust
 
 		return true, nil
 	default:
-		// Fast scaling start: If purgeKeysOnRebalance property is set to 'true' and we have no replicasPerPrimary set. No need to iterate over the partitions.
-		if redkeyCluster.Spec.PurgeKeysOnRebalance != nil && *redkeyCluster.Spec.PurgeKeysOnRebalance && redkeyCluster.Spec.ReplicasPerPrimary == 0 {
+		// Fast scaling start: If purgeKeysOnRebalance property is set to 'true'. No need to iterate over the partitions.
+		if redkeyCluster.Spec.PurgeKeysOnRebalance != nil && *redkeyCluster.Spec.PurgeKeysOnRebalance {
 			r.logInfo(redkeyCluster.NamespacedName(), "Fast upgrading will be performed")
 
 			err := r.updateClusterSubStatus(ctx, redkeyCluster, redkeyv1.SubstatusFastScaling, "")
