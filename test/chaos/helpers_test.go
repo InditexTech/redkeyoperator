@@ -21,12 +21,12 @@ func startK6OrFail(namespace, clusterName string, duration time.Duration, vus in
 	return jobName
 }
 
-// cleanupK6Job safely deletes a k6 job, ignoring errors.
+// cleanupK6Job deletes a k6 job and fails the spec if cleanup fails.
 func cleanupK6Job(namespace, jobName string) {
 	if jobName == "" {
 		return
 	}
-	_ = framework.DeleteK6Job(ctx, k8sClientset, namespace, jobName)
+	Expect(framework.DeleteK6Job(ctx, k8sClientset, namespace, jobName)).To(Succeed(), "failed to clean up k6 job %s in namespace %s", jobName, namespace)
 }
 
 // chaosLoop runs a chaos function repeatedly until the duration expires.

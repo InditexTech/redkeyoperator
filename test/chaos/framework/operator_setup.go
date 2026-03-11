@@ -22,38 +22,107 @@ import (
 
 // EnsureOperatorSetup creates the ServiceAccount, RBAC, ConfigMap and Deployment for the operator.
 func EnsureOperatorSetup(ctx context.Context, clientset kubernetes.Interface, namespace string) error {
-	// Create ServiceAccount
-	if _, err := clientset.CoreV1().ServiceAccounts(namespace).Create(ctx, newServiceAccount(namespace), metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
+	if err := ensureServiceAccount(ctx, clientset, newServiceAccount(namespace)); err != nil {
 		return fmt.Errorf("ensure ServiceAccount: %w", err)
 	}
-
-	// Create Roles
-	if _, err := clientset.RbacV1().Roles(namespace).Create(ctx, newRole(namespace, "leader-election-role", leaderElectionPolicyRules()), metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
+	if err := ensureRole(ctx, clientset, newRole(namespace, "leader-election-role", leaderElectionPolicyRules())); err != nil {
 		return fmt.Errorf("ensure leader-election-role: %w", err)
 	}
-	if _, err := clientset.RbacV1().Roles(namespace).Create(ctx, newRole(namespace, "redkey-operator-role", operatorPolicyRules()), metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
+	if err := ensureRole(ctx, clientset, newRole(namespace, "redkey-operator-role", operatorPolicyRules())); err != nil {
 		return fmt.Errorf("ensure redkey-operator-role: %w", err)
 	}
-
-	// Create RoleBindings
-	if _, err := clientset.RbacV1().RoleBindings(namespace).Create(ctx, newRoleBinding(namespace, "leader-election-rolebinding", "leader-election-role"), metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
+	if err := ensureRoleBinding(ctx, clientset, newRoleBinding(namespace, "leader-election-rolebinding", "leader-election-role")); err != nil {
 		return fmt.Errorf("ensure leader-election-rolebinding: %w", err)
 	}
-	if _, err := clientset.RbacV1().RoleBindings(namespace).Create(ctx, newRoleBinding(namespace, "redkey-operator-rolebinding", "redkey-operator-role"), metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
+	if err := ensureRoleBinding(ctx, clientset, newRoleBinding(namespace, "redkey-operator-rolebinding", "redkey-operator-role")); err != nil {
 		return fmt.Errorf("ensure redkey-operator-rolebinding: %w", err)
 	}
-
-	// Create ConfigMap
-	if _, err := clientset.CoreV1().ConfigMaps(namespace).Create(ctx, newConfigMap(namespace), metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
+	if err := ensureConfigMap(ctx, clientset, newConfigMap(namespace)); err != nil {
 		return fmt.Errorf("ensure ConfigMap: %w", err)
 	}
-
-	// Create Deployment
-	if _, err := clientset.AppsV1().Deployments(namespace).Create(ctx, newOperatorDeployment(namespace), metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
+	if err := ensureDeployment(ctx, clientset, newOperatorDeployment(namespace)); err != nil {
 		return fmt.Errorf("ensure Deployment: %w", err)
 	}
 
 	return nil
+}
+
+func ensureServiceAccount(ctx context.Context, clientset kubernetes.Interface, desired *corev1.ServiceAccount) error {
+	existing, err := clientset.CoreV1().ServiceAccounts(desired.Namespace).Get(ctx, desired.Name, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			_, err = clientset.CoreV1().ServiceAccounts(desired.Namespace).Create(ctx, desired, metav1.CreateOptions{})
+			return err
+		}
+		return err
+	}
+
+	desired.ResourceVersion = existing.ResourceVersion
+	desired.Secrets = existing.Secrets
+	desired.ImagePullSecrets = existing.ImagePullSecrets
+	desired.AutomountServiceAccountToken = existing.AutomountServiceAccountToken
+	_, err = clientset.CoreV1().ServiceAccounts(desired.Namespace).Update(ctx, desired, metav1.UpdateOptions{})
+	return err
+}
+
+func ensureRole(ctx context.Context, clientset kubernetes.Interface, desired *rbacv1.Role) error {
+	existing, err := clientset.RbacV1().Roles(desired.Namespace).Get(ctx, desired.Name, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			_, err = clientset.RbacV1().Roles(desired.Namespace).Create(ctx, desired, metav1.CreateOptions{})
+			return err
+		}
+		return err
+	}
+
+	desired.ResourceVersion = existing.ResourceVersion
+	_, err = clientset.RbacV1().Roles(desired.Namespace).Update(ctx, desired, metav1.UpdateOptions{})
+	return err
+}
+
+func ensureRoleBinding(ctx context.Context, clientset kubernetes.Interface, desired *rbacv1.RoleBinding) error {
+	existing, err := clientset.RbacV1().RoleBindings(desired.Namespace).Get(ctx, desired.Name, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			_, err = clientset.RbacV1().RoleBindings(desired.Namespace).Create(ctx, desired, metav1.CreateOptions{})
+			return err
+		}
+		return err
+	}
+
+	desired.ResourceVersion = existing.ResourceVersion
+	_, err = clientset.RbacV1().RoleBindings(desired.Namespace).Update(ctx, desired, metav1.UpdateOptions{})
+	return err
+}
+
+func ensureConfigMap(ctx context.Context, clientset kubernetes.Interface, desired *corev1.ConfigMap) error {
+	existing, err := clientset.CoreV1().ConfigMaps(desired.Namespace).Get(ctx, desired.Name, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			_, err = clientset.CoreV1().ConfigMaps(desired.Namespace).Create(ctx, desired, metav1.CreateOptions{})
+			return err
+		}
+		return err
+	}
+
+	desired.ResourceVersion = existing.ResourceVersion
+	_, err = clientset.CoreV1().ConfigMaps(desired.Namespace).Update(ctx, desired, metav1.UpdateOptions{})
+	return err
+}
+
+func ensureDeployment(ctx context.Context, clientset kubernetes.Interface, desired *appsv1.Deployment) error {
+	existing, err := clientset.AppsV1().Deployments(desired.Namespace).Get(ctx, desired.Name, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			_, err = clientset.AppsV1().Deployments(desired.Namespace).Create(ctx, desired, metav1.CreateOptions{})
+			return err
+		}
+		return err
+	}
+
+	desired.ResourceVersion = existing.ResourceVersion
+	_, err = clientset.AppsV1().Deployments(desired.Namespace).Update(ctx, desired, metav1.UpdateOptions{})
+	return err
 }
 
 func newServiceAccount(ns string) *corev1.ServiceAccount {

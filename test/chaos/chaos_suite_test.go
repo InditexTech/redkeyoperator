@@ -70,13 +70,19 @@ var _ = Describe("Chaos Under Load", Label("chaos", "load"), func() {
 	})
 
 	AfterEach(func() {
-		if CurrentSpecReport().Failed() {
+		namespaceName := ""
+		if namespace != nil {
+			namespaceName = namespace.Name
+		}
+
+		if CurrentSpecReport().Failed() && namespaceName != "" {
 			collectDiagnostics(namespace.Name)
 		}
 		if k6JobName != "" {
-			_ = framework.DeleteK6Job(ctx, k8sClientset, namespace.Name, k6JobName)
+			Expect(namespaceName).NotTo(BeEmpty(), "k6 job cleanup requires a namespace")
+			Expect(framework.DeleteK6Job(ctx, k8sClientset, namespaceName, k6JobName)).To(Succeed(), "failed to clean up k6 job %s in namespace %s", k6JobName, namespaceName)
 		}
-		_ = framework.DeleteNamespace(ctx, k8sClientset, dynamicClient, namespace)
+		Expect(framework.DeleteNamespace(ctx, k8sClientset, dynamicClient, namespace)).To(Succeed(), "failed to clean up namespace %s", namespaceName)
 	})
 
 	// ==================================================================================
@@ -289,10 +295,15 @@ var _ = Describe("Topology Corruption Recovery", Label("chaos", "topology"), fun
 	})
 
 	AfterEach(func() {
-		if CurrentSpecReport().Failed() {
+		namespaceName := ""
+		if namespace != nil {
+			namespaceName = namespace.Name
+		}
+
+		if CurrentSpecReport().Failed() && namespaceName != "" {
 			collectDiagnostics(namespace.Name)
 		}
-		_ = framework.DeleteNamespace(ctx, k8sClientset, dynamicClient, namespace)
+		Expect(framework.DeleteNamespace(ctx, k8sClientset, dynamicClient, namespace)).To(Succeed(), "failed to clean up namespace %s", namespaceName)
 	})
 
 	// ==================================================================================

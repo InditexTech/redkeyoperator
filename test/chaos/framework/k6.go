@@ -23,12 +23,11 @@ import (
 )
 
 const (
-	defaultK6Image    = "localhost:5001/redkey-k6:dev"
-	k6JobTimeout      = 30 * time.Minute
-	k6StartupTimeout  = 2 * time.Minute
-	defaultK6VUs      = 10
-	k6ScriptConfigMap = "k6-scripts"
-	k6LogTailLines    = int64(200)
+	defaultK6Image   = "localhost:5001/redkey-k6:dev"
+	k6JobTimeout     = 30 * time.Minute
+	k6StartupTimeout = 2 * time.Minute
+	defaultK6VUs     = 10
+	k6LogTailLines   = int64(200)
 )
 
 var k6ErrorPattern = regexp.MustCompile(`(?m)\[K6_ERROR\]`)
@@ -185,7 +184,20 @@ func DeleteK6Job(ctx context.Context, clientset kubernetes.Interface, namespace,
 	if errors.IsNotFound(err) {
 		return nil
 	}
-	return err
+	if err != nil {
+		return err
+	}
+
+	return wait.PollUntilContextTimeout(ctx, time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+		_, err := clientset.BatchV1().Jobs(namespace).Get(ctx, jobName, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			return true, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		return false, nil
+	})
 }
 
 // GetK6JobLogs returns the logs from the k6 job pod.
@@ -232,7 +244,7 @@ func GetK6JobLogs(ctx context.Context, clientset kubernetes.Interface, namespace
 	return buf.String(), nil
 }
 
-// getRedisHosts returns a comma-separated list of redis host:port for k6.
+// getRedisHosts returns stable redis host:port endpoints for k6.
 func getRedisHosts(ctx context.Context, clientset kubernetes.Interface, namespace, clusterName string) (string, error) {
 	pods, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("redkey-cluster-name=%s,redis.redkeycluster.operator/component=redis", clusterName),
@@ -247,6 +259,10 @@ func getRedisHosts(ctx context.Context, clientset kubernetes.Interface, namespac
 
 	var hosts []string
 	for _, pod := range pods.Items {
+		if pod.Name != "" {
+			hosts = append(hosts, fmt.Sprintf("%s.%s.%s.svc:6379", pod.Name, clusterName, namespace))
+			continue
+		}
 		if pod.Status.PodIP != "" {
 			hosts = append(hosts, fmt.Sprintf("%s:6379", pod.Status.PodIP))
 		}
