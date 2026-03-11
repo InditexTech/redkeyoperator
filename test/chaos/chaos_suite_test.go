@@ -150,7 +150,7 @@ var _ = Describe("Chaos Under Load", Label("chaos", "load"), func() {
 			GinkgoWriter.Printf("=== Chaos iteration %d ===\n", iteration)
 
 			By(fmt.Sprintf("iteration %d: deleting operator pod", iteration))
-			Expect(framework.DeleteOperatorPod(ctx, k8sClientset, namespace.Name)).To(Succeed())
+			Expect(framework.DeleteOperatorPods(ctx, k8sClientset, namespace.Name)).To(Succeed())
 
 			By(fmt.Sprintf("iteration %d: deleting random redis pods", iteration))
 			deleted, err := framework.DeleteRandomRedisPods(ctx, k8sClientset, namespace.Name, clusterName, 2, rng)
@@ -230,7 +230,7 @@ var _ = Describe("Chaos Under Load", Label("chaos", "load"), func() {
 			switch action {
 			case 0:
 				By(fmt.Sprintf("iteration %d: deleting operator pod", iteration))
-				Expect(framework.DeleteOperatorPod(ctx, k8sClientset, namespace.Name)).To(Succeed())
+				Expect(framework.DeleteOperatorPods(ctx, k8sClientset, namespace.Name)).To(Succeed())
 			case 1:
 				By(fmt.Sprintf("iteration %d: deleting robin pods", iteration))
 				deleted, err := framework.DeleteRobinPods(ctx, k8sClientset, namespace.Name, clusterName, 2, rng)

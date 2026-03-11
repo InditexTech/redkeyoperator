@@ -10,7 +10,7 @@ import (
 	"os"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -43,8 +43,9 @@ func ScaleOperatorUp(ctx context.Context, clientset kubernetes.Interface, namesp
 	return scaleDeploymentNative(ctx, clientset, namespace, operatorDeploymentName, 1)
 }
 
-// DeleteOperatorPod deletes the operator pod (the deployment will recreate it).
-func DeleteOperatorPod(ctx context.Context, clientset kubernetes.Interface, namespace string) error {
+// DeleteOperatorPods requests deletion of the current operator pods.
+// It only verifies that the Kubernetes delete calls succeed.
+func DeleteOperatorPods(ctx context.Context, clientset kubernetes.Interface, namespace string) error {
 	pods, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: OperatorPodsSelector(),
 	})
@@ -62,22 +63,7 @@ func DeleteOperatorPod(ctx context.Context, clientset kubernetes.Interface, name
 		}
 	}
 
-	// Wait for at least one operator pod to be ready again
-	return wait.PollUntilContextTimeout(ctx, 2*time.Second, operatorScaleTimeout, true, func(ctx context.Context) (bool, error) {
-		pods, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
-			LabelSelector: OperatorPodsSelector(),
-		})
-		if err != nil {
-			return false, nil
-		}
-
-		for _, pod := range pods.Items {
-			if pod.Status.Phase == corev1.PodRunning && isPodReady(&pod) {
-				return true, nil
-			}
-		}
-		return false, nil
-	})
+	return nil
 }
 
 // scaleDeploymentNative scales a deployment to the desired replica count using native client-go.
@@ -108,7 +94,18 @@ func waitForDeploymentScaleDownNative(ctx context.Context, clientset kubernetes.
 			}
 			return false, nil
 		}
-		return dep.Status.Replicas == 0, nil
+
+		selector, err := deploymentPodSelector(dep)
+		if err != nil {
+			return false, err
+		}
+
+		pods, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: selector})
+		if err != nil {
+			return false, nil
+		}
+
+		return dep.Status.Replicas == 0 && dep.Status.ReadyReplicas == 0 && len(pods.Items) == 0, nil
 	})
 }
 
@@ -124,11 +121,10 @@ func waitForDeploymentReadyNative(ctx context.Context, clientset kubernetes.Inte
 }
 
 // isPodReady returns true if all containers in the pod are ready.
-func isPodReady(pod *corev1.Pod) bool {
-	for _, condition := range pod.Status.Conditions {
-		if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
-			return true
-		}
+func deploymentPodSelector(dep *appsv1.Deployment) (string, error) {
+	selector, err := metav1.LabelSelectorAsSelector(dep.Spec.Selector)
+	if err != nil {
+		return "", fmt.Errorf("deployment %s has invalid selector: %w", dep.Name, err)
 	}
-	return false
+	return selector.String(), nil
 }

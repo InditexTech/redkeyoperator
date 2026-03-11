@@ -92,13 +92,13 @@ func clusterCheckPasses(ctx context.Context, namespace, podName string) bool {
 	return !strings.Contains(stdout, "[ERR]")
 }
 
-// clusterNodesHasFailure checks if any node is in fail state or has migrating slots.
+// clusterNodesHasFailure checks if any node is in fail state or has migrating/importing slots.
 func clusterNodesHasFailure(ctx context.Context, namespace, podName string) bool {
 	stdout, _, err := RemoteCommand(ctx, namespace, podName, "redis-cli cluster nodes")
 	if err != nil {
 		return true
 	}
-	return strings.Contains(stdout, "fail") || strings.Contains(stdout, "->")
+	return strings.Contains(stdout, "fail") || strings.Contains(stdout, "->") || strings.Contains(stdout, "<-")
 }
 
 // AssertAllSlotsAssigned verifies that all 16384 slots are assigned.

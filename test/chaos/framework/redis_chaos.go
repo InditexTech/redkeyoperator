@@ -131,7 +131,18 @@ func scaleRobinDeploymentNative(ctx context.Context, clientset kubernetes.Interf
 				}
 				return false, nil
 			}
-			return dep.Status.Replicas == 0, nil
+
+			selector, err := deploymentPodSelector(dep)
+			if err != nil {
+				return false, err
+			}
+
+			pods, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: selector})
+			if err != nil {
+				return false, nil
+			}
+
+			return dep.Status.Replicas == 0 && dep.Status.ReadyReplicas == 0 && len(pods.Items) == 0, nil
 		})
 	}
 
