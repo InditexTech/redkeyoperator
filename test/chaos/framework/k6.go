@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -27,7 +28,10 @@ const (
 	k6StartupTimeout  = 2 * time.Minute
 	defaultK6VUs      = 10
 	k6ScriptConfigMap = "k6-scripts"
+	k6LogTailLines    = int64(200)
 )
+
+var k6ErrorPattern = regexp.MustCompile(`(?m)\[K6_ERROR\]`)
 
 // GetK6Image returns the k6 image from environment or default.
 func GetK6Image() string {
@@ -146,10 +150,21 @@ func WaitForK6JobCompletion(ctx context.Context, clientset kubernetes.Interface,
 
 		for _, condition := range job.Status.Conditions {
 			if condition.Type == batchv1.JobComplete && condition.Status == corev1.ConditionTrue {
+				logs, logsErr := GetK6JobLogs(ctx, clientset, namespace, jobName)
+				if logsErr != nil {
+					return false, fmt.Errorf("k6 job completed but logs could not be inspected: %w", logsErr)
+				}
+				if k6ErrorPattern.MatchString(logs) {
+					return false, fmt.Errorf("k6 job completed with application errors: %s", summarizeK6Logs(logs))
+				}
 				return true, nil
 			}
 			if condition.Type == batchv1.JobFailed && condition.Status == corev1.ConditionTrue {
-				return false, fmt.Errorf("k6 job failed: %s", condition.Message)
+				logs, logsErr := GetK6JobLogs(ctx, clientset, namespace, jobName)
+				if logsErr != nil {
+					return false, fmt.Errorf("k6 job failed: %s (log inspection failed: %v)", condition.Message, logsErr)
+				}
+				return false, fmt.Errorf("k6 job failed: %s; logs: %s", condition.Message, summarizeK6Logs(logs))
 			}
 		}
 
@@ -198,7 +213,7 @@ func GetK6JobLogs(ctx context.Context, clientset kubernetes.Interface, namespace
 
 	// Get logs from the first pod using proper log API
 	pod := pods.Items[0]
-	tailLines := int64(1000)
+	tailLines := k6LogTailLines
 	opts := &corev1.PodLogOptions{
 		TailLines: &tailLines,
 	}
@@ -258,4 +273,15 @@ func formatDuration(d time.Duration) string {
 		return fmt.Sprintf("%dh", hours)
 	}
 	return fmt.Sprintf("%dh%dm", hours, minutes)
+}
+
+func summarizeK6Logs(logs string) string {
+	trimmed := strings.TrimSpace(logs)
+	if trimmed == "" {
+		return "<empty logs>"
+	}
+	if len(trimmed) > 1500 {
+		return trimmed[len(trimmed)-1500:]
+	}
+	return trimmed
 }

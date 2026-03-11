@@ -7,7 +7,13 @@
 
 import redis from 'k6/x/redis';
 import { randomBytes } from 'k6/crypto';
-import { sleep } from 'k6';
+import { check, sleep } from 'k6';
+
+export const options = {
+    thresholds: {
+        checks: ['rate>0.99'],
+    },
+};
 
 const client = new redis.Client({
     cluster: {
@@ -25,31 +31,44 @@ export default function () {
     const uniqueKey = `mykey_${__VU}_${__ITER}`;
     const value = generateRandomValue(300000);
 
-    // Set the key with a TTL of 30 seconds
-    client.set(uniqueKey, value, 30);
+    try {
+        const setResult = client.set(uniqueKey, value, 30);
+        const setOk = check(setResult, {
+            'redis set succeeds': (result) => result === 'OK',
+        });
+        if (!setOk) {
+            const message = `[K6_ERROR] set failed for ${uniqueKey}`;
+            console.error(message);
+            throw new Error(message);
+        }
 
-    // Randomly delete approximately 1 in 10 keys
-    if (Math.random() < 0.1) {
-        client.del(uniqueKey).then((deleted) => {
-            if (deleted === 1) {
-                console.log(`Key "${uniqueKey}" deleted.`);
-            } else {
-                console.warn(`Failed to delete key "${uniqueKey}".`);
+        // Randomly delete approximately 1 in 10 keys
+        if (Math.random() < 0.1) {
+            const deleted = client.del(uniqueKey);
+            const deleteOk = check(deleted, {
+                'redis delete succeeds': (result) => result === 1,
+            });
+            if (!deleteOk) {
+                const message = `[K6_ERROR] delete failed for ${uniqueKey}; result=${deleted}`;
+                console.error(message);
+                throw new Error(message);
             }
-        }).catch((error) => {
-            console.error(`Error deleting key "${uniqueKey}": ${error}`);
-        });
-    } else {
-        // Retrieve the value for the key
-        client.get(uniqueKey).then((retrievedValue) => {
-            if (retrievedValue === null) {
-                console.error(`Key "${uniqueKey}" not found!`);
-            } else {
-                console.log(`Retrieved value for key "${uniqueKey}": Length=${retrievedValue.length}`);
+        } else {
+            const retrievedValue = client.get(uniqueKey);
+            const getOk = check(retrievedValue, {
+                'redis get returns original value': (result) => result === value,
+            });
+            if (!getOk) {
+                const resultLength = retrievedValue ? retrievedValue.length : 'null';
+                const message = `[K6_ERROR] get failed for ${uniqueKey}; length=${resultLength}`;
+                console.error(message);
+                throw new Error(message);
             }
-        }).catch((error) => {
-            console.error(`Error retrieving key "${uniqueKey}": ${error}`);
-        });
+        }
+    } catch (error) {
+        const message = `[K6_ERROR] iteration failed for ${uniqueKey}: ${error}`;
+        console.error(message);
+        throw error;
     }
 
     // Sleep for a short random duration to simulate real-world load patterns

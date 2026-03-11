@@ -110,6 +110,7 @@ var _ = Describe("Chaos Under Load", Label("chaos", "load"), func() {
 			deleteCount := rng.Intn(int(newSize)/2) + 1
 			deleted, err := framework.DeleteRandomRedisPods(ctx, k8sClientset, namespace.Name, clusterName, deleteCount, rng)
 			Expect(err).NotTo(HaveOccurred())
+			Expect(deleted).NotTo(BeEmpty(), "expected at least one redis pod deletion")
 			GinkgoWriter.Printf("Deleted pods: %v\n", deleted)
 
 			By(fmt.Sprintf("iteration %d: waiting for cluster recovery", iteration))
@@ -152,8 +153,9 @@ var _ = Describe("Chaos Under Load", Label("chaos", "load"), func() {
 			Expect(framework.DeleteOperatorPod(ctx, k8sClientset, namespace.Name)).To(Succeed())
 
 			By(fmt.Sprintf("iteration %d: deleting random redis pods", iteration))
-			_, err := framework.DeleteRandomRedisPods(ctx, k8sClientset, namespace.Name, clusterName, 2, rng)
+			deleted, err := framework.DeleteRandomRedisPods(ctx, k8sClientset, namespace.Name, clusterName, 2, rng)
 			Expect(err).NotTo(HaveOccurred())
+			Expect(deleted).NotTo(BeEmpty(), "expected at least one redis pod deletion")
 
 			By(fmt.Sprintf("iteration %d: waiting for recovery", iteration))
 			Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
@@ -185,11 +187,14 @@ var _ = Describe("Chaos Under Load", Label("chaos", "load"), func() {
 			GinkgoWriter.Printf("=== Chaos iteration %d ===\n", iteration)
 
 			By(fmt.Sprintf("iteration %d: deleting robin pods", iteration))
-			_, _ = framework.DeleteRobinPods(ctx, k8sClientset, namespace.Name, clusterName, 2, rng)
+			deletedRobin, err := framework.DeleteRobinPods(ctx, k8sClientset, namespace.Name, clusterName, 2, rng)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(deletedRobin).NotTo(BeEmpty(), "expected at least one robin pod deletion")
 
 			By(fmt.Sprintf("iteration %d: deleting random redis pods", iteration))
-			_, err := framework.DeleteRandomRedisPods(ctx, k8sClientset, namespace.Name, clusterName, 2, rng)
+			deletedRedis, err := framework.DeleteRandomRedisPods(ctx, k8sClientset, namespace.Name, clusterName, 2, rng)
 			Expect(err).NotTo(HaveOccurred())
+			Expect(deletedRedis).NotTo(BeEmpty(), "expected at least one redis pod deletion")
 
 			By(fmt.Sprintf("iteration %d: waiting for recovery", iteration))
 			Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
@@ -228,10 +233,14 @@ var _ = Describe("Chaos Under Load", Label("chaos", "load"), func() {
 				Expect(framework.DeleteOperatorPod(ctx, k8sClientset, namespace.Name)).To(Succeed())
 			case 1:
 				By(fmt.Sprintf("iteration %d: deleting robin pods", iteration))
-				_, _ = framework.DeleteRobinPods(ctx, k8sClientset, namespace.Name, clusterName, 2, rng)
+				deleted, err := framework.DeleteRobinPods(ctx, k8sClientset, namespace.Name, clusterName, 2, rng)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(deleted).NotTo(BeEmpty(), "expected at least one robin pod deletion")
 			case 2:
 				By(fmt.Sprintf("iteration %d: deleting random redis pods", iteration))
-				_, _ = framework.DeleteRandomRedisPods(ctx, k8sClientset, namespace.Name, clusterName, 2, rng)
+				deleted, err := framework.DeleteRandomRedisPods(ctx, k8sClientset, namespace.Name, clusterName, 2, rng)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(deleted).NotTo(BeEmpty(), "expected at least one redis pod deletion")
 			case 3:
 				By(fmt.Sprintf("iteration %d: scaling cluster", iteration))
 				newSize := int32(rng.Intn(maxPrimaries-minPrimaries+1) + minPrimaries)

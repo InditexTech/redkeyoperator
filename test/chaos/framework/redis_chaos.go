@@ -170,7 +170,10 @@ func CorruptSlotOwnership(ctx context.Context, clientset kubernetes.Interface, n
 
 	// Delete slot from all nodes
 	for _, pod := range pods.Items {
-		_, _, _ = RemoteCommand(ctx, namespace, pod.Name, fmt.Sprintf("redis-cli cluster delslots %d", slot))
+		stdout, stderr, err := RemoteCommand(ctx, namespace, pod.Name, fmt.Sprintf("redis-cli cluster delslots %d", slot))
+		if err != nil {
+			return fmt.Errorf("failed to delslots %d on %s: %w (stdout=%q stderr=%q)", slot, pod.Name, err, trimNewline(stdout), trimNewline(stderr))
+		}
 	}
 
 	// Assign slot to different nodes inconsistently (first two nodes)
@@ -255,7 +258,10 @@ func ForcePrimaryToReplica(ctx context.Context, clientset kubernetes.Interface, 
 	}
 
 	// Delete all slots from the pod
-	_, _, _ = RemoteCommand(ctx, namespace, podName, "redis-cli cluster flushslots")
+	stdout, stderr, err := RemoteCommand(ctx, namespace, podName, "redis-cli cluster flushslots")
+	if err != nil {
+		return fmt.Errorf("failed to flushslots on %s: %w (stdout=%q stderr=%q)", podName, err, trimNewline(stdout), trimNewline(stderr))
+	}
 
 	// Make it replicate the target
 	_, _, err = RemoteCommand(ctx, namespace, podName, fmt.Sprintf("redis-cli cluster replicate %s", targetNodeID))
