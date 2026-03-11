@@ -146,8 +146,8 @@ func buildRedkeyCluster(
 	// Robin configuration
 	robinImage := GetRobinImage()
 	rc.Spec.Robin = &redkeyv1.RobinSpec{
-		Template: &corev1.PodTemplateSpec{
-			Spec: corev1.PodSpec{
+		Template: &redkeyv1.PartialPodTemplateSpec{
+			Spec: redkeyv1.PartialPodSpec{
 				Containers: []corev1.Container{
 					{
 						Name:            "robin",

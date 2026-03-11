@@ -31,16 +31,16 @@ func EnsureOperatorSetup(ctx context.Context, clientset kubernetes.Interface, na
 	if _, err := clientset.RbacV1().Roles(namespace).Create(ctx, newRole(namespace, "leader-election-role", leaderElectionPolicyRules()), metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
 		return fmt.Errorf("ensure leader-election-role: %w", err)
 	}
-	if _, err := clientset.RbacV1().Roles(namespace).Create(ctx, newRole(namespace, "redis-operator-role", operatorPolicyRules()), metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
-		return fmt.Errorf("ensure redis-operator-role: %w", err)
+	if _, err := clientset.RbacV1().Roles(namespace).Create(ctx, newRole(namespace, "redkey-operator-role", operatorPolicyRules()), metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
+		return fmt.Errorf("ensure redkey-operator-role: %w", err)
 	}
 
 	// Create RoleBindings
 	if _, err := clientset.RbacV1().RoleBindings(namespace).Create(ctx, newRoleBinding(namespace, "leader-election-rolebinding", "leader-election-role"), metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
 		return fmt.Errorf("ensure leader-election-rolebinding: %w", err)
 	}
-	if _, err := clientset.RbacV1().RoleBindings(namespace).Create(ctx, newRoleBinding(namespace, "redis-operator-rolebinding", "redis-operator-role"), metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
-		return fmt.Errorf("ensure redis-operator-rolebinding: %w", err)
+	if _, err := clientset.RbacV1().RoleBindings(namespace).Create(ctx, newRoleBinding(namespace, "redkey-operator-rolebinding", "redkey-operator-role"), metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
+		return fmt.Errorf("ensure redkey-operator-rolebinding: %w", err)
 	}
 
 	// Create ConfigMap
@@ -59,7 +59,7 @@ func EnsureOperatorSetup(ctx context.Context, clientset kubernetes.Interface, na
 func newServiceAccount(ns string) *corev1.ServiceAccount {
 	return &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "redis-operator-sa",
+			Name:      "redkey-operator-sa",
 			Namespace: ns,
 		},
 	}
@@ -76,13 +76,13 @@ func newRoleBinding(ns, name, roleName string) *rbacv1.RoleBinding {
 	return &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns},
 		RoleRef:    rbacv1.RoleRef{APIGroup: "rbac.authorization.k8s.io", Kind: "Role", Name: roleName},
-		Subjects:   []rbacv1.Subject{{Kind: "ServiceAccount", Name: "redis-operator-sa", Namespace: ns}},
+		Subjects:   []rbacv1.Subject{{Kind: "ServiceAccount", Name: "redkey-operator-sa", Namespace: ns}},
 	}
 }
 
 func newConfigMap(ns string) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{Name: "redis-operator-config", Namespace: ns},
+		ObjectMeta: metav1.ObjectMeta{Name: "redkey-operator-config", Namespace: ns},
 		Data: map[string]string{
 			"redis_operator_config.yaml": `apiVersion: controller-runtime.sigs.k8s.io/v1alpha1
 kind: ControllerManagerConfig
@@ -102,7 +102,7 @@ func newOperatorDeployment(ns string) *appsv1.Deployment {
 	replicas := int32(1)
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "redis-operator",
+			Name:      "redkey-operator",
 			Namespace: ns,
 			Labels:    map[string]string{"control-plane": "redkey-operator"},
 		},
@@ -122,7 +122,7 @@ func newOperatorDeployment(ns string) *appsv1.Deployment {
 					},
 				},
 				Spec: corev1.PodSpec{
-					ServiceAccountName:            "redis-operator-sa",
+					ServiceAccountName:            "redkey-operator-sa",
 					SecurityContext:               &corev1.PodSecurityContext{RunAsNonRoot: ptr.To(true)},
 					TerminationGracePeriodSeconds: ptr.To(int64(10)),
 					Containers:                    []corev1.Container{newOperatorContainer(ns)},
@@ -134,7 +134,7 @@ func newOperatorDeployment(ns string) *appsv1.Deployment {
 
 func newOperatorContainer(ns string) corev1.Container {
 	return corev1.Container{
-		Name:            "redis-operator",
+		Name:            "redkey-operator",
 		Image:           GetOperatorImage(),
 		Command:         []string{"/manager"},
 		Args:            []string{"--leader-elect", "--max-concurrent-reconciles", "10"},
@@ -206,17 +206,17 @@ func operatorPolicyRules() []rbacv1.PolicyRule {
 			Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
 		},
 		{
-			APIGroups: []string{"redis.inditex.dev"},
+			APIGroups: []string{"redkey.inditex.dev"},
 			Resources: []string{"redkeyclusters"},
 			Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
 		},
 		{
-			APIGroups: []string{"redis.inditex.dev"},
+			APIGroups: []string{"redkey.inditex.dev"},
 			Resources: []string{"redkeyclusters/finalizers"},
 			Verbs:     []string{"update"},
 		},
 		{
-			APIGroups: []string{"redis.inditex.dev"},
+			APIGroups: []string{"redkey.inditex.dev"},
 			Resources: []string{"redkeyclusters/status"},
 			Verbs:     []string{"get", "patch", "update"},
 		},

@@ -575,7 +575,7 @@ GINKGO_ENV ?= GOMAXPROCS=$(GOMAXPROCS) \
 
 GINKGO_PACKAGES ?= ./test/e2e
 
-.PHONY: test-e2e
+.PHONY: install test-e2e
 test-e2e: process-manifests-crd ginkgo  ## Execute e2e application test
 	$(info $(M) running e2e tests...)
 	@mkdir -p $(dir $(TEST_E2E_OUTPUT))

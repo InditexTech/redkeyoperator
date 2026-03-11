@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	operatorDeploymentName = "redis-operator"
+	operatorDeploymentName = "redkey-operator"
 	operatorScaleTimeout   = 2 * time.Minute
 
 	defaultOperatorImage = "localhost:5001/redkey-operator:dev"

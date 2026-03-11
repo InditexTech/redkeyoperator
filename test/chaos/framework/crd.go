@@ -20,7 +20,7 @@ import (
 
 // RedkeyClusterGVR is the GroupVersionResource for RedkeyCluster CRD.
 var RedkeyClusterGVR = schema.GroupVersionResource{
-	Group:    "redis.inditex.dev",
+	Group:    "redkey.inditex.dev",
 	Version:  "v1",
 	Resource: "redkeyclusters",
 }
@@ -92,7 +92,7 @@ func ScaleRedkeyCluster(ctx context.Context, dc dynamic.Interface, namespace, na
 func redkeyClusterToUnstructured(rc *redkeyv1.RedkeyCluster) (*unstructured.Unstructured, error) {
 	// Ensure TypeMeta is set
 	rc.TypeMeta = metav1.TypeMeta{
-		APIVersion: "redis.inditex.dev/v1",
+		APIVersion: "redkey.inditex.dev/v1",
 		Kind:       "RedkeyCluster",
 	}
 

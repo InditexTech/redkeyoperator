@@ -13,8 +13,8 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/inditextech/redkeyoperator/test/chaos/framework"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -22,15 +22,15 @@ const (
 	defaultPrimaries = 5
 
 	// Chaos timing constants
-	chaosIterationDelay   = 5 * time.Second  // Delay between chaos iterations
-	chaosRateLimitDelay   = 10 * time.Second // Delay for rate limiting between heavy operations
-	chaosReserveTime      = 1 * time.Minute  // Time reserved at end of chaos for final checks
-	k6CompletionBuffer    = 5 * time.Minute  // Buffer time for k6 job completion
-	operatorReadyTimeout  = 2 * time.Minute  // Timeout for operator to become ready
-	operatorPollInterval  = 5 * time.Second  // Poll interval for operator readiness
-	scaleAckTimeout       = 30 * time.Second // Timeout for StatefulSet to acknowledge scale
-	scalePollInterval     = 2 * time.Second  // Poll interval for scale acknowledgment
-	diagnosticsLogTail    = int64(100)       // Number of log lines to capture for diagnostics
+	chaosIterationDelay  = 5 * time.Second  // Delay between chaos iterations
+	chaosRateLimitDelay  = 10 * time.Second // Delay for rate limiting between heavy operations
+	chaosReserveTime     = 1 * time.Minute  // Time reserved at end of chaos for final checks
+	k6CompletionBuffer   = 5 * time.Minute  // Buffer time for k6 job completion
+	operatorReadyTimeout = 2 * time.Minute  // Timeout for operator to become ready
+	operatorPollInterval = 5 * time.Second  // Poll interval for operator readiness
+	scaleAckTimeout      = 30 * time.Second // Timeout for StatefulSet to acknowledge scale
+	scalePollInterval    = 2 * time.Second  // Poll interval for scale acknowledgment
+	diagnosticsLogTail   = int64(100)       // Number of log lines to capture for diagnostics
 
 	// Scaling bounds
 	minPrimaries = 3
@@ -58,7 +58,7 @@ var _ = Describe("Chaos Under Load", Label("chaos", "load"), func() {
 		Expect(framework.EnsureOperatorSetup(ctx, k8sClientset, namespace.Name)).To(Succeed())
 
 		Eventually(func() bool {
-			dep, err := k8sClientset.AppsV1().Deployments(namespace.Name).Get(ctx, "redis-operator", metav1.GetOptions{})
+			dep, err := k8sClientset.AppsV1().Deployments(namespace.Name).Get(ctx, "redkey-operator", metav1.GetOptions{})
 			return err == nil && dep.Status.AvailableReplicas >= 1
 		}, operatorReadyTimeout, operatorPollInterval).Should(BeTrue())
 
@@ -268,7 +268,7 @@ var _ = Describe("Topology Corruption Recovery", Label("chaos", "topology"), fun
 		Expect(framework.EnsureOperatorSetup(ctx, k8sClientset, namespace.Name)).To(Succeed())
 
 		Eventually(func() bool {
-			dep, err := k8sClientset.AppsV1().Deployments(namespace.Name).Get(ctx, "redis-operator", metav1.GetOptions{})
+			dep, err := k8sClientset.AppsV1().Deployments(namespace.Name).Get(ctx, "redkey-operator", metav1.GetOptions{})
 			return err == nil && dep.Status.AvailableReplicas >= 1
 		}, operatorReadyTimeout, operatorPollInterval).Should(BeTrue())
 
