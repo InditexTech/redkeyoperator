@@ -617,6 +617,4 @@ test-chaos: process-manifests-crd ginkgo k6-push  ## Execute chaos tests
 		ginkgo \
 			--timeout=$(CHAOS_TIMEOUT) \
 			--json-report=$(CHAOS_TEST_OUTPUT) \
-			$(GINKGO_OPTS) \
-			--procs=1 \
 			$(GINKGO_OPTS) $(CHAOS_PACKAGES)
