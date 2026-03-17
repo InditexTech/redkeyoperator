@@ -35,10 +35,13 @@ def generate_md_report(data: dict) -> str:
     specs = suite["SpecReports"]
     passed = sum(1 for s in specs if s.get("State") == "passed" and s.get("LeafNodeType") == "It")
     failed = sum(1 for s in specs if s.get("State") == "failed")
+    skipped = sum(1 for s in specs if s.get("State") == "skipped" and s.get("LeafNodeType") == "It")
     total = suite["PreRunStats"]["TotalSpecs"]
 
     status = "PASS" if suite["SuiteSucceeded"] else "FAIL"
     lines.append(f"## {status}: {suite['SuiteDescription']} ({passed}/{total} passed)")
+    if skipped:
+        lines.append(f"- Skipped: {skipped}")
     lines.append("")
 
     for spec in specs:
@@ -59,10 +62,10 @@ def generate_md_report(data: dict) -> str:
 
         # Build test name from hierarchy + text
         full_name = " > ".join(hierarchy + [text]) if hierarchy else text
-        status = "PASS" if state in ("passed", "skipped") else "FAIL"
-
-        if status == "PASS": # We do not want PASS tests
+        if state == "passed":
             continue
+
+        status = "SKIP" if state == "skipped" else "FAIL"
 
         lines.append(f"### {status}: {escape_md(full_name)}")
         lines.append("")

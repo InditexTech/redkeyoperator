@@ -619,15 +619,4 @@ test-chaos: process-manifests-crd ginkgo k6-push  ## Execute chaos tests
 			--json-report=$(CHAOS_TEST_OUTPUT) \
 			$(GINKGO_OPTS) \
 			--procs=1 \
-			$(CHAOS_PACKAGES)
-
-.PHONY: test-chaos-focus
-test-chaos-focus: process-manifests-crd ginkgo k6-push  ## Run specific chaos test by name
-	$(info $(M) running focused chaos test: $(FOCUS))
-	$(GINKGO_ENV) K6_IMG=$(K6_IMG) CHAOS_DURATION=$(CHAOS_DURATION) \
-		$(if $(CHAOS_SEED),CHAOS_SEED=$(CHAOS_SEED),) \
-		ginkgo \
-			--timeout=$(CHAOS_TIMEOUT) \
-			--focus="$(FOCUS)" \
-			--procs=1 \
-			$(CHAOS_PACKAGES)
+			$(GINKGO_OPTS) $(CHAOS_PACKAGES)
