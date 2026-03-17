@@ -331,6 +331,7 @@ var _ = Describe("Topology Corruption Recovery", Label("chaos", "topology"), fun
 		By("waiting for cluster to heal")
 		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
 		Expect(framework.AssertAllSlotsAssigned(ctx, k8sClientset, namespace.Name, clusterName)).To(Succeed())
+		Expect(framework.AssertNoNodesInFailState(ctx, k8sClientset, namespace.Name, clusterName)).To(Succeed())
 	})
 
 	// ==================================================================================
@@ -388,6 +389,7 @@ var _ = Describe("Topology Corruption Recovery", Label("chaos", "topology"), fun
 		By("waiting for cluster to heal")
 		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
 		Expect(framework.AssertAllSlotsAssigned(ctx, k8sClientset, namespace.Name, clusterName)).To(Succeed())
+		Expect(framework.AssertNoNodesInFailState(ctx, k8sClientset, namespace.Name, clusterName)).To(Succeed())
 	})
 })
 
