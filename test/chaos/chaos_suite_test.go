@@ -86,7 +86,8 @@ var _ = Describe("Chaos Under Load", Label("chaos", "load"), func() {
 	})
 
 	// ==================================================================================
-	// Scenario 1: Continuous Chaos Under Load
+	// Scenario 1: Continuous Scaling Under Load and Chaos (PurgeKeysOnRebalance=true)
+	//              PurgeKeysOnRebalance=true --> the StatefulSet is recreated when scaling
 	// ==================================================================================
 	It("survives continuous scaling and pod deletion while handling traffic", func() {
 		By("starting k6 load job")
@@ -106,11 +107,19 @@ var _ = Describe("Chaos Under Load", Label("chaos", "load"), func() {
 			newSize := int32(rng.Intn(maxPrimaries-minPrimaries+1) + minPrimaries)
 			Expect(framework.ScaleCluster(ctx, dynamicClient, namespace.Name, clusterName, newSize)).To(Succeed())
 
-			// Poll for StatefulSet to acknowledge the scale instead of fixed sleep
-			Eventually(func() int32 {
-				replicas, _ := framework.GetStatefulSetReplicas(ctx, k8sClientset, namespace.Name, clusterName)
-				return replicas
-			}, scaleAckTimeout, scalePollInterval).Should(Equal(newSize))
+			// Poll for StatefulSet to acknowledge the scale and pods to exist.
+			// During fast scaling (PurgeKeysOnRebalance=true), the operator deletes and
+			// recreates the StatefulSet, so we must wait for pods to actually exist
+			// before attempting to delete them.
+			Eventually(func() int {
+				pods, err := k8sClientset.CoreV1().Pods(namespace.Name).List(ctx, metav1.ListOptions{
+					LabelSelector: framework.RedisPodsSelector(clusterName),
+				})
+				if err != nil {
+					return 0
+				}
+				return len(pods.Items)
+			}, scaleAckTimeout, scalePollInterval).Should(BeNumerically(">=", int(newSize)))
 
 			By(fmt.Sprintf("iteration %d: deleting random redis pods", iteration))
 			deleteCount := rng.Intn(int(newSize)/2) + 1

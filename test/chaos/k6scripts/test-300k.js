@@ -27,12 +27,12 @@ function generateRandomValue(maxBytes) {
     return randomBytes(size).toString('base64');
 }
 
-export default function () {
+export default async function () {
     const uniqueKey = `mykey_${__VU}_${__ITER}`;
     const value = generateRandomValue(300000);
 
     try {
-        const setResult = client.set(uniqueKey, value, 30);
+        const setResult = await client.set(uniqueKey, value, 30);
         const setOk = check(setResult, {
             'redis set succeeds': (result) => result === 'OK',
         });
@@ -44,7 +44,7 @@ export default function () {
 
         // Randomly delete approximately 1 in 10 keys
         if (Math.random() < 0.1) {
-            const deleted = client.del(uniqueKey);
+            const deleted = await client.del(uniqueKey);
             const deleteOk = check(deleted, {
                 'redis delete succeeds': (result) => result === 1,
             });
@@ -54,7 +54,7 @@ export default function () {
                 throw new Error(message);
             }
         } else {
-            const retrievedValue = client.get(uniqueKey);
+            const retrievedValue = await client.get(uniqueKey);
             const getOk = check(retrievedValue, {
                 'redis get returns original value': (result) => result === value,
             });

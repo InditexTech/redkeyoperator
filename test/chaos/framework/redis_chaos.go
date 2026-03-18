@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -20,8 +21,24 @@ import (
 )
 
 const (
-	robinScaleTimeout = 2 * time.Minute
+	robinScaleTimeout  = 2 * time.Minute
+	scaleRetryTimeout  = 2 * time.Minute
+	scaleRetryInterval = 3 * time.Second
 )
+
+// isNotReadyValidationError returns true when the Kubernetes API rejects a
+// mutation because the cluster status is not 'Ready'. This is a transient
+// condition during chaos: the cluster will eventually settle to Ready, at
+// which point the scale request will be accepted.
+func isNotReadyValidationError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if !errors.IsInvalid(err) {
+		return false
+	}
+	return strings.Contains(err.Error(), "Changing the number of primaries is not allowed unless the cluster is in 'Ready' status")
+}
 
 // DeleteRandomRedisPods deletes N random redis pods from the cluster.
 func DeleteRandomRedisPods(ctx context.Context, clientset kubernetes.Interface, namespace, clusterName string, count int, rng *rand.Rand) ([]string, error) {
@@ -89,9 +106,24 @@ func DeleteRobinPods(ctx context.Context, clientset kubernetes.Interface, namesp
 }
 
 // ScaleCluster scales the Redis cluster to the specified number of primaries.
+// It retries on conflict errors and on webhook validation errors that reject
+// the change because the cluster is not yet in 'Ready' status, which is a
+// transient condition during chaos operations.
 func ScaleCluster(ctx context.Context, dc dynamic.Interface, namespace, clusterName string, primaries int32) error {
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return ScaleRedkeyCluster(ctx, dc, namespace, clusterName, primaries)
+	return wait.PollUntilContextTimeout(ctx, scaleRetryInterval, scaleRetryTimeout, true, func(ctx context.Context) (bool, error) {
+		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			return ScaleRedkeyCluster(ctx, dc, namespace, clusterName, primaries)
+		})
+		if err == nil {
+			return true, nil
+		}
+		// If the webhook rejected the update because the cluster is not Ready,
+		// keep polling—the operator will eventually reconcile the cluster back
+		// to Ready status.
+		if isNotReadyValidationError(err) {
+			return false, nil
+		}
+		return false, err
 	})
 }
 
