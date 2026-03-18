@@ -20,13 +20,14 @@ import (
 )
 
 var (
-	k8sClientset      kubernetes.Interface
-	dynamicClient     dynamic.Interface
-	ctx               context.Context
-	cancel            context.CancelFunc
-	chaosDuration     time.Duration
-	chaosSeed         int64
-	chaosReadyTimeout = 10 * time.Minute
+	k8sClientset        kubernetes.Interface
+	dynamicClient       dynamic.Interface
+	ctx                 context.Context
+	cancel              context.CancelFunc
+	chaosDuration       time.Duration
+	chaosSeed           int64
+	chaosReadyTimeout   = 10 * time.Minute
+	skipDeleteNamespace bool
 )
 
 func TestChaos(t *testing.T) {
@@ -84,7 +85,11 @@ var _ = SynchronizedBeforeSuite(
 			chaosSeed = GinkgoRandomSeed()
 		}
 
-		GinkgoWriter.Printf("Chaos test configuration: duration=%v, seed=%d\n", chaosDuration, chaosSeed)
+		if os.Getenv("CHAOS_SKIP_DELETE_NAMESPACE") != "" {
+			skipDeleteNamespace = true
+		}
+
+		GinkgoWriter.Printf("Chaos test configuration: duration=%v, seed=%d, skipDeleteNamespace=%v\n", chaosDuration, chaosSeed, skipDeleteNamespace)
 	},
 )
 

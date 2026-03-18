@@ -51,9 +51,11 @@ func GetRobinImage() string {
 }
 
 // CreateRedkeyCluster creates a RedkeyCluster CR using dynamic client.
-func CreateRedkeyCluster(ctx context.Context, dc dynamic.Interface, namespace, name string, primaries int32) error {
+// When purgeKeys is true the operator deletes and recreates the StatefulSet on
+// scaling; when false the StatefulSet is updated in place.
+func CreateRedkeyCluster(ctx context.Context, dc dynamic.Interface, namespace, name string, primaries int32, purgeKeys bool) error {
 	key := types.NamespacedName{Namespace: namespace, Name: name}
-	rc := buildRedkeyCluster(key, primaries, 0, "", GetRedisImage(), true, true, redkeyv1.Pdb{}, redkeyv1.RedkeyClusterOverrideSpec{})
+	rc := buildRedkeyCluster(key, primaries, 0, "", GetRedisImage(), purgeKeys, true, redkeyv1.Pdb{}, redkeyv1.RedkeyClusterOverrideSpec{})
 	return EnsureRedkeyCluster(ctx, dc, rc)
 }
 

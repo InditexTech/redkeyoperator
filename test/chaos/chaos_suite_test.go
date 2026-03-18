@@ -38,7 +38,7 @@ const (
 	defaultVUs   = 10 // Number of virtual users for k6 load tests
 )
 
-var _ = Describe("Chaos Under Load", Label("chaos", "load"), func() {
+var _ = Describe("Chaos Under Load (PurgeKeysOnRebalance=true)", Label("chaos", "load"), func() {
 	var (
 		namespace *corev1.Namespace
 		k6JobName string
@@ -63,7 +63,7 @@ var _ = Describe("Chaos Under Load", Label("chaos", "load"), func() {
 		}, operatorReadyTimeout, operatorPollInterval).Should(BeTrue())
 
 		By("creating Redis cluster with 5 primaries")
-		Expect(framework.CreateRedkeyCluster(ctx, dynamicClient, namespace.Name, clusterName, defaultPrimaries)).To(Succeed())
+		Expect(framework.CreateRedkeyCluster(ctx, dynamicClient, namespace.Name, clusterName, defaultPrimaries, true)).To(Succeed())
 
 		By("waiting for cluster to be ready")
 		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
@@ -82,7 +82,11 @@ var _ = Describe("Chaos Under Load", Label("chaos", "load"), func() {
 			Expect(namespaceName).NotTo(BeEmpty(), "k6 job cleanup requires a namespace")
 			Expect(framework.DeleteK6Job(ctx, k8sClientset, namespaceName, k6JobName)).To(Succeed(), "failed to clean up k6 job %s in namespace %s", k6JobName, namespaceName)
 		}
-		Expect(framework.DeleteNamespace(ctx, k8sClientset, dynamicClient, namespace)).To(Succeed(), "failed to clean up namespace %s", namespaceName)
+		if skipDeleteNamespace && CurrentSpecReport().Failed() {
+			GinkgoWriter.Printf("CHAOS_SKIP_DELETE_NAMESPACE is set and spec failed — preserving namespace %s for inspection\n", namespaceName)
+		} else {
+			Expect(framework.DeleteNamespace(ctx, k8sClientset, dynamicClient, namespace)).To(Succeed(), "failed to clean up namespace %s", namespaceName)
+		}
 	})
 
 	// ==================================================================================
@@ -90,174 +94,112 @@ var _ = Describe("Chaos Under Load", Label("chaos", "load"), func() {
 	//              PurgeKeysOnRebalance=true --> the StatefulSet is recreated when scaling
 	// ==================================================================================
 	It("survives continuous scaling and pod deletion while handling traffic", func() {
-		By("starting k6 load job")
-		var err error
-		k6JobName, err = framework.StartK6LoadJob(ctx, k8sClientset, namespace.Name, clusterName, chaosDuration, defaultVUs)
-		Expect(err).NotTo(HaveOccurred())
-
-		By("executing chaos loop")
-		endTime := time.Now().Add(chaosDuration - chaosReserveTime)
-
-		iteration := 0
-		for time.Now().Before(endTime) {
-			iteration++
-			GinkgoWriter.Printf("=== Chaos iteration %d ===\n", iteration)
-
-			By(fmt.Sprintf("iteration %d: scaling cluster up", iteration))
-			newSize := int32(rng.Intn(maxPrimaries-minPrimaries+1) + minPrimaries)
-			Expect(framework.ScaleCluster(ctx, dynamicClient, namespace.Name, clusterName, newSize)).To(Succeed())
-
-			Expect(framework.WaitForScaleAck(ctx, k8sClientset, namespace.Name, clusterName, newSize, scaleAckTimeout, scalePollInterval)).To(Succeed())
-
-			By(fmt.Sprintf("iteration %d: deleting random redis pods", iteration))
-			deleteCount := rng.Intn(int(newSize)/2) + 1
-			deleted, err := framework.DeleteRandomRedisPods(ctx, k8sClientset, namespace.Name, clusterName, deleteCount, rng)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(deleted).NotTo(BeEmpty(), "expected at least one redis pod deletion")
-			GinkgoWriter.Printf("Deleted pods: %v\n", deleted)
-
-			By(fmt.Sprintf("iteration %d: waiting for cluster recovery", iteration))
-			Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
-
-			By(fmt.Sprintf("iteration %d: scaling cluster down", iteration))
-			downSize := int32(rng.Intn(3) + minPrimaries)
-			Expect(framework.ScaleCluster(ctx, dynamicClient, namespace.Name, clusterName, downSize)).To(Succeed())
-
-			Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
-		}
-
-		By("verifying final cluster state")
-		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
-		Expect(framework.AssertAllSlotsAssigned(ctx, k8sClientset, namespace.Name, clusterName)).To(Succeed())
-		Expect(framework.AssertNoNodesInFailState(ctx, k8sClientset, namespace.Name, clusterName)).To(Succeed())
-
-		By("verifying k6 job completed successfully")
-		Expect(framework.WaitForK6JobCompletion(ctx, k8sClientset, namespace.Name, k6JobName, chaosDuration+k6CompletionBuffer)).To(Succeed())
+		k6JobName = runScalingChaos(rng, namespace.Name, clusterName)
 	})
 
 	// ==================================================================================
 	// Scenario 2: Chaos with Operator Deletion
 	// ==================================================================================
 	It("recovers when operator pod is deleted during chaos", func() {
-		By("starting k6 load job")
-		var err error
-		k6JobName, err = framework.StartK6LoadJob(ctx, k8sClientset, namespace.Name, clusterName, chaosDuration, defaultVUs)
-		Expect(err).NotTo(HaveOccurred())
-
-		By("executing chaos with operator deletion")
-		endTime := time.Now().Add(chaosDuration - chaosReserveTime)
-
-		iteration := 0
-		for time.Now().Before(endTime) {
-			iteration++
-			GinkgoWriter.Printf("=== Chaos iteration %d ===\n", iteration)
-
-			By(fmt.Sprintf("iteration %d: deleting operator pod", iteration))
-			Expect(framework.DeleteOperatorPods(ctx, k8sClientset, namespace.Name)).To(Succeed())
-
-			By(fmt.Sprintf("iteration %d: deleting random redis pods", iteration))
-			deleted, err := framework.DeleteRandomRedisPods(ctx, k8sClientset, namespace.Name, clusterName, 2, rng)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(deleted).NotTo(BeEmpty(), "expected at least one redis pod deletion")
-
-			By(fmt.Sprintf("iteration %d: waiting for recovery", iteration))
-			Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
-
-			// Rate limit between iterations
-			time.Sleep(chaosRateLimitDelay)
-		}
-
-		By("verifying final cluster state")
-		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
-		Expect(framework.WaitForK6JobCompletion(ctx, k8sClientset, namespace.Name, k6JobName, chaosDuration+k6CompletionBuffer)).To(Succeed())
+		k6JobName = runOperatorDeletionChaos(rng, namespace.Name, clusterName)
 	})
 
 	// ==================================================================================
 	// Scenario 3: Chaos with Robin Deletion
 	// ==================================================================================
 	It("recovers when robin pods are deleted during chaos", func() {
-		By("starting k6 load job")
-		var err error
-		k6JobName, err = framework.StartK6LoadJob(ctx, k8sClientset, namespace.Name, clusterName, chaosDuration, defaultVUs)
-		Expect(err).NotTo(HaveOccurred())
-
-		By("executing chaos with robin deletion")
-		endTime := time.Now().Add(chaosDuration - chaosReserveTime)
-
-		iteration := 0
-		for time.Now().Before(endTime) {
-			iteration++
-			GinkgoWriter.Printf("=== Chaos iteration %d ===\n", iteration)
-
-			By(fmt.Sprintf("iteration %d: deleting robin pods", iteration))
-			Expect(framework.DeleteRobinPods(ctx, k8sClientset, namespace.Name, clusterName)).To(Succeed())
-
-			By(fmt.Sprintf("iteration %d: deleting random redis pods", iteration))
-			deletedRedis, err := framework.DeleteRandomRedisPods(ctx, k8sClientset, namespace.Name, clusterName, 2, rng)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(deletedRedis).NotTo(BeEmpty(), "expected at least one redis pod deletion")
-
-			By(fmt.Sprintf("iteration %d: waiting for recovery", iteration))
-			Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
-
-			// Rate limit between iterations
-			time.Sleep(chaosRateLimitDelay)
-		}
-
-		By("verifying final cluster state")
-		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
-		Expect(framework.WaitForK6JobCompletion(ctx, k8sClientset, namespace.Name, k6JobName, chaosDuration+k6CompletionBuffer)).To(Succeed())
+		k6JobName = runRobinDeletionChaos(rng, namespace.Name, clusterName)
 	})
 
 	// ==================================================================================
 	// Scenario 4: Full Chaos (Operator + Robin + Redis)
 	// ==================================================================================
 	It("recovers from full chaos deleting operator, robin, and redis pods", func() {
-		By("starting k6 load job")
+		k6JobName = runFullChaos(rng, namespace.Name, clusterName)
+	})
+})
+
+// ======================================================================================
+// Chaos Under Load (NoPurge) — same scenarios with PurgeKeysOnRebalance=false
+// PurgeKeysOnRebalance=false --> the StatefulSet is updated in place when scaling
+// ======================================================================================
+var _ = Describe("Chaos Under Load (PurgeKeysOnRebalance=false)", Label("chaos", "load", "nopurge"), func() {
+	var (
+		namespace *corev1.Namespace
+		k6JobName string
+		rng       *rand.Rand
+	)
+
+	BeforeEach(func() {
 		var err error
-		k6JobName, err = framework.StartK6LoadJob(ctx, k8sClientset, namespace.Name, clusterName, chaosDuration, defaultVUs)
-		Expect(err).NotTo(HaveOccurred())
 
-		By("executing full chaos")
-		endTime := time.Now().Add(chaosDuration - chaosReserveTime)
+		rng = rand.New(rand.NewSource(chaosSeed))
+		GinkgoWriter.Printf("Using random seed: %d\n", chaosSeed)
 
-		iteration := 0
-		for time.Now().Before(endTime) {
-			iteration++
-			GinkgoWriter.Printf("=== Full chaos iteration %d ===\n", iteration)
+		namespace, err = framework.CreateNamespace(ctx, k8sClientset, fmt.Sprintf("chaos-np-%d", GinkgoParallelProcess()))
+		Expect(err).NotTo(HaveOccurred(), "failed to create namespace")
 
-			action := rng.Intn(4)
+		By("deploying operator in namespace")
+		Expect(framework.EnsureOperatorSetup(ctx, k8sClientset, namespace.Name)).To(Succeed())
 
-			switch action {
-			case 0:
-				By(fmt.Sprintf("iteration %d: deleting operator pod", iteration))
-				Expect(framework.DeleteOperatorPods(ctx, k8sClientset, namespace.Name)).To(Succeed())
-			case 1:
-				By(fmt.Sprintf("iteration %d: deleting robin pods", iteration))
-				Expect(framework.DeleteRobinPods(ctx, k8sClientset, namespace.Name, clusterName)).To(Succeed())
-			case 2:
-				By(fmt.Sprintf("iteration %d: deleting random redis pods", iteration))
-				deleted, err := framework.DeleteRandomRedisPods(ctx, k8sClientset, namespace.Name, clusterName, 2, rng)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(deleted).NotTo(BeEmpty(), "expected at least one redis pod deletion")
-			case 3:
-				By(fmt.Sprintf("iteration %d: scaling cluster", iteration))
-				newSize := int32(rng.Intn(maxPrimaries-minPrimaries+1) + minPrimaries)
-				Expect(framework.ScaleCluster(ctx, dynamicClient, namespace.Name, clusterName, newSize)).To(Succeed())
-			}
+		Eventually(func() bool {
+			dep, err := k8sClientset.AppsV1().Deployments(namespace.Name).Get(ctx, "redkey-operator", metav1.GetOptions{})
+			return err == nil && dep.Status.AvailableReplicas >= 1
+		}, operatorReadyTimeout, operatorPollInterval).Should(BeTrue())
 
-			By(fmt.Sprintf("iteration %d: waiting for recovery", iteration))
-			Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
+		By("creating Redis cluster with 5 primaries (PurgeKeysOnRebalance=false)")
+		Expect(framework.CreateRedkeyCluster(ctx, dynamicClient, namespace.Name, clusterName, defaultPrimaries, false)).To(Succeed())
 
-			// Rate limit between chaos actions
-			time.Sleep(chaosIterationDelay)
+		By("waiting for cluster to be ready")
+		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
+	})
+
+	AfterEach(func() {
+		namespaceName := ""
+		if namespace != nil {
+			namespaceName = namespace.Name
 		}
 
-		By("verifying final cluster state")
-		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
-		Expect(framework.AssertAllSlotsAssigned(ctx, k8sClientset, namespace.Name, clusterName)).To(Succeed())
-		Expect(framework.AssertNoNodesInFailState(ctx, k8sClientset, namespace.Name, clusterName)).To(Succeed())
-		Expect(framework.WaitForK6JobCompletion(ctx, k8sClientset, namespace.Name, k6JobName, chaosDuration+k6CompletionBuffer)).To(Succeed())
+		if CurrentSpecReport().Failed() && namespaceName != "" {
+			collectDiagnostics(namespace.Name)
+		}
+		if k6JobName != "" {
+			Expect(namespaceName).NotTo(BeEmpty(), "k6 job cleanup requires a namespace")
+			Expect(framework.DeleteK6Job(ctx, k8sClientset, namespaceName, k6JobName)).To(Succeed(), "failed to clean up k6 job %s in namespace %s", k6JobName, namespaceName)
+		}
+		if skipDeleteNamespace && CurrentSpecReport().Failed() {
+			GinkgoWriter.Printf("CHAOS_SKIP_DELETE_NAMESPACE is set and spec failed — preserving namespace %s for inspection\n", namespaceName)
+		} else {
+			Expect(framework.DeleteNamespace(ctx, k8sClientset, dynamicClient, namespace)).To(Succeed(), "failed to clean up namespace %s", namespaceName)
+		}
+	})
+
+	// ==================================================================================
+	// Scenario 1 (NoPurge): Continuous Scaling Under Load and Chaos
+	// ==================================================================================
+	It("survives continuous scaling and pod deletion while handling traffic without purge", func() {
+		k6JobName = runScalingChaos(rng, namespace.Name, clusterName)
+	})
+
+	// ==================================================================================
+	// Scenario 2 (NoPurge): Chaos with Operator Deletion
+	// ==================================================================================
+	It("recovers when operator pod is deleted during chaos without purge", func() {
+		k6JobName = runOperatorDeletionChaos(rng, namespace.Name, clusterName)
+	})
+
+	// ==================================================================================
+	// Scenario 3 (NoPurge): Chaos with Robin Deletion
+	// ==================================================================================
+	It("recovers when robin pods are deleted during chaos without purge", func() {
+		k6JobName = runRobinDeletionChaos(rng, namespace.Name, clusterName)
+	})
+
+	// ==================================================================================
+	// Scenario 4 (NoPurge): Full Chaos (Operator + Robin + Redis)
+	// ==================================================================================
+	It("recovers from full chaos deleting operator, robin, and redis pods without purge", func() {
+		k6JobName = runFullChaos(rng, namespace.Name, clusterName)
 	})
 })
 
@@ -281,7 +223,7 @@ var _ = Describe("Topology Corruption Recovery", Label("chaos", "topology"), fun
 		}, operatorReadyTimeout, operatorPollInterval).Should(BeTrue())
 
 		By("creating Redis cluster with 5 primaries")
-		Expect(framework.CreateRedkeyCluster(ctx, dynamicClient, namespace.Name, clusterName, defaultPrimaries)).To(Succeed())
+		Expect(framework.CreateRedkeyCluster(ctx, dynamicClient, namespace.Name, clusterName, defaultPrimaries, true)).To(Succeed())
 
 		By("waiting for cluster to be ready")
 		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
@@ -296,7 +238,11 @@ var _ = Describe("Topology Corruption Recovery", Label("chaos", "topology"), fun
 		if CurrentSpecReport().Failed() && namespaceName != "" {
 			collectDiagnostics(namespace.Name)
 		}
-		Expect(framework.DeleteNamespace(ctx, k8sClientset, dynamicClient, namespace)).To(Succeed(), "failed to clean up namespace %s", namespaceName)
+		if skipDeleteNamespace && CurrentSpecReport().Failed() {
+			GinkgoWriter.Printf("CHAOS_SKIP_DELETE_NAMESPACE is set and spec failed — preserving namespace %s for inspection\n", namespaceName)
+		} else {
+			Expect(framework.DeleteNamespace(ctx, k8sClientset, dynamicClient, namespace)).To(Succeed(), "failed to clean up namespace %s", namespaceName)
+		}
 	})
 
 	// ==================================================================================
