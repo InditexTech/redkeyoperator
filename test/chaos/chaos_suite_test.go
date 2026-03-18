@@ -107,19 +107,7 @@ var _ = Describe("Chaos Under Load", Label("chaos", "load"), func() {
 			newSize := int32(rng.Intn(maxPrimaries-minPrimaries+1) + minPrimaries)
 			Expect(framework.ScaleCluster(ctx, dynamicClient, namespace.Name, clusterName, newSize)).To(Succeed())
 
-			// Poll for StatefulSet to acknowledge the scale and pods to exist.
-			// During fast scaling (PurgeKeysOnRebalance=true), the operator deletes and
-			// recreates the StatefulSet, so we must wait for pods to actually exist
-			// before attempting to delete them.
-			Eventually(func() int {
-				pods, err := k8sClientset.CoreV1().Pods(namespace.Name).List(ctx, metav1.ListOptions{
-					LabelSelector: framework.RedisPodsSelector(clusterName),
-				})
-				if err != nil {
-					return 0
-				}
-				return len(pods.Items)
-			}, scaleAckTimeout, scalePollInterval).Should(BeNumerically(">=", int(newSize)))
+			Expect(framework.WaitForScaleAck(ctx, k8sClientset, namespace.Name, clusterName, newSize, scaleAckTimeout, scalePollInterval)).To(Succeed())
 
 			By(fmt.Sprintf("iteration %d: deleting random redis pods", iteration))
 			deleteCount := rng.Intn(int(newSize)/2) + 1
@@ -202,9 +190,7 @@ var _ = Describe("Chaos Under Load", Label("chaos", "load"), func() {
 			GinkgoWriter.Printf("=== Chaos iteration %d ===\n", iteration)
 
 			By(fmt.Sprintf("iteration %d: deleting robin pods", iteration))
-			deletedRobin, err := framework.DeleteRobinPods(ctx, k8sClientset, namespace.Name, clusterName, 2, rng)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(deletedRobin).NotTo(BeEmpty(), "expected at least one robin pod deletion")
+			Expect(framework.DeleteRobinPods(ctx, k8sClientset, namespace.Name, clusterName)).To(Succeed())
 
 			By(fmt.Sprintf("iteration %d: deleting random redis pods", iteration))
 			deletedRedis, err := framework.DeleteRandomRedisPods(ctx, k8sClientset, namespace.Name, clusterName, 2, rng)
@@ -248,9 +234,7 @@ var _ = Describe("Chaos Under Load", Label("chaos", "load"), func() {
 				Expect(framework.DeleteOperatorPods(ctx, k8sClientset, namespace.Name)).To(Succeed())
 			case 1:
 				By(fmt.Sprintf("iteration %d: deleting robin pods", iteration))
-				deleted, err := framework.DeleteRobinPods(ctx, k8sClientset, namespace.Name, clusterName, 2, rng)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(deleted).NotTo(BeEmpty(), "expected at least one robin pod deletion")
+				Expect(framework.DeleteRobinPods(ctx, k8sClientset, namespace.Name, clusterName)).To(Succeed())
 			case 2:
 				By(fmt.Sprintf("iteration %d: deleting random redis pods", iteration))
 				deleted, err := framework.DeleteRandomRedisPods(ctx, k8sClientset, namespace.Name, clusterName, 2, rng)

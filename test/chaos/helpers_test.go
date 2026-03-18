@@ -60,14 +60,9 @@ func verifyK6Completed(namespace, jobName string, timeout time.Duration) {
 	Expect(framework.WaitForK6JobCompletion(ctx, k8sClientset, namespace, jobName, timeout)).To(Succeed())
 }
 
-// waitForStatefulSetReplicas polls until the StatefulSet has the expected replica count.
+// waitForStatefulSetReplicas polls until the StatefulSet has the expected replica
+// count and at least that many pods exist.
 func waitForStatefulSetReplicas(namespace, clusterName string, expectedReplicas int32) {
-	Eventually(func() int32 {
-		replicas, err := framework.GetStatefulSetReplicas(ctx, k8sClientset, namespace, clusterName)
-		if err != nil {
-			return -1
-		}
-		return replicas
-	}, scaleAckTimeout, scalePollInterval).Should(Equal(expectedReplicas),
-		fmt.Sprintf("StatefulSet should have %d replicas", expectedReplicas))
+	Expect(framework.WaitForScaleAck(ctx, k8sClientset, namespace, clusterName, expectedReplicas, scaleAckTimeout, scalePollInterval)).To(Succeed(),
+		fmt.Sprintf("StatefulSet should have %d replicas with pods", expectedReplicas))
 }

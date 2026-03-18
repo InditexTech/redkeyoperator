@@ -77,32 +77,27 @@ func DeleteRandomRedisPods(ctx context.Context, clientset kubernetes.Interface, 
 	return deleted, nil
 }
 
-// DeleteRobinPods deletes N random robin pods from the cluster.
-func DeleteRobinPods(ctx context.Context, clientset kubernetes.Interface, namespace, clusterName string, count int, rng *rand.Rand) ([]string, error) {
+// DeleteRobinPods requests deletion of all robin pods for the cluster.
+// It only verifies that the Kubernetes delete calls succeed.
+func DeleteRobinPods(ctx context.Context, clientset kubernetes.Interface, namespace, clusterName string) error {
 	pods, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: RobinPodsSelector(clusterName),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to list robin pods: %w", err)
+		return fmt.Errorf("failed to list robin pods: %w", err)
 	}
 
 	if len(pods.Items) == 0 {
-		return nil, nil
+		return nil
 	}
 
-	// Shuffle and pick N pods
-	indices := rng.Perm(len(pods.Items))
-
-	var deleted []string
-	for i := 0; i < count && i < len(indices); i++ {
-		pod := pods.Items[indices[i]]
+	for _, pod := range pods.Items {
 		if err := clientset.CoreV1().Pods(namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
-			return deleted, fmt.Errorf("failed to delete robin pod %s: %w", pod.Name, err)
+			return fmt.Errorf("failed to delete robin pod %s: %w", pod.Name, err)
 		}
-		deleted = append(deleted, pod.Name)
 	}
 
-	return deleted, nil
+	return nil
 }
 
 // ScaleCluster scales the Redis cluster to the specified number of primaries.

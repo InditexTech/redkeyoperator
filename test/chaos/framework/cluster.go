@@ -69,6 +69,31 @@ func GetStatefulSetReplicas(ctx context.Context, clientset kubernetes.Interface,
 	return *sts.Spec.Replicas, nil
 }
 
+// WaitForScaleAck polls until the StatefulSet has the expected replica count
+// and at least that many pods exist. During fast scaling
+// (PurgeKeysOnRebalance=true), the operator may delete and recreate the
+// StatefulSet, so both conditions must be met before the caller can safely
+// interact with the pods.
+func WaitForScaleAck(ctx context.Context, clientset kubernetes.Interface, namespace, clusterName string, expectedReplicas int32, timeout, interval time.Duration) error {
+	return wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (bool, error) {
+		replicas, err := GetStatefulSetReplicas(ctx, clientset, namespace, clusterName)
+		if err != nil {
+			return false, nil
+		}
+		if replicas != expectedReplicas {
+			return false, nil
+		}
+
+		pods, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
+			LabelSelector: RedisPodsSelector(clusterName),
+		})
+		if err != nil {
+			return false, nil
+		}
+		return int32(len(pods.Items)) >= expectedReplicas, nil
+	})
+}
+
 // buildRedkeyCluster constructs a RedkeyCluster object with the given parameters.
 func buildRedkeyCluster(
 	key types.NamespacedName,
