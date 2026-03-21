@@ -85,7 +85,7 @@ var _ = SynchronizedBeforeSuite(
 			chaosSeed = GinkgoRandomSeed()
 		}
 
-		if os.Getenv("CHAOS_SKIP_DELETE_NAMESPACE") != "" {
+		if os.Getenv("CHAOS_KEEP_NAMESPACE_ON_FAILED") != "" {
 			skipDeleteNamespace = true
 		}
 

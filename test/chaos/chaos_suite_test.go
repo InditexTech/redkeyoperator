@@ -83,7 +83,7 @@ var _ = Describe("Chaos Under Load (PurgeKeysOnRebalance=true)", Label("chaos", 
 			Expect(framework.DeleteK6Job(ctx, k8sClientset, namespaceName, k6JobName)).To(Succeed(), "failed to clean up k6 job %s in namespace %s", k6JobName, namespaceName)
 		}
 		if skipDeleteNamespace && CurrentSpecReport().Failed() {
-			GinkgoWriter.Printf("CHAOS_SKIP_DELETE_NAMESPACE is set and spec failed — preserving namespace %s for inspection\n", namespaceName)
+			GinkgoWriter.Printf("CHAOS_KEEP_NAMESPACE_ON_FAILED is set and spec failed — preserving namespace %s for inspection\n", namespaceName)
 		} else {
 			Expect(framework.DeleteNamespace(ctx, k8sClientset, dynamicClient, namespace)).To(Succeed(), "failed to clean up namespace %s", namespaceName)
 		}
@@ -168,7 +168,7 @@ var _ = Describe("Chaos Under Load (PurgeKeysOnRebalance=false)", Label("chaos",
 			Expect(framework.DeleteK6Job(ctx, k8sClientset, namespaceName, k6JobName)).To(Succeed(), "failed to clean up k6 job %s in namespace %s", k6JobName, namespaceName)
 		}
 		if skipDeleteNamespace && CurrentSpecReport().Failed() {
-			GinkgoWriter.Printf("CHAOS_SKIP_DELETE_NAMESPACE is set and spec failed — preserving namespace %s for inspection\n", namespaceName)
+			GinkgoWriter.Printf("CHAOS_KEEP_NAMESPACE_ON_FAILED is set and spec failed — preserving namespace %s for inspection\n", namespaceName)
 		} else {
 			Expect(framework.DeleteNamespace(ctx, k8sClientset, dynamicClient, namespace)).To(Succeed(), "failed to clean up namespace %s", namespaceName)
 		}
@@ -239,7 +239,7 @@ var _ = Describe("Topology Corruption Recovery", Label("chaos", "topology"), fun
 			collectDiagnostics(namespace.Name)
 		}
 		if skipDeleteNamespace && CurrentSpecReport().Failed() {
-			GinkgoWriter.Printf("CHAOS_SKIP_DELETE_NAMESPACE is set and spec failed — preserving namespace %s for inspection\n", namespaceName)
+			GinkgoWriter.Printf("CHAOS_KEEP_NAMESPACE_ON_FAILED is set and spec failed — preserving namespace %s for inspection\n", namespaceName)
 		} else {
 			Expect(framework.DeleteNamespace(ctx, k8sClientset, dynamicClient, namespace)).To(Succeed(), "failed to clean up namespace %s", namespaceName)
 		}

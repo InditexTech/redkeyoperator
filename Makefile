@@ -597,7 +597,7 @@ CHAOS_SEED ?=
 CHAOS_TIMEOUT ?= 30m
 CHAOS_PACKAGES ?= ./test/chaos
 CHAOS_TEST_OUTPUT = .local/chaos-test.json
-
+# CHAOS_KEEP_NAMESPACE_ON_FAILED=1 #  if != "" skip delete namespace if failed
 .PHONY: k6-build
 k6-build:  ## Build k6 image with xk6-redis extension
 	$(info $(M) building k6 docker image with redis extension)
