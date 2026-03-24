@@ -2,10 +2,14 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-FROM golang:1.25.7-trixie AS builder
+# Define the desired Golang version
+ARG GOLANG_VERSION=1.25.8
+
+
+FROM golang:${GOLANG_VERSION}-trixie AS builder
 
 # install git and basic build tools so xk6 can fetch & build extensions
-RUN apk add --no-cache git build-base ca-certificates
+RUN apt update && apt upgrade -y && apt install -y curl procps build-essential ca-certificates
 
 RUN go install go.k6.io/xk6/cmd/xk6@latest
 RUN xk6 build \

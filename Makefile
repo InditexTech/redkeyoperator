@@ -609,7 +609,7 @@ k6-push: k6-build  ## Push k6 image to local registry
 	docker push $(K6_IMG)
 
 .PHONY: test-chaos
-test-chaos: process-manifests-crd ginkgo k6-push  ## Execute chaos tests
+test-chaos: process-manifests-crd ginkgo  ## Execute chaos tests
 	$(info $(M) running chaos tests...)
 	@mkdir -p $(dir $(CHAOS_TEST_OUTPUT))
 	$(GINKGO_ENV) K6_IMG=$(K6_IMG) CHAOS_DURATION=$(CHAOS_DURATION) \
