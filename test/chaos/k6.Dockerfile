@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-FROM golang:1.25-alpine AS builder
+FROM golang:1.25.7-trixie AS builder
 
 # install git and basic build tools so xk6 can fetch & build extensions
 RUN apk add --no-cache git build-base ca-certificates
@@ -12,7 +12,7 @@ RUN xk6 build \
     --with github.com/grafana/xk6-redis \
     --output /k6
 
-FROM alpine:3.23
+FROM debian:trixie-slim AS final
 COPY --from=builder /k6 /usr/bin/k6
 COPY k6scripts/ /scripts/
 ENTRYPOINT ["/usr/bin/k6"]
