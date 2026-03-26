@@ -24,7 +24,7 @@ var (
 	dynamicClient       dynamic.Interface
 	ctx                 context.Context
 	cancel              context.CancelFunc
-	chaosDuration       time.Duration
+	chaosIterations     int
 	chaosSeed           int64
 	chaosReadyTimeout   = 10 * time.Minute
 	skipDeleteNamespace bool
@@ -72,7 +72,7 @@ var _ = SynchronizedBeforeSuite(
 
 		ctx, cancel = context.WithCancel(context.Background())
 
-		chaosDuration = parseDuration(os.Getenv("CHAOS_DURATION"), 10*time.Minute)
+		chaosIterations = parseInt(os.Getenv("CHAOS_ITERATIONS"), 3)
 
 		if seedStr := os.Getenv("CHAOS_SEED"); seedStr != "" {
 			seed, err := strconv.ParseInt(seedStr, 10, 64)
@@ -89,7 +89,7 @@ var _ = SynchronizedBeforeSuite(
 			skipDeleteNamespace = true
 		}
 
-		GinkgoWriter.Printf("Chaos test configuration: duration=%v, seed=%d, skipDeleteNamespace=%v\n", chaosDuration, chaosSeed, skipDeleteNamespace)
+		GinkgoWriter.Printf("Chaos test configuration: iterations=%d, seed=%d, skipDeleteNamespace=%v\n", chaosIterations, chaosSeed, skipDeleteNamespace)
 	},
 )
 
@@ -106,14 +106,14 @@ var _ = SynchronizedAfterSuite(
 	},
 )
 
-// parseDuration parses a duration string and returns a default if parsing fails.
-func parseDuration(s string, defaultVal time.Duration) time.Duration {
+// parseInt parses an integer string and returns a default if parsing fails.
+func parseInt(s string, defaultVal int) int {
 	if s == "" {
 		return defaultVal
 	}
-	d, err := time.ParseDuration(s)
+	v, err := strconv.Atoi(s)
 	if err != nil {
 		return defaultVal
 	}
-	return d
+	return v
 }

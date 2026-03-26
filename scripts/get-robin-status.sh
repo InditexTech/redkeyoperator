@@ -6,8 +6,13 @@ set -o nounset
 
 set +o errexit
 set +o pipefail
-while sleep 2; do
-    ns=$(kubectl get namespace  2> /dev/null  | grep redis | cut -f1 -d" " )
+
+if (( $# > 0 )); then
+    nss=$1
+else
+    nss=$(kubectl get namespace  2> /dev/null  | grep -E '(redis|chaos)' | cut -f1 -d" " )
+fi
+for ns in $nss; do
     p=$(kubectl get pod -n $ns 2> /dev/null | grep robin | cut -f1 -d" " 2> /dev/null)
     echo -n "RKCLUST STATUS: "
     kubectl exec $p -n $ns -- curl -s http://localhost:8080/v1/redkeycluster/status 2> /dev/null

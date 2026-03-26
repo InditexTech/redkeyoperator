@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	batchv1 "k8s.io/api/batch/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,11 +23,19 @@ import (
 
 const (
 	defaultK6Image   = "localhost:5001/redkey-k6:dev"
-	k6JobTimeout     = 30 * time.Minute
 	k6StartupTimeout = 2 * time.Minute
+	k6StopTimeout    = 30 * time.Second
 	defaultK6VUs     = 10
 	k6LogTailLines   = int64(200)
+	// k6 runs with a very long duration so it keeps generating load until
+	// the test explicitly stops it by deleting the deployment.
+	k6RunDuration = "24h"
 )
+
+// K6LoadSelector returns the label selector for k6 load pods.
+func K6LoadSelector() string {
+	return "app=k6-load"
+}
 
 // GetK6Image returns the k6 image from environment or default.
 func GetK6Image() string {
@@ -37,9 +45,10 @@ func GetK6Image() string {
 	return defaultK6Image
 }
 
-// StartK6LoadJob creates and starts a k6 Job for load testing.
-// Returns the job name.
-func StartK6LoadJob(ctx context.Context, clientset kubernetes.Interface, namespace, clusterName string, duration time.Duration, vus int) (string, error) {
+// StartK6LoadDeployment creates a k6 Deployment that generates continuous
+// load against the Redis cluster. The deployment keeps running until
+// explicitly stopped via StopK6Load. Returns the deployment name.
+func StartK6LoadDeployment(ctx context.Context, clientset kubernetes.Interface, namespace, clusterName string, vus int) (string, error) {
 	if vus <= 0 {
 		vus = defaultK6VUs
 	}
@@ -50,24 +59,28 @@ func StartK6LoadJob(ctx context.Context, clientset kubernetes.Interface, namespa
 		return "", fmt.Errorf("failed to get redis hosts: %w", err)
 	}
 
-	jobName := fmt.Sprintf("k6-load-%s", clusterName)
+	deployName := fmt.Sprintf("k6-load-%s", clusterName)
+	labels := map[string]string{
+		"app":                 "k6-load",
+		"redkey-cluster-name": clusterName,
+	}
 
-	job := &batchv1.Job{
+	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      jobName,
+			Name:      deployName,
 			Namespace: namespace,
 		},
-		Spec: batchv1.JobSpec{
-			BackoffLimit: ptr.To(int32(0)),
+		Spec: appsv1.DeploymentSpec{
+			Replicas: ptr.To(int32(1)),
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
+			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"app":                 "k6-load",
-						"redkey-cluster-name": clusterName,
-					},
+					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
-					RestartPolicy: corev1.RestartPolicyNever,
+					RestartPolicy: corev1.RestartPolicyAlways,
 					Containers: []corev1.Container{
 						{
 							Name:  "k6",
@@ -75,7 +88,7 @@ func StartK6LoadJob(ctx context.Context, clientset kubernetes.Interface, namespa
 							Args: []string{
 								"run",
 								"/scripts/test-300k.js",
-								"--duration", formatDuration(duration),
+								"--duration", k6RunDuration,
 								"--vus", fmt.Sprintf("%d", vus),
 							},
 							Env: []corev1.EnvVar{
@@ -91,26 +104,26 @@ func StartK6LoadJob(ctx context.Context, clientset kubernetes.Interface, namespa
 		},
 	}
 
-	// Delete existing job if present
+	// Delete existing deployment if present
 	propagation := metav1.DeletePropagationForeground
-	_ = clientset.BatchV1().Jobs(namespace).Delete(ctx, jobName, metav1.DeleteOptions{
+	_ = clientset.AppsV1().Deployments(namespace).Delete(ctx, deployName, metav1.DeleteOptions{
 		PropagationPolicy: &propagation,
 	})
 
 	// Wait for deletion
-	_ = wait.PollUntilContextTimeout(ctx, time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
-		_, err := clientset.BatchV1().Jobs(namespace).Get(ctx, jobName, metav1.GetOptions{})
+	_ = wait.PollUntilContextTimeout(ctx, time.Second, k6StopTimeout, true, func(ctx context.Context) (bool, error) {
+		_, err := clientset.AppsV1().Deployments(namespace).Get(ctx, deployName, metav1.GetOptions{})
 		return errors.IsNotFound(err), nil
 	})
 
-	if _, err := clientset.BatchV1().Jobs(namespace).Create(ctx, job, metav1.CreateOptions{}); err != nil {
-		return "", fmt.Errorf("failed to create k6 job: %w", err)
+	if _, err := clientset.AppsV1().Deployments(namespace).Create(ctx, dep, metav1.CreateOptions{}); err != nil {
+		return "", fmt.Errorf("failed to create k6 deployment: %w", err)
 	}
 
-	// Wait for job pod to start
+	// Wait for at least one pod to be running
 	err = wait.PollUntilContextTimeout(ctx, 2*time.Second, k6StartupTimeout, true, func(ctx context.Context) (bool, error) {
 		pods, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
-			LabelSelector: "app=k6-load",
+			LabelSelector: K6LoadSelector(),
 		})
 		if err != nil {
 			return false, nil
@@ -123,55 +136,21 @@ func StartK6LoadJob(ctx context.Context, clientset kubernetes.Interface, namespa
 		return false, nil
 	})
 	if err != nil {
-		return jobName, fmt.Errorf("k6 job pod did not start: %w", err)
+		return deployName, fmt.Errorf("k6 deployment pod did not start: %w", err)
 	}
 
-	return jobName, nil
+	return deployName, nil
 }
 
-// WaitForK6JobCompletion waits for the k6 job to complete successfully.
-func WaitForK6JobCompletion(ctx context.Context, clientset kubernetes.Interface, namespace, jobName string, timeout time.Duration) error {
-	if timeout == 0 {
-		timeout = k6JobTimeout
-	}
-
-	return wait.PollUntilContextTimeout(ctx, 5*time.Second, timeout, true, func(ctx context.Context) (bool, error) {
-		job, err := clientset.BatchV1().Jobs(namespace).Get(ctx, jobName, metav1.GetOptions{})
-		if err != nil {
-			if errors.IsNotFound(err) {
-				return false, fmt.Errorf("k6 job not found")
-			}
-			return false, nil
-		}
-
-		for _, condition := range job.Status.Conditions {
-			if condition.Type == batchv1.JobComplete && condition.Status == corev1.ConditionTrue {
-				// k6 exited 0, meaning all thresholds (including checks rate>0.99) passed.
-				// Transient [K6_ERROR] entries are expected during chaos scenarios
-				// (pod deletions, scaling) and are already accounted for by the threshold.
-				return true, nil
-			}
-			if condition.Type == batchv1.JobFailed && condition.Status == corev1.ConditionTrue {
-				logs, logsErr := GetK6JobLogs(ctx, clientset, namespace, jobName)
-				if logsErr != nil {
-					return false, fmt.Errorf("k6 job failed: %s (log inspection failed: %v)", condition.Message, logsErr)
-				}
-				return false, fmt.Errorf("k6 job failed: %s; logs: %s", condition.Message, summarizeK6Logs(logs))
-			}
-		}
-
-		return false, nil
-	})
-}
-
-// DeleteK6Job deletes the k6 job and its pods.
-func DeleteK6Job(ctx context.Context, clientset kubernetes.Interface, namespace, jobName string) error {
-	if jobName == "" {
+// StopK6Load deletes the k6 load deployment and waits for its pods to
+// terminate. It is safe to call with an empty name.
+func StopK6Load(ctx context.Context, clientset kubernetes.Interface, namespace, deployName string) error {
+	if deployName == "" {
 		return nil
 	}
 
 	propagation := metav1.DeletePropagationForeground
-	err := clientset.BatchV1().Jobs(namespace).Delete(ctx, jobName, metav1.DeleteOptions{
+	err := clientset.AppsV1().Deployments(namespace).Delete(ctx, deployName, metav1.DeleteOptions{
 		PropagationPolicy: &propagation,
 	})
 	if errors.IsNotFound(err) {
@@ -181,8 +160,8 @@ func DeleteK6Job(ctx context.Context, clientset kubernetes.Interface, namespace,
 		return err
 	}
 
-	return wait.PollUntilContextTimeout(ctx, time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
-		_, err := clientset.BatchV1().Jobs(namespace).Get(ctx, jobName, metav1.GetOptions{})
+	return wait.PollUntilContextTimeout(ctx, time.Second, k6StopTimeout, true, func(ctx context.Context) (bool, error) {
+		_, err := clientset.AppsV1().Deployments(namespace).Get(ctx, deployName, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
 			return true, nil
 		}
@@ -193,23 +172,13 @@ func DeleteK6Job(ctx context.Context, clientset kubernetes.Interface, namespace,
 	})
 }
 
-// GetK6JobLogs returns the logs from the k6 job pod.
-func GetK6JobLogs(ctx context.Context, clientset kubernetes.Interface, namespace, jobName string) (string, error) {
+// GetK6Logs returns the logs from a running k6 load pod.
+func GetK6Logs(ctx context.Context, clientset kubernetes.Interface, namespace string) (string, error) {
 	pods, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("app=k6-load,job-name=%s", jobName),
+		LabelSelector: K6LoadSelector(),
 	})
 	if err != nil {
 		return "", err
-	}
-
-	if len(pods.Items) == 0 {
-		// Try alternative label selector
-		pods, err = clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
-			LabelSelector: "app=k6-load",
-		})
-		if err != nil {
-			return "", err
-		}
 	}
 
 	if len(pods.Items) == 0 {
@@ -225,13 +194,13 @@ func GetK6JobLogs(ctx context.Context, clientset kubernetes.Interface, namespace
 	req := clientset.CoreV1().Pods(namespace).GetLogs(pod.Name, opts)
 	stream, err := req.Stream(ctx)
 	if err != nil {
-		return fmt.Sprintf("Pod %s completed but failed to get logs: %v", pod.Name, err), nil
+		return fmt.Sprintf("Pod %s running but failed to get logs: %v", pod.Name, err), nil
 	}
 	defer stream.Close()
 
 	var buf strings.Builder
 	if _, err := io.Copy(&buf, stream); err != nil {
-		return fmt.Sprintf("Pod %s completed but failed to read logs: %v", pod.Name, err), nil
+		return fmt.Sprintf("Pod %s running but failed to read logs: %v", pod.Name, err), nil
 	}
 
 	return buf.String(), nil
@@ -266,31 +235,4 @@ func getRedisHosts(ctx context.Context, clientset kubernetes.Interface, namespac
 	}
 
 	return strings.Join(hosts, ","), nil
-}
-
-// formatDuration formats a duration for k6 (e.g., "10m", "1h30m").
-func formatDuration(d time.Duration) string {
-	if d < time.Minute {
-		return fmt.Sprintf("%ds", int(d.Seconds()))
-	}
-	if d < time.Hour {
-		return fmt.Sprintf("%dm", int(d.Minutes()))
-	}
-	hours := int(d.Hours())
-	minutes := int(d.Minutes()) % 60
-	if minutes == 0 {
-		return fmt.Sprintf("%dh", hours)
-	}
-	return fmt.Sprintf("%dh%dm", hours, minutes)
-}
-
-func summarizeK6Logs(logs string) string {
-	trimmed := strings.TrimSpace(logs)
-	if trimmed == "" {
-		return "<empty logs>"
-	}
-	if len(trimmed) > 1500 {
-		return trimmed[len(trimmed)-1500:]
-	}
-	return trimmed
 }

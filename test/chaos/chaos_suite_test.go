@@ -24,8 +24,6 @@ const (
 	// Chaos timing constants
 	chaosIterationDelay  = 5 * time.Second  // Delay between chaos iterations
 	chaosRateLimitDelay  = 10 * time.Second // Delay for rate limiting between heavy operations
-	chaosReserveTime     = 1 * time.Minute  // Time reserved at end of chaos for final checks
-	k6CompletionBuffer   = 5 * time.Minute  // Buffer time for k6 job completion
 	operatorReadyTimeout = 2 * time.Minute  // Timeout for operator to become ready
 	operatorPollInterval = 5 * time.Second  // Poll interval for operator readiness
 	scaleAckTimeout      = 30 * time.Second // Timeout for StatefulSet to acknowledge scale
@@ -41,7 +39,7 @@ const (
 var _ = Describe("Chaos Under Load (PurgeKeysOnRebalance=true)", Label("chaos", "load"), func() {
 	var (
 		namespace *corev1.Namespace
-		k6JobName string
+		k6DepName string
 		rng       *rand.Rand
 	)
 
@@ -78,9 +76,8 @@ var _ = Describe("Chaos Under Load (PurgeKeysOnRebalance=true)", Label("chaos", 
 		if CurrentSpecReport().Failed() && namespaceName != "" {
 			collectDiagnostics(namespace.Name)
 		}
-		if k6JobName != "" {
-			Expect(namespaceName).NotTo(BeEmpty(), "k6 job cleanup requires a namespace")
-			Expect(framework.DeleteK6Job(ctx, k8sClientset, namespaceName, k6JobName)).To(Succeed(), "failed to clean up k6 job %s in namespace %s", k6JobName, namespaceName)
+		if k6DepName != "" && namespaceName != "" {
+			Expect(framework.StopK6Load(ctx, k8sClientset, namespaceName, k6DepName)).To(Succeed(), "failed to clean up k6 deployment %s in namespace %s", k6DepName, namespaceName)
 		}
 		if skipDeleteNamespace && CurrentSpecReport().Failed() {
 			GinkgoWriter.Printf("CHAOS_KEEP_NAMESPACE_ON_FAILED is set and spec failed — preserving namespace %s for inspection\n", namespaceName)
@@ -94,28 +91,28 @@ var _ = Describe("Chaos Under Load (PurgeKeysOnRebalance=true)", Label("chaos", 
 	//              PurgeKeysOnRebalance=true --> the StatefulSet is recreated when scaling
 	// ==================================================================================
 	It("survives continuous scaling and pod deletion while handling traffic", func() {
-		k6JobName = runScalingChaos(rng, namespace.Name, clusterName)
+		k6DepName = runScalingChaos(rng, namespace.Name, clusterName)
 	})
 
 	// ==================================================================================
 	// Scenario 2: Chaos with Operator Deletion
 	// ==================================================================================
 	It("recovers when operator pod is deleted during chaos", func() {
-		k6JobName = runOperatorDeletionChaos(rng, namespace.Name, clusterName)
+		k6DepName = runOperatorDeletionChaos(rng, namespace.Name, clusterName)
 	})
 
 	// ==================================================================================
 	// Scenario 3: Chaos with Robin Deletion
 	// ==================================================================================
 	It("recovers when robin pods are deleted during chaos", func() {
-		k6JobName = runRobinDeletionChaos(rng, namespace.Name, clusterName)
+		k6DepName = runRobinDeletionChaos(rng, namespace.Name, clusterName)
 	})
 
 	// ==================================================================================
 	// Scenario 4: Full Chaos (Operator + Robin + Redis)
 	// ==================================================================================
 	It("recovers from full chaos deleting operator, robin, and redis pods", func() {
-		k6JobName = runFullChaos(rng, namespace.Name, clusterName)
+		k6DepName = runFullChaos(rng, namespace.Name, clusterName)
 	})
 })
 
@@ -126,7 +123,7 @@ var _ = Describe("Chaos Under Load (PurgeKeysOnRebalance=true)", Label("chaos", 
 var _ = Describe("Chaos Under Load (PurgeKeysOnRebalance=false)", Label("chaos", "load", "nopurge"), func() {
 	var (
 		namespace *corev1.Namespace
-		k6JobName string
+		k6DepName string
 		rng       *rand.Rand
 	)
 
@@ -163,9 +160,8 @@ var _ = Describe("Chaos Under Load (PurgeKeysOnRebalance=false)", Label("chaos",
 		if CurrentSpecReport().Failed() && namespaceName != "" {
 			collectDiagnostics(namespace.Name)
 		}
-		if k6JobName != "" {
-			Expect(namespaceName).NotTo(BeEmpty(), "k6 job cleanup requires a namespace")
-			Expect(framework.DeleteK6Job(ctx, k8sClientset, namespaceName, k6JobName)).To(Succeed(), "failed to clean up k6 job %s in namespace %s", k6JobName, namespaceName)
+		if k6DepName != "" && namespaceName != "" {
+			Expect(framework.StopK6Load(ctx, k8sClientset, namespaceName, k6DepName)).To(Succeed(), "failed to clean up k6 deployment %s in namespace %s", k6DepName, namespaceName)
 		}
 		if skipDeleteNamespace && CurrentSpecReport().Failed() {
 			GinkgoWriter.Printf("CHAOS_KEEP_NAMESPACE_ON_FAILED is set and spec failed — preserving namespace %s for inspection\n", namespaceName)
@@ -178,28 +174,28 @@ var _ = Describe("Chaos Under Load (PurgeKeysOnRebalance=false)", Label("chaos",
 	// Scenario 1 (NoPurge): Continuous Scaling Under Load and Chaos
 	// ==================================================================================
 	It("survives continuous scaling and pod deletion while handling traffic without purge", func() {
-		k6JobName = runScalingChaos(rng, namespace.Name, clusterName)
+		k6DepName = runScalingChaos(rng, namespace.Name, clusterName)
 	})
 
 	// ==================================================================================
 	// Scenario 2 (NoPurge): Chaos with Operator Deletion
 	// ==================================================================================
 	It("recovers when operator pod is deleted during chaos without purge", func() {
-		k6JobName = runOperatorDeletionChaos(rng, namespace.Name, clusterName)
+		k6DepName = runOperatorDeletionChaos(rng, namespace.Name, clusterName)
 	})
 
 	// ==================================================================================
 	// Scenario 3 (NoPurge): Chaos with Robin Deletion
 	// ==================================================================================
 	It("recovers when robin pods are deleted during chaos without purge", func() {
-		k6JobName = runRobinDeletionChaos(rng, namespace.Name, clusterName)
+		k6DepName = runRobinDeletionChaos(rng, namespace.Name, clusterName)
 	})
 
 	// ==================================================================================
 	// Scenario 4 (NoPurge): Full Chaos (Operator + Robin + Redis)
 	// ==================================================================================
 	It("recovers from full chaos deleting operator, robin, and redis pods without purge", func() {
-		k6JobName = runFullChaos(rng, namespace.Name, clusterName)
+		k6DepName = runFullChaos(rng, namespace.Name, clusterName)
 	})
 })
 

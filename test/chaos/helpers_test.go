@@ -15,32 +15,19 @@ import (
 	"github.com/inditextech/redkeyoperator/test/chaos/framework"
 )
 
-// startK6OrFail starts a k6 load job and fails the test if it errors.
-func startK6OrFail(namespace, clusterName string, duration time.Duration, vus int) string {
-	jobName, err := framework.StartK6LoadJob(ctx, k8sClientset, namespace, clusterName, duration, vus)
-	Expect(err).NotTo(HaveOccurred(), "failed to start k6 job")
-	return jobName
+// startK6OrFail starts a k6 load deployment and fails the test if it errors.
+func startK6OrFail(namespace, clusterName string, vus int) string {
+	depName, err := framework.StartK6LoadDeployment(ctx, k8sClientset, namespace, clusterName, vus)
+	Expect(err).NotTo(HaveOccurred(), "failed to start k6 load deployment")
+	return depName
 }
 
-// cleanupK6Job deletes a k6 job and fails the spec if cleanup fails.
-func cleanupK6Job(namespace, jobName string) {
-	if jobName == "" {
+// stopK6Load stops the k6 load deployment and fails the spec if cleanup fails.
+func stopK6Load(namespace, depName string) {
+	if depName == "" {
 		return
 	}
-	Expect(framework.DeleteK6Job(ctx, k8sClientset, namespace, jobName)).To(Succeed(), "failed to clean up k6 job %s in namespace %s", jobName, namespace)
-}
-
-// chaosLoop runs a chaos function repeatedly until the duration expires.
-// Reserves time at the end for final checks.
-func chaosLoop(duration time.Duration, chaosFn func(iteration int)) {
-	endTime := time.Now().Add(duration - chaosReserveTime)
-	iteration := 0
-
-	for time.Now().Before(endTime) {
-		iteration++
-		GinkgoWriter.Printf("=== Chaos iteration %d ===\n", iteration)
-		chaosFn(iteration)
-	}
+	Expect(framework.StopK6Load(ctx, k8sClientset, namespace, depName)).To(Succeed(), "failed to stop k6 deployment %s in namespace %s", depName, namespace)
 }
 
 // verifyClusterHealthy runs all cluster health checks.
@@ -55,182 +42,178 @@ func verifyClusterHealthy(namespace, clusterName string) {
 	Expect(framework.AssertNoNodesInFailState(ctx, k8sClientset, namespace, clusterName)).To(Succeed())
 }
 
-// verifyK6Completed waits for k6 job to complete successfully.
-func verifyK6Completed(namespace, jobName string, timeout time.Duration) {
-	By("verifying k6 job completed successfully")
-	Expect(framework.WaitForK6JobCompletion(ctx, k8sClientset, namespace, jobName, timeout)).To(Succeed())
-}
-
-// waitForStatefulSetReplicas polls until the StatefulSet has the expected replica
-// count and at least that many pods exist.
-func waitForStatefulSetReplicas(namespace, clusterName string, expectedReplicas int32) {
-	Expect(framework.WaitForScaleAck(ctx, k8sClientset, namespace, clusterName, expectedReplicas, scaleAckTimeout, scalePollInterval)).To(Succeed(),
-		fmt.Sprintf("StatefulSet should have %d replicas with pods", expectedReplicas))
-}
-
 // ---------------------------------------------------------------------------
 // Shared chaos scenario bodies
 // ---------------------------------------------------------------------------
 // Each function runs the full chaos scenario (start k6, chaos loop, verify)
-// and returns the k6 job name so the caller can clean it up.
+// and returns the k6 deployment name so the caller can clean it up.
 
 // runScalingChaos runs the continuous-scaling-and-pod-deletion scenario.
 func runScalingChaos(rng *rand.Rand, namespace, clusterName string) string {
-	By("starting k6 load job")
-	k6JobName := startK6OrFail(namespace, clusterName, chaosDuration, defaultVUs)
+	By("starting k6 load deployment")
+	k6DepName := startK6OrFail(namespace, clusterName, defaultVUs)
 
-	By("executing chaos loop")
-	endTime := time.Now().Add(chaosDuration - chaosReserveTime)
+	By(fmt.Sprintf("executing chaos loop (%d iterations)", chaosIterations))
 
-	iteration := 0
-	for time.Now().Before(endTime) {
-		iteration++
-		GinkgoWriter.Printf("=== Chaos iteration %d ===\n", iteration)
+	for i := 1; i <= chaosIterations; i++ {
+		GinkgoWriter.Printf("=== Chaos iteration %d/%d ===\n", i, chaosIterations)
 
-		By(fmt.Sprintf("iteration %d: scaling cluster up", iteration))
+		By(fmt.Sprintf("iteration %d/%d: scaling cluster up", i, chaosIterations))
 		newSize := int32(rng.Intn(maxPrimaries-minPrimaries+1) + minPrimaries)
-		Expect(framework.ScaleCluster(ctx, dynamicClient, namespace, clusterName, newSize)).To(Succeed())
+		Expect(framework.ScaleCluster(ctx, dynamicClient, namespace, clusterName, newSize)).To(Succeed(),
+			fmt.Sprintf("iteration %d/%d: failed to scale cluster up to %d", i, chaosIterations, newSize))
 
-		Expect(framework.WaitForScaleAck(ctx, k8sClientset, namespace, clusterName, newSize, scaleAckTimeout, scalePollInterval)).To(Succeed())
+		Expect(framework.WaitForScaleAck(ctx, k8sClientset, namespace, clusterName, newSize, scaleAckTimeout, scalePollInterval)).To(Succeed(),
+			fmt.Sprintf("iteration %d/%d: StatefulSet did not acknowledge scale to %d", i, chaosIterations, newSize))
 
-		By(fmt.Sprintf("iteration %d: deleting random redis pods", iteration))
+		By(fmt.Sprintf("iteration %d/%d: deleting random redis pods", i, chaosIterations))
 		deleteCount := rng.Intn(int(newSize)/2) + 1
 		deleted, err := framework.DeleteRandomRedisPods(ctx, k8sClientset, namespace, clusterName, deleteCount, rng)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(deleted).NotTo(BeEmpty(), "expected at least one redis pod deletion")
+		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("iteration %d/%d: failed to delete random redis pods", i, chaosIterations))
+		Expect(deleted).NotTo(BeEmpty(), fmt.Sprintf("iteration %d/%d: expected at least one redis pod deletion", i, chaosIterations))
 		GinkgoWriter.Printf("Deleted pods: %v\n", deleted)
 
-		By(fmt.Sprintf("iteration %d: waiting for cluster recovery", iteration))
-		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed())
+		By(fmt.Sprintf("iteration %d/%d: waiting for cluster recovery", i, chaosIterations))
+		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed(),
+			fmt.Sprintf("iteration %d/%d: cluster did not recover after pod deletion", i, chaosIterations))
 
-		By(fmt.Sprintf("iteration %d: scaling cluster down", iteration))
+		By(fmt.Sprintf("iteration %d/%d: scaling cluster down", i, chaosIterations))
 		downSize := int32(rng.Intn(3) + minPrimaries)
-		Expect(framework.ScaleCluster(ctx, dynamicClient, namespace, clusterName, downSize)).To(Succeed())
+		Expect(framework.ScaleCluster(ctx, dynamicClient, namespace, clusterName, downSize)).To(Succeed(),
+			fmt.Sprintf("iteration %d/%d: failed to scale cluster down to %d", i, chaosIterations, downSize))
 
-		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed())
+		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed(),
+			fmt.Sprintf("iteration %d/%d: cluster did not become ready after scaling down", i, chaosIterations))
 	}
+
+	By("stopping k6 load")
+	stopK6Load(namespace, k6DepName)
 
 	By("verifying final cluster state")
 	verifyClusterHealthy(namespace, clusterName)
-	verifyK6Completed(namespace, k6JobName, chaosDuration+k6CompletionBuffer)
 
-	return k6JobName
+	return k6DepName
 }
 
 // runOperatorDeletionChaos runs the operator-pod-deletion scenario.
 func runOperatorDeletionChaos(rng *rand.Rand, namespace, clusterName string) string {
-	By("starting k6 load job")
-	k6JobName := startK6OrFail(namespace, clusterName, chaosDuration, defaultVUs)
+	By("starting k6 load deployment")
+	k6DepName := startK6OrFail(namespace, clusterName, defaultVUs)
 
-	By("executing chaos with operator deletion")
-	endTime := time.Now().Add(chaosDuration - chaosReserveTime)
+	By(fmt.Sprintf("executing chaos with operator deletion (%d iterations)", chaosIterations))
 
-	iteration := 0
-	for time.Now().Before(endTime) {
-		iteration++
-		GinkgoWriter.Printf("=== Chaos iteration %d ===\n", iteration)
+	for i := 1; i <= chaosIterations; i++ {
+		GinkgoWriter.Printf("=== Chaos iteration %d/%d ===\n", i, chaosIterations)
 
-		By(fmt.Sprintf("iteration %d: deleting operator pod", iteration))
-		Expect(framework.DeleteOperatorPods(ctx, k8sClientset, namespace)).To(Succeed())
+		By(fmt.Sprintf("iteration %d/%d: deleting operator pod", i, chaosIterations))
+		Expect(framework.DeleteOperatorPods(ctx, k8sClientset, namespace)).To(Succeed(),
+			fmt.Sprintf("iteration %d/%d: failed to delete operator pods", i, chaosIterations))
 
-		By(fmt.Sprintf("iteration %d: deleting random redis pods", iteration))
+		By(fmt.Sprintf("iteration %d/%d: deleting random redis pods", i, chaosIterations))
 		deleted, err := framework.DeleteRandomRedisPods(ctx, k8sClientset, namespace, clusterName, 2, rng)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(deleted).NotTo(BeEmpty(), "expected at least one redis pod deletion")
+		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("iteration %d/%d: failed to delete random redis pods", i, chaosIterations))
+		Expect(deleted).NotTo(BeEmpty(), fmt.Sprintf("iteration %d/%d: expected at least one redis pod deletion", i, chaosIterations))
 
-		By(fmt.Sprintf("iteration %d: waiting for recovery", iteration))
-		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed())
+		By(fmt.Sprintf("iteration %d/%d: waiting for recovery", i, chaosIterations))
+		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed(),
+			fmt.Sprintf("iteration %d/%d: cluster did not recover after operator deletion", i, chaosIterations))
 
 		// Rate limit between iterations
 		time.Sleep(chaosRateLimitDelay)
 	}
 
+	By("stopping k6 load")
+	stopK6Load(namespace, k6DepName)
+
 	By("verifying final cluster state")
 	Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed())
-	verifyK6Completed(namespace, k6JobName, chaosDuration+k6CompletionBuffer)
 
-	return k6JobName
+	return k6DepName
 }
 
 // runRobinDeletionChaos runs the robin-pod-deletion scenario.
 func runRobinDeletionChaos(rng *rand.Rand, namespace, clusterName string) string {
-	By("starting k6 load job")
-	k6JobName := startK6OrFail(namespace, clusterName, chaosDuration, defaultVUs)
+	By("starting k6 load deployment")
+	k6DepName := startK6OrFail(namespace, clusterName, defaultVUs)
 
-	By("executing chaos with robin deletion")
-	endTime := time.Now().Add(chaosDuration - chaosReserveTime)
+	By(fmt.Sprintf("executing chaos with robin deletion (%d iterations)", chaosIterations))
 
-	iteration := 0
-	for time.Now().Before(endTime) {
-		iteration++
-		GinkgoWriter.Printf("=== Chaos iteration %d ===\n", iteration)
+	for i := 1; i <= chaosIterations; i++ {
+		GinkgoWriter.Printf("=== Chaos iteration %d/%d ===\n", i, chaosIterations)
 
-		By(fmt.Sprintf("iteration %d: deleting robin pods", iteration))
-		Expect(framework.DeleteRobinPods(ctx, k8sClientset, namespace, clusterName)).To(Succeed())
+		By(fmt.Sprintf("iteration %d/%d: deleting robin pods", i, chaosIterations))
+		Expect(framework.DeleteRobinPods(ctx, k8sClientset, namespace, clusterName)).To(Succeed(),
+			fmt.Sprintf("iteration %d/%d: failed to delete robin pods", i, chaosIterations))
 
-		By(fmt.Sprintf("iteration %d: deleting random redis pods", iteration))
+		By(fmt.Sprintf("iteration %d/%d: deleting random redis pods", i, chaosIterations))
 		deletedRedis, err := framework.DeleteRandomRedisPods(ctx, k8sClientset, namespace, clusterName, 2, rng)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(deletedRedis).NotTo(BeEmpty(), "expected at least one redis pod deletion")
+		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("iteration %d/%d: failed to delete random redis pods", i, chaosIterations))
+		Expect(deletedRedis).NotTo(BeEmpty(), fmt.Sprintf("iteration %d/%d: expected at least one redis pod deletion", i, chaosIterations))
 
-		By(fmt.Sprintf("iteration %d: waiting for recovery", iteration))
-		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed())
+		By(fmt.Sprintf("iteration %d/%d: waiting for recovery", i, chaosIterations))
+		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed(),
+			fmt.Sprintf("iteration %d/%d: cluster did not recover after robin deletion", i, chaosIterations))
 
 		// Rate limit between iterations
 		time.Sleep(chaosRateLimitDelay)
 	}
 
+	By("stopping k6 load")
+	stopK6Load(namespace, k6DepName)
+
 	By("verifying final cluster state")
 	Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed())
-	verifyK6Completed(namespace, k6JobName, chaosDuration+k6CompletionBuffer)
 
-	return k6JobName
+	return k6DepName
 }
 
 // runFullChaos runs the full chaos scenario with random operator, robin, redis,
 // and scaling actions.
 func runFullChaos(rng *rand.Rand, namespace, clusterName string) string {
-	By("starting k6 load job")
-	k6JobName := startK6OrFail(namespace, clusterName, chaosDuration, defaultVUs)
+	By("starting k6 load deployment")
+	k6DepName := startK6OrFail(namespace, clusterName, defaultVUs)
 
-	By("executing full chaos")
-	endTime := time.Now().Add(chaosDuration - chaosReserveTime)
+	By(fmt.Sprintf("executing full chaos (%d iterations)", chaosIterations))
 
-	iteration := 0
-	for time.Now().Before(endTime) {
-		iteration++
-		GinkgoWriter.Printf("=== Full chaos iteration %d ===\n", iteration)
+	for i := 1; i <= chaosIterations; i++ {
+		GinkgoWriter.Printf("=== Full chaos iteration %d/%d ===\n", i, chaosIterations)
 
 		action := rng.Intn(4)
 
 		switch action {
 		case 0:
-			By(fmt.Sprintf("iteration %d: deleting operator pod", iteration))
-			Expect(framework.DeleteOperatorPods(ctx, k8sClientset, namespace)).To(Succeed())
+			By(fmt.Sprintf("iteration %d/%d: deleting operator pod", i, chaosIterations))
+			Expect(framework.DeleteOperatorPods(ctx, k8sClientset, namespace)).To(Succeed(),
+				fmt.Sprintf("iteration %d/%d: failed to delete operator pods", i, chaosIterations))
 		case 1:
-			By(fmt.Sprintf("iteration %d: deleting robin pods", iteration))
-			Expect(framework.DeleteRobinPods(ctx, k8sClientset, namespace, clusterName)).To(Succeed())
+			By(fmt.Sprintf("iteration %d/%d: deleting robin pods", i, chaosIterations))
+			Expect(framework.DeleteRobinPods(ctx, k8sClientset, namespace, clusterName)).To(Succeed(),
+				fmt.Sprintf("iteration %d/%d: failed to delete robin pods", i, chaosIterations))
 		case 2:
-			By(fmt.Sprintf("iteration %d: deleting random redis pods", iteration))
+			By(fmt.Sprintf("iteration %d/%d: deleting random redis pods", i, chaosIterations))
 			deleted, err := framework.DeleteRandomRedisPods(ctx, k8sClientset, namespace, clusterName, 2, rng)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(deleted).NotTo(BeEmpty(), "expected at least one redis pod deletion")
+			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("iteration %d/%d: failed to delete random redis pods", i, chaosIterations))
+			Expect(deleted).NotTo(BeEmpty(), fmt.Sprintf("iteration %d/%d: expected at least one redis pod deletion", i, chaosIterations))
 		case 3:
-			By(fmt.Sprintf("iteration %d: scaling cluster", iteration))
+			By(fmt.Sprintf("iteration %d/%d: scaling cluster", i, chaosIterations))
 			newSize := int32(rng.Intn(maxPrimaries-minPrimaries+1) + minPrimaries)
-			Expect(framework.ScaleCluster(ctx, dynamicClient, namespace, clusterName, newSize)).To(Succeed())
+			Expect(framework.ScaleCluster(ctx, dynamicClient, namespace, clusterName, newSize)).To(Succeed(),
+				fmt.Sprintf("iteration %d/%d: failed to scale cluster to %d", i, chaosIterations, newSize))
 		}
 
-		By(fmt.Sprintf("iteration %d: waiting for recovery", iteration))
-		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed())
+		By(fmt.Sprintf("iteration %d/%d: waiting for recovery", i, chaosIterations))
+		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed(),
+			fmt.Sprintf("iteration %d/%d: cluster did not recover after chaos action", i, chaosIterations))
 
 		// Rate limit between chaos actions
 		time.Sleep(chaosIterationDelay)
 	}
 
+	By("stopping k6 load")
+	stopK6Load(namespace, k6DepName)
+
 	By("verifying final cluster state")
 	verifyClusterHealthy(namespace, clusterName)
-	verifyK6Completed(namespace, k6JobName, chaosDuration+k6CompletionBuffer)
 
-	return k6JobName
+	return k6DepName
 }

@@ -4,6 +4,7 @@
 import json
 import sys
 import pathlib
+import os
 
 def escape_md(text: str) -> str:
     """Escape special characters for markdown."""
@@ -119,48 +120,23 @@ def generate_md_report(data: dict) -> str:
     return "\n".join(lines)
 
 
-def unique(path: str) -> str:
-    path = pathlib.Path(path)
-
-    if not path.exists():
-        return path
-
-    stem = path.stem
-    suffix = path.suffix
-    parent = path.parent
-
-    i = 1
-    while True:
-        candidate = parent / f"{stem}_{i}{suffix}"
-        if not candidate.exists():
-            return candidate
-        i += 1
-
-
-
-
 def main():
-    if len(sys.argv) < 2:
-        input_file = ".local/results.json"
-    else:
-        input_file = sys.argv[1]
+    input_files = [f for f in [".local/results.json", ".local/chaos-test.json"] if os.path.exists(f)]
 
-    output_file = sys.argv[2] if len(sys.argv) > 2 else input_file.replace(".json", ".md")
+    for input_file in input_files:
+        output_file =  input_file.replace(".json", ".md")
 
-    output_file = unique(output_file)
+        print(f"Reading: {input_file}")
+        with open(input_file, "r") as f:
+            data = json.load(f)
 
-    print(f"Reading: {input_file}")
-    with open(input_file, "r") as f:
-        data = json.load(f)
+        md_content = generate_md_report(data)
 
-    md_content = generate_md_report(data)
+        print(f"Writing: {output_file}")
+        with open(output_file, "w") as f:
+            f.write(md_content)
 
-    print(f"Writing: {output_file}")
-    with open(output_file, "w") as f:
-        f.write(md_content)
-
-    print("Done!")
-
+        print("Done!")
 
 if __name__ == "__main__":
     main()
