@@ -176,8 +176,10 @@ func runRobinDeletionChaos(rng *rand.Rand, namespace, clusterName string) string
 	return k6DepName
 }
 
-// runFullChaos runs the full chaos scenario with random operator, robin, redis,
-// and scaling actions.
+// runFullChaos runs the full chaos scenario firing multiple actions per
+// iteration — operator deletion, robin deletion, redis pod deletion, and
+// scaling — without waiting for recovery between them. This tests the
+// operator's ability to heal from accumulated, overlapping failures.
 func runFullChaos(rng *rand.Rand, namespace, clusterName string) string {
 	By("starting k6 load deployment")
 	k6DepName := startK6OrFail(namespace, clusterName, defaultVUs)
@@ -187,23 +189,29 @@ func runFullChaos(rng *rand.Rand, namespace, clusterName string) string {
 	for i := 1; i <= chaosIterations; i++ {
 		GinkgoWriter.Printf("=== Full chaos iteration %d/%d ===\n", i, chaosIterations)
 
-		action := rng.Intn(4)
+		// Each action is independently chosen so multiple (or all) can fire
+		// in the same iteration, accumulating failures before recovery.
 
-		switch action {
-		case 0:
+		if rng.Intn(2) == 0 {
 			By(fmt.Sprintf("iteration %d/%d: deleting operator pod", i, chaosIterations))
 			Expect(framework.DeleteOperatorPods(ctx, k8sClientset, namespace)).To(Succeed(),
 				fmt.Sprintf("iteration %d/%d: failed to delete operator pods", i, chaosIterations))
-		case 1:
+		}
+
+		if rng.Intn(2) == 0 {
 			By(fmt.Sprintf("iteration %d/%d: deleting robin pods", i, chaosIterations))
 			Expect(framework.DeleteRobinPods(ctx, k8sClientset, namespace, clusterName)).To(Succeed(),
 				fmt.Sprintf("iteration %d/%d: failed to delete robin pods", i, chaosIterations))
-		case 2:
+		}
+
+		if rng.Intn(2) == 0 {
 			By(fmt.Sprintf("iteration %d/%d: deleting random redis pods", i, chaosIterations))
 			deleted, err := framework.DeleteRandomRedisPods(ctx, k8sClientset, namespace, clusterName, 2, rng)
 			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("iteration %d/%d: failed to delete random redis pods", i, chaosIterations))
 			Expect(deleted).NotTo(BeEmpty(), fmt.Sprintf("iteration %d/%d: expected at least one redis pod deletion", i, chaosIterations))
-		case 3:
+		}
+
+		if rng.Intn(2) == 0 {
 			By(fmt.Sprintf("iteration %d/%d: scaling cluster", i, chaosIterations))
 			newSize := int32(rng.Intn(maxPrimaries-minPrimaries+1) + minPrimaries)
 			Expect(framework.ScaleCluster(ctx, dynamicClient, namespace, clusterName, newSize)).To(Succeed(),
@@ -212,9 +220,9 @@ func runFullChaos(rng *rand.Rand, namespace, clusterName string) string {
 
 		By(fmt.Sprintf("iteration %d/%d: waiting for recovery", i, chaosIterations))
 		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed(),
-			fmt.Sprintf("iteration %d/%d: cluster did not recover after chaos action", i, chaosIterations))
+			fmt.Sprintf("iteration %d/%d: cluster did not recover after chaos actions", i, chaosIterations))
 
-		// Rate limit between chaos actions
+		// Rate limit between chaos iterations
 		time.Sleep(chaosIterationDelay)
 	}
 
