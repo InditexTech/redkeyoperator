@@ -65,7 +65,14 @@ func WaitForChaosReady(ctx context.Context, dc dynamic.Interface, clientset kube
 			return false, nil
 		}
 
-		// 3. For each running pod, verify cluster health
+		// 3. Verify the pod count matches what the spec expects.
+		// This prevents a false-positive Ready when the operator hasn't yet
+		// processed a spec.primaries change (race between CR update and reconcile).
+		if len(pods.Items) != cluster.Spec.NodesNeeded() {
+			return false, nil
+		}
+
+		// 4. For each running pod, verify cluster health
 		for _, pod := range pods.Items {
 			if pod.Status.Phase != corev1.PodRunning {
 				return false, nil

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -116,6 +117,7 @@ func ScaleCluster(ctx context.Context, dc dynamic.Interface, namespace, clusterN
 		// keep polling—the operator will eventually reconcile the cluster back
 		// to Ready status.
 		if isNotReadyValidationError(err) {
+			ginkgo.GinkgoWriter.Printf("ScaleCluster %s/%s to %d primaries: blocked by validation (not Ready): %v\n", namespace, clusterName, primaries, err)
 			return false, nil
 		}
 		return false, err

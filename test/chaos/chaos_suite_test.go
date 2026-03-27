@@ -91,7 +91,7 @@ var _ = Describe("Chaos Under Load (PurgeKeysOnRebalance=true)", Label("chaos", 
 	//              PurgeKeysOnRebalance=true --> the StatefulSet is recreated when scaling
 	// ==================================================================================
 	It("survives continuous scaling and pod deletion while handling traffic", func() {
-		k6DepName = runScalingChaos(rng, namespace.Name, clusterName)
+		k6DepName = runScalingChaos(rng, namespace.Name, clusterName, true)
 	})
 
 	// ==================================================================================
@@ -174,7 +174,7 @@ var _ = Describe("Chaos Under Load (PurgeKeysOnRebalance=false)", Label("chaos",
 	// Scenario 1 (NoPurge): Continuous Scaling Under Load and Chaos
 	// ==================================================================================
 	It("survives continuous scaling and pod deletion while handling traffic without purge", func() {
-		k6DepName = runScalingChaos(rng, namespace.Name, clusterName)
+		k6DepName = runScalingChaos(rng, namespace.Name, clusterName, false)
 	})
 
 	// ==================================================================================

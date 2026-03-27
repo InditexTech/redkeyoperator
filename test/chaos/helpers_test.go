@@ -49,7 +49,11 @@ func verifyClusterHealthy(namespace, clusterName string) {
 // and returns the k6 deployment name so the caller can clean it up.
 
 // runScalingChaos runs the continuous-scaling-and-pod-deletion scenario.
-func runScalingChaos(rng *rand.Rand, namespace, clusterName string) string {
+// When purgeKeysOnRebalance is true the operator deletes and recreates the
+// StatefulSet on scaling, so we must wait for the new StatefulSet to
+// acknowledge the target replica count before proceeding. When false the
+// StatefulSet is updated in place and the acknowledgment step is skipped.
+func runScalingChaos(rng *rand.Rand, namespace, clusterName string, purgeKeysOnRebalance bool) string {
 	By("starting k6 load deployment")
 	k6DepName := startK6OrFail(namespace, clusterName, defaultVUs)
 
@@ -63,8 +67,13 @@ func runScalingChaos(rng *rand.Rand, namespace, clusterName string) string {
 		Expect(framework.ScaleCluster(ctx, dynamicClient, namespace, clusterName, newSize)).To(Succeed(),
 			fmt.Sprintf("iteration %d/%d: failed to scale cluster up to %d", i, chaosIterations, newSize))
 
-		Expect(framework.WaitForScaleAck(ctx, k8sClientset, namespace, clusterName, newSize, scaleAckTimeout, scalePollInterval)).To(Succeed(),
-			fmt.Sprintf("iteration %d/%d: StatefulSet did not acknowledge scale to %d", i, chaosIterations, newSize))
+		// When purge is enabled the operator deletes and recreates the
+		// StatefulSet, so we must wait for the new one to appear with the
+		// correct replica count before interacting with pods.
+		if purgeKeysOnRebalance {
+			Expect(framework.WaitForScaleAck(ctx, k8sClientset, namespace, clusterName, newSize, scaleAckTimeout, scalePollInterval)).To(Succeed(),
+				fmt.Sprintf("iteration %d/%d: StatefulSet did not acknowledge scale to %d", i, chaosIterations, newSize))
+		}
 
 		By(fmt.Sprintf("iteration %d/%d: deleting random redis pods", i, chaosIterations))
 		deleteCount := rng.Intn(int(newSize)/2) + 1
@@ -78,7 +87,7 @@ func runScalingChaos(rng *rand.Rand, namespace, clusterName string) string {
 			fmt.Sprintf("iteration %d/%d: cluster did not recover after pod deletion", i, chaosIterations))
 
 		By(fmt.Sprintf("iteration %d/%d: scaling cluster down", i, chaosIterations))
-		downSize := int32(rng.Intn(3) + minPrimaries)
+		downSize := int32(minPrimaries - rng.Intn(3))
 		Expect(framework.ScaleCluster(ctx, dynamicClient, namespace, clusterName, downSize)).To(Succeed(),
 			fmt.Sprintf("iteration %d/%d: failed to scale cluster down to %d", i, chaosIterations, downSize))
 

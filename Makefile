@@ -592,7 +592,7 @@ test-e2e-cov: process-manifests-crd ginkgo  ## Execute e2e application test with
 ##@ Chaos Testing
 
 K6_IMG ?= localhost:5001/redkey-k6:dev
-CHAOS_ITERATIONS ?= 3
+CHAOS_ITERATIONS ?= 5
 CHAOS_SEED ?=
 CHAOS_TIMEOUT ?= 60m
 CHAOS_PACKAGES ?= ./test/chaos
