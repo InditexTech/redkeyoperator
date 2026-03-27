@@ -122,6 +122,7 @@ func runOperatorDeletionChaos(rng *rand.Rand, namespace, clusterName string) str
 		deleted, err := framework.DeleteRandomRedisPods(ctx, k8sClientset, namespace, clusterName, 2, rng)
 		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("iteration %d/%d: failed to delete random redis pods", i, chaosIterations))
 		Expect(deleted).NotTo(BeEmpty(), fmt.Sprintf("iteration %d/%d: expected at least one redis pod deletion", i, chaosIterations))
+		GinkgoWriter.Printf("Deleted pods: %v\n", deleted)
 
 		By(fmt.Sprintf("iteration %d/%d: waiting for recovery", i, chaosIterations))
 		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed(),
@@ -158,6 +159,7 @@ func runRobinDeletionChaos(rng *rand.Rand, namespace, clusterName string) string
 		deletedRedis, err := framework.DeleteRandomRedisPods(ctx, k8sClientset, namespace, clusterName, 2, rng)
 		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("iteration %d/%d: failed to delete random redis pods", i, chaosIterations))
 		Expect(deletedRedis).NotTo(BeEmpty(), fmt.Sprintf("iteration %d/%d: expected at least one redis pod deletion", i, chaosIterations))
+		GinkgoWriter.Printf("Deleted pods: %v\n", deletedRedis)
 
 		By(fmt.Sprintf("iteration %d/%d: waiting for recovery", i, chaosIterations))
 		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed(),
@@ -209,6 +211,7 @@ func runFullChaos(rng *rand.Rand, namespace, clusterName string) string {
 			deleted, err := framework.DeleteRandomRedisPods(ctx, k8sClientset, namespace, clusterName, 2, rng)
 			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("iteration %d/%d: failed to delete random redis pods", i, chaosIterations))
 			Expect(deleted).NotTo(BeEmpty(), fmt.Sprintf("iteration %d/%d: expected at least one redis pod deletion", i, chaosIterations))
+			GinkgoWriter.Printf("Deleted pods: %v\n", deleted)
 		}
 
 		if rng.Intn(2) == 0 {
