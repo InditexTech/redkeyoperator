@@ -59,11 +59,14 @@ func runScalingChaos(rng *rand.Rand, namespace, clusterName string, purgeKeysOnR
 
 	By(fmt.Sprintf("executing chaos loop (%d iterations)", chaosIterations))
 
+	currentPrimaries := int32(defaultPrimaries)
+
 	for i := 1; i <= chaosIterations; i++ {
 		GinkgoWriter.Printf("=== Chaos iteration %d/%d ===\n", i, chaosIterations)
 
 		By(fmt.Sprintf("iteration %d/%d: scaling cluster up", i, chaosIterations))
 		newSize := int32(rng.Intn(maxPrimaries-minPrimaries+1) + minPrimaries)
+		GinkgoWriter.Printf("Scaling up: %d -> %d primaries\n", currentPrimaries, newSize)
 		Expect(framework.ScaleCluster(ctx, dynamicClient, namespace, clusterName, newSize)).To(Succeed(),
 			fmt.Sprintf("iteration %d/%d: failed to scale cluster up to %d", i, chaosIterations, newSize))
 
@@ -86,13 +89,28 @@ func runScalingChaos(rng *rand.Rand, namespace, clusterName string, purgeKeysOnR
 		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed(),
 			fmt.Sprintf("iteration %d/%d: cluster did not recover after pod deletion", i, chaosIterations))
 
+		// Verify the cluster spec matches what we scaled to.
+		cluster, err := framework.GetRedkeyCluster(ctx, dynamicClient, namespace, clusterName)
+		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("iteration %d/%d: failed to get cluster after scale-up recovery", i, chaosIterations))
+		Expect(cluster.Spec.Primaries).To(Equal(newSize),
+			fmt.Sprintf("iteration %d/%d: expected spec.primaries=%d after scale-up, got %d", i, chaosIterations, newSize, cluster.Spec.Primaries))
+		currentPrimaries = newSize
+
 		By(fmt.Sprintf("iteration %d/%d: scaling cluster down", i, chaosIterations))
 		downSize := int32(minPrimaries - rng.Intn(3))
+		GinkgoWriter.Printf("Scaling down: %d -> %d primaries\n", currentPrimaries, downSize)
 		Expect(framework.ScaleCluster(ctx, dynamicClient, namespace, clusterName, downSize)).To(Succeed(),
 			fmt.Sprintf("iteration %d/%d: failed to scale cluster down to %d", i, chaosIterations, downSize))
 
 		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed(),
 			fmt.Sprintf("iteration %d/%d: cluster did not become ready after scaling down", i, chaosIterations))
+
+		// Verify the cluster spec matches what we scaled to.
+		cluster, err = framework.GetRedkeyCluster(ctx, dynamicClient, namespace, clusterName)
+		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("iteration %d/%d: failed to get cluster after scale-down recovery", i, chaosIterations))
+		Expect(cluster.Spec.Primaries).To(Equal(downSize),
+			fmt.Sprintf("iteration %d/%d: expected spec.primaries=%d after scale-down, got %d", i, chaosIterations, downSize, cluster.Spec.Primaries))
+		currentPrimaries = downSize
 	}
 
 	By("stopping k6 load")
@@ -188,8 +206,12 @@ func runFullChaos(rng *rand.Rand, namespace, clusterName string) string {
 
 	By(fmt.Sprintf("executing full chaos (%d iterations)", chaosIterations))
 
+	currentPrimaries := int32(defaultPrimaries)
+	var scaled bool
+
 	for i := 1; i <= chaosIterations; i++ {
 		GinkgoWriter.Printf("=== Full chaos iteration %d/%d ===\n", i, chaosIterations)
+		scaled = false
 
 		// Each action is independently chosen so multiple (or all) can fire
 		// in the same iteration, accumulating failures before recovery.
@@ -214,16 +236,28 @@ func runFullChaos(rng *rand.Rand, namespace, clusterName string) string {
 			GinkgoWriter.Printf("Deleted pods: %v\n", deleted)
 		}
 
+		var newSize int32
 		if rng.Intn(2) == 0 {
 			By(fmt.Sprintf("iteration %d/%d: scaling cluster", i, chaosIterations))
-			newSize := int32(rng.Intn(maxPrimaries-minPrimaries+1) + minPrimaries)
+			newSize = int32(rng.Intn(maxPrimaries-minPrimaries+1) + minPrimaries)
+			GinkgoWriter.Printf("Scaling: %d -> %d primaries\n", currentPrimaries, newSize)
 			Expect(framework.ScaleCluster(ctx, dynamicClient, namespace, clusterName, newSize)).To(Succeed(),
 				fmt.Sprintf("iteration %d/%d: failed to scale cluster to %d", i, chaosIterations, newSize))
+			scaled = true
 		}
 
 		By(fmt.Sprintf("iteration %d/%d: waiting for recovery", i, chaosIterations))
 		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed(),
 			fmt.Sprintf("iteration %d/%d: cluster did not recover after chaos actions", i, chaosIterations))
+
+		// Verify the cluster spec matches what we expect after recovery.
+		if scaled {
+			cluster, err := framework.GetRedkeyCluster(ctx, dynamicClient, namespace, clusterName)
+			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("iteration %d/%d: failed to get cluster after recovery", i, chaosIterations))
+			Expect(cluster.Spec.Primaries).To(Equal(newSize),
+				fmt.Sprintf("iteration %d/%d: expected spec.primaries=%d after scaling, got %d", i, chaosIterations, newSize, cluster.Spec.Primaries))
+			currentPrimaries = newSize
+		}
 
 		// Rate limit between chaos iterations
 		time.Sleep(chaosIterationDelay)

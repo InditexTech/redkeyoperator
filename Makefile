@@ -592,9 +592,10 @@ test-e2e-cov: process-manifests-crd ginkgo  ## Execute e2e application test with
 ##@ Chaos Testing
 
 K6_IMG ?= localhost:5001/redkey-k6:dev
-CHAOS_ITERATIONS ?= 5
+CHAOS_ITERATIONS ?= 10
 CHAOS_SEED ?=
-CHAOS_TIMEOUT ?= 60m
+# With 10 iterations 60 m is not enough with TEST_PARALLEL_PROCESS=8 export GOMAXPROCS=8
+CHAOS_TIMEOUT ?= 100m
 CHAOS_PACKAGES ?= ./test/chaos
 CHAOS_TEST_OUTPUT = .local/chaos-test.json
 # CHAOS_KEEP_NAMESPACE_ON_FAILED=1 #  if != "" skip delete namespace if failed

@@ -366,5 +366,14 @@ func collectDiagnostics(namespace string) {
 		GinkgoWriter.Printf("Failed to get redis logs: %v\n", err)
 	}
 
+	// Capture robin pod logs
+	GinkgoWriter.Printf("\n--- Robin Pod Logs (last %d lines) ---\n", diagnosticsLogTail)
+	robinLogs, err := framework.GetPodLogs(ctx, k8sClientset, namespace, framework.RobinPodsSelector(clusterName), diagnosticsLogTail)
+	if err == nil {
+		GinkgoWriter.Printf("%s\n", robinLogs)
+	} else {
+		GinkgoWriter.Printf("Failed to get robin logs: %v\n", err)
+	}
+
 	GinkgoWriter.Printf("=== END DIAGNOSTICS ===\n\n")
 }

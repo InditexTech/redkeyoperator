@@ -13,7 +13,6 @@ import (
 
 	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
@@ -23,7 +22,6 @@ import (
 const (
 	defaultChaosReadyTimeout = 10 * time.Minute
 	pollInterval             = 2 * time.Second
-	maxConsecutiveErrors     = 10
 )
 
 // WaitForChaosReady waits for the Redis cluster to be fully healthy.
@@ -33,23 +31,27 @@ func WaitForChaosReady(ctx context.Context, dc dynamic.Interface, clientset kube
 		timeout = defaultChaosReadyTimeout
 	}
 
-	var consecutiveErrors int
-	var lastErr error
+	var lastReason string
+	err := wait.PollUntilContextTimeout(ctx, pollInterval, timeout, true, func(ctx context.Context) (bool, error) {
+		// When the context is cancelled or expired, avoid overwriting
+		// lastReason so we preserve the real diagnostic from the
+		// previous poll tick. All API calls below would fail with a
+		// context error, which is not useful for debugging.
+		if ctx.Err() != nil {
+			return false, ctx.Err()
+		}
 
-	return wait.PollUntilContextTimeout(ctx, pollInterval, timeout, true, func(ctx context.Context) (bool, error) {
 		// 1. Check CR status
 		cluster, err := GetRedkeyCluster(ctx, dc, namespace, clusterName)
 		if err != nil {
-			consecutiveErrors++
-			lastErr = err
-			if !errors.IsNotFound(err) && consecutiveErrors > maxConsecutiveErrors {
-				return false, fmt.Errorf("persistent error getting cluster (after %d attempts): %w", consecutiveErrors, lastErr)
+			if ctx.Err() == nil {
+				lastReason = fmt.Sprintf("error getting cluster: %v", err)
 			}
 			return false, nil
 		}
-		consecutiveErrors = 0
 
 		if cluster.Status.Status != redkeyv1.StatusReady {
+			lastReason = fmt.Sprintf("CR status is %q (want Ready)", cluster.Status.Status)
 			return false, nil
 		}
 
@@ -58,36 +60,57 @@ func WaitForChaosReady(ctx context.Context, dc dynamic.Interface, clientset kube
 			LabelSelector: RedisPodsSelector(clusterName),
 		})
 		if err != nil {
+			if ctx.Err() == nil {
+				lastReason = fmt.Sprintf("error listing pods: %v", err)
+			}
 			return false, nil
 		}
 
 		if len(pods.Items) == 0 {
+			lastReason = "pod count is 0"
 			return false, nil
 		}
 
 		// 3. Verify the pod count matches what the spec expects.
 		// This prevents a false-positive Ready when the operator hasn't yet
 		// processed a spec.primaries change (race between CR update and reconcile).
-		if len(pods.Items) != cluster.Spec.NodesNeeded() {
+		expected := cluster.Spec.NodesNeeded()
+		if len(pods.Items) != expected {
+			lastReason = fmt.Sprintf("pod count %d != expected %d (spec.primaries=%d)", len(pods.Items), expected, cluster.Spec.Primaries)
 			return false, nil
 		}
 
 		// 4. For each running pod, verify cluster health
 		for _, pod := range pods.Items {
 			if pod.Status.Phase != corev1.PodRunning {
+				lastReason = fmt.Sprintf("pod %s phase is %s (want Running)", pod.Name, pod.Status.Phase)
+				return false, nil
+			}
+
+			if ctx.Err() != nil {
 				return false, nil
 			}
 
 			if !clusterCheckPasses(ctx, namespace, pod.Name) {
+				if ctx.Err() == nil {
+					lastReason = fmt.Sprintf("redis-cli --cluster check failed on pod %s", pod.Name)
+				}
 				return false, nil
 			}
 
 			if clusterNodesHasFailure(ctx, namespace, pod.Name) {
+				if ctx.Err() == nil {
+					lastReason = fmt.Sprintf("cluster nodes failure detected on pod %s", pod.Name)
+				}
 				return false, nil
 			}
 		}
 		return true, nil
 	})
+	if err != nil && lastReason != "" {
+		return fmt.Errorf("WaitForChaosReady(%s/%s): last check: %s: %w", namespace, clusterName, lastReason, err)
+	}
+	return err
 }
 
 // clusterCheckPasses runs redis-cli --cluster check and returns true if it succeeds.
