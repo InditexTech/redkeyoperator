@@ -26,7 +26,7 @@ var (
 	cancel              context.CancelFunc
 	chaosIterations     int
 	chaosSeed           int64
-	chaosReadyTimeout   = 10 * time.Minute
+	chaosReadyTimeout   = 15 * time.Minute // if it is scaling 1 to 7, 3 pods deleted, k6 load, it was bigger than 10
 	skipDeleteNamespace bool
 )
 

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 INDUSTRIA DE DISENO TEXTIL S.A. (INDITEX S.A.)
+//
+// SPDX-License-Identifier: Apache-2.0
+
 /*
   Test that imitates a redis-cluster that was causing rebalancing errors:
   - Value Size: 1Byte - 300KBytes

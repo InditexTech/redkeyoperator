@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 INDUSTRIA DE DISENO TEXTIL S.A. (INDITEX S.A.)
+#
+# SPDX-License-Identifier: Apache-2.0
+
 # clean-finalizers.sh
 # Find and remove finalizers from all namespaced resources in a namespace.
 # Useful when an operator/controller was removed and CRs are stuck terminating.

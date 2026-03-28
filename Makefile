@@ -559,8 +559,8 @@ ginkgo:
 	$(GO) install github.com/onsi/ginkgo/v2/ginkgo
 
 
-TEST_PARALLEL_PROCESS ?= 4
-GOMAXPROCS ?= 4
+TEST_PARALLEL_PROCESS ?= 8
+GOMAXPROCS ?= 8
 REDIS_IMAGE ?= redis:8.4.0
 CHANGED_REDIS_IMAGE ?= redis:8.2.3
 

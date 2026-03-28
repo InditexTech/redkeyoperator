@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 INDUSTRIA DE DISENO TEXTIL S.A. (INDITEX S.A.)
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # E2E Chaos Test Design
 
 ## Overview
@@ -263,13 +269,13 @@ func WaitForChaosReady(ctx context.Context, client client.Client, namespace, clu
 
 ## 6. Usage Examples
 
-| Command                                          | Purpose                          |
-|--------------------------------------------------|----------------------------------|
-| `make test-chaos`                                | Run all chaos tests (sequential) |
-| `make test-chaos-focus FOCUS="Continuous Chaos"` | Run single scenario              |
-| `make test-chaos CHAOS_DURATION=5m`              | Short chaos duration             |
-| `make test-chaos CHAOS_SEED=12345`               | Reproducible random seed         |
-| `make k6-build`                                  | Build k6 image only              |
+| Command                                                                       | Purpose                     |
+|-------------------------------------------------------------------------------|-----------------------------|
+| `make test-chaos`                                                             | Run all chaos tests         |
+| `make test-chaos GINKGO_EXTRA_OPTS='--focus="survives continuous scaling"'`   | Run single scenario         |
+| `make test-chaos CHAOS_ITERATIONS=3`                                          | Fewer iterations per spec   |
+| `make test-chaos CHAOS_SEED=12345`                                            | Reproducible random seed    |
+| `make k6-build`                                                               | Build k6 image only         |
 
 ---
 
@@ -475,15 +481,39 @@ func verifyK6Completed(c client.Client, namespace, jobName string, timeout time.
 
 ## 12. Environment Variables
 
-| Variable         | Default                        | Purpose                                |
-|------------------|--------------------------------|----------------------------------------|
-| `K6_IMG`         | `localhost:5001/redkey-k6:dev` | k6 container image                     |
-| `CHAOS_TIMEOUT`  | `30m`                          | Maximum Ginkgo test timeout            |
-| `CHAOS_DURATION` | `10m`                          | k6 load duration / chaos loop duration |
-| `CHAOS_SEED`     | (auto)                         | Random seed for reproducibility        |
-| `CHAOS_VUS`      | `10`                           | k6 virtual users                       |
-| `OPERATOR_IMAGE` | From main Makefile             | Operator image for tests               |
-| `ROBIN_IMAGE`    | From main Makefile             | Robin image for tests                  |
+### Makefile variables (set via `make` or exported in shell / `.envrc`)
+
+| Variable                 | Default                                              | Purpose                                                                                                        |
+|--------------------------|------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
+| `TEST_PARALLEL_PROCESS`  | `8`                                                  | Number of parallel Ginkgo processes (`-procs`). Applies to both E2E and chaos tests.                           |
+| `GOMAXPROCS`             | `8`                                                  | Go runtime parallelism. Should match `TEST_PARALLEL_PROCESS`.                                                  |
+| `K6_IMG`                 | `localhost:5001/redkey-k6:dev`                       | k6 container image with xk6-redis extension.                                                                   |
+| `CHAOS_ITERATIONS`       | `10`                                                 | Number of chaos loop iterations per test spec.                                                                 |
+| `CHAOS_SEED`             | *(auto: Ginkgo random seed)*                         | Fixed random seed for reproducibility.                                                                         |
+| `CHAOS_TIMEOUT`          | `100m`                                               | Maximum Ginkgo suite timeout (`--timeout`). Must accommodate iterations x recovery time / parallelism.         |
+| `CHAOS_PACKAGES`         | `./test/chaos`                                       | Go test packages for the chaos suite.                                                                          |
+| `IMG`                    | `localhost:5001/redkey-operator:$(VERSION)`           | Operator image. Passed to tests as `OPERATOR_IMAGE`.                                                           |
+| `IMG_ROBIN`              | `ghcr.io/inditextech/redkey-robin:$(ROBIN_VERSION)`  | Robin image. Passed to tests as `ROBIN_IMAGE`.                                                                 |
+| `REDIS_IMAGE`            | `redis:8.4.0`                                        | Redis image used for cluster pods.                                                                             |
+| `GINKGO_EXTRA_OPTS`      | *(empty)*                                            | Extra Ginkgo flags (e.g. `--focus="..."`, `--label-filter=...`).                                               |
+
+### Test-only environment variables (read by Go code, not in Makefile defaults)
+
+| Variable                          | Default                   | Purpose                                                                                  |
+|-----------------------------------|---------------------------|------------------------------------------------------------------------------------------|
+| `CHAOS_KEEP_NAMESPACE_ON_FAILED`  | *(unset)*                 | When non-empty, preserves failed test namespaces for post-mortem inspection.              |
+| `KUBECONFIG`                      | `~/.kube/config`          | Path to kubeconfig file.                                                                 |
+| `OPERATOR_IMAGE`                  | `localhost:5001/redkey-operator:dev` | Operator image (set automatically by `GINKGO_ENV` from `IMG`).                  |
+| `ROBIN_IMAGE`                     | `localhost:5001/redkey-robin:dev`    | Robin image (set automatically by `GINKGO_ENV` from `IMG_ROBIN`).               |
+
+### Recommended `.envrc` for local development
+
+```shell
+export TEST_PARALLEL_PROCESS=8
+export GOMAXPROCS=8
+export CHAOS_KEEP_NAMESPACE_ON_FAILED=true
+export IMG_ROBIN=localhost:5001/redkey-robin:0.1.0
+```
 
 ---
 
