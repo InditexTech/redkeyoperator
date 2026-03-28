@@ -8,7 +8,7 @@ SHELL := /bin/bash
 NAME           := redkey-operator
 VERSION        := 0.1.0
 ROBIN_VERSION  := 0.1.0
-GOLANG_VERSION := 1.25.7
+GOLANG_VERSION := 1.25.8
 DELVE_VERSION  := 1.25
 
 ## Tool Versions
@@ -559,8 +559,8 @@ ginkgo:
 	$(GO) install github.com/onsi/ginkgo/v2/ginkgo
 
 
-TEST_PARALLEL_PROCESS ?= 4
-GOMAXPROCS ?= 4
+TEST_PARALLEL_PROCESS ?= 8
+GOMAXPROCS ?= 8
 REDIS_IMAGE ?= redis:8.4.0
 CHANGED_REDIS_IMAGE ?= redis:8.2.3
 
@@ -575,7 +575,7 @@ GINKGO_ENV ?= GOMAXPROCS=$(GOMAXPROCS) \
 
 GINKGO_PACKAGES ?= ./test/e2e
 
-.PHONY: test-e2e
+.PHONY: install test-e2e
 test-e2e: process-manifests-crd ginkgo  ## Execute e2e application test
 	$(info $(M) running e2e tests...)
 	@mkdir -p $(dir $(TEST_E2E_OUTPUT))
@@ -588,3 +588,34 @@ test-e2e-cov: process-manifests-crd ginkgo  ## Execute e2e application test with
 	$(GINKGO_ENV) ginkgo \
 	     -cover -covermode=count -coverprofile=$(TEST_COVERAGE_PROFILE_OUTPUT_FILE) -output-dir=$(TEST_COVERAGE_PROFILE_OUTPUT) \
 		$(GINKGO_OPTS) $(GINKGO_PACKAGES)
+
+##@ Chaos Testing
+
+K6_IMG ?= localhost:5001/redkey-k6:dev
+CHAOS_ITERATIONS ?= 10
+CHAOS_SEED ?=
+# With 10 iterations 60 m is not enough with TEST_PARALLEL_PROCESS=8 export GOMAXPROCS=8
+CHAOS_TIMEOUT ?= 100m
+CHAOS_PACKAGES ?= ./test/chaos
+CHAOS_TEST_OUTPUT = .local/chaos-test.json
+# CHAOS_KEEP_NAMESPACE_ON_FAILED=1 #  if != "" skip delete namespace if failed
+.PHONY: k6-build
+k6-build:  ## Build k6 image with xk6-redis extension
+	$(info $(M) building k6 docker image with redis extension)
+	docker build --build-arg GOLANG_VERSION=$(GOLANG_VERSION) -t $(K6_IMG) -f test/chaos/k6.Dockerfile test/chaos
+
+.PHONY: k6-push
+k6-push: k6-build  ## Push k6 image to local registry
+	$(info $(M) pushing k6 image)
+	docker push $(K6_IMG)
+
+.PHONY: test-chaos
+test-chaos: process-manifests-crd ginkgo  ## Execute chaos tests
+	$(info $(M) running chaos tests...)
+	@mkdir -p $(dir $(CHAOS_TEST_OUTPUT))
+	$(GINKGO_ENV) K6_IMG=$(K6_IMG) CHAOS_ITERATIONS=$(CHAOS_ITERATIONS) \
+		$(if $(CHAOS_SEED),CHAOS_SEED=$(CHAOS_SEED),) \
+		ginkgo \
+			--timeout=$(CHAOS_TIMEOUT) \
+			--json-report=$(CHAOS_TEST_OUTPUT) \
+			$(GINKGO_OPTS) $(CHAOS_PACKAGES)

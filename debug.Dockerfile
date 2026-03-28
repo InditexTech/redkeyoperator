@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Define the desired Golang version
-ARG GOLANG_VERSION=1.25.7
+ARG GOLANG_VERSION=1.25.8
 
 # Use an official Golang image with a specific version based on Debian
 FROM golang:${GOLANG_VERSION}-trixie
