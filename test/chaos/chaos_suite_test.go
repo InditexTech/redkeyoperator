@@ -64,7 +64,7 @@ var _ = Describe("Chaos Under Load (PurgeKeysOnRebalance=true)", Label("chaos", 
 		Expect(framework.CreateRedkeyCluster(ctx, dynamicClient, namespace.Name, clusterName, defaultPrimaries, true)).To(Succeed())
 
 		By("waiting for cluster to be ready")
-		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
+		Expect(framework.WaitForRedkeyClusterReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
 	})
 
 	AfterEach(func() {
@@ -148,7 +148,7 @@ var _ = Describe("Chaos Under Load (PurgeKeysOnRebalance=false)", Label("chaos",
 		Expect(framework.CreateRedkeyCluster(ctx, dynamicClient, namespace.Name, clusterName, defaultPrimaries, false)).To(Succeed())
 
 		By("waiting for cluster to be ready")
-		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
+		Expect(framework.WaitForRedkeyClusterReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
 	})
 
 	AfterEach(func() {
@@ -222,7 +222,7 @@ var _ = Describe("Topology Corruption Recovery", Label("chaos", "topology"), fun
 		Expect(framework.CreateRedkeyCluster(ctx, dynamicClient, namespace.Name, clusterName, defaultPrimaries, true)).To(Succeed())
 
 		By("waiting for cluster to be ready")
-		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
+		Expect(framework.WaitForRedkeyClusterReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
 	})
 
 	AfterEach(func() {
@@ -246,7 +246,7 @@ var _ = Describe("Topology Corruption Recovery", Label("chaos", "topology"), fun
 	// ==================================================================================
 	It("heals slot ownership conflicts when operator and robin restart", func() {
 		By("verifying cluster is ready")
-		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
+		Expect(framework.WaitForRedkeyClusterReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
 
 		By("scaling operator to 0")
 		Expect(framework.ScaleOperatorDown(ctx, k8sClientset, namespace.Name)).To(Succeed())
@@ -264,9 +264,7 @@ var _ = Describe("Topology Corruption Recovery", Label("chaos", "topology"), fun
 		Expect(framework.ScaleOperatorUp(ctx, k8sClientset, namespace.Name)).To(Succeed())
 
 		By("waiting for cluster to heal")
-		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
-		Expect(framework.AssertAllSlotsAssigned(ctx, k8sClientset, namespace.Name, clusterName)).To(Succeed())
-		Expect(framework.AssertNoNodesInFailState(ctx, k8sClientset, namespace.Name, clusterName)).To(Succeed())
+		Expect(framework.WaitForRedkeyClusterReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
 	})
 
 	// ==================================================================================
@@ -274,7 +272,7 @@ var _ = Describe("Topology Corruption Recovery", Label("chaos", "topology"), fun
 	// ==================================================================================
 	It("recovers from mid-migration slots when operator and robin restart", func() {
 		By("verifying cluster is ready")
-		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
+		Expect(framework.WaitForRedkeyClusterReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
 
 		By("scaling operator to 0")
 		Expect(framework.ScaleOperatorDown(ctx, k8sClientset, namespace.Name)).To(Succeed())
@@ -292,9 +290,7 @@ var _ = Describe("Topology Corruption Recovery", Label("chaos", "topology"), fun
 		Expect(framework.ScaleOperatorUp(ctx, k8sClientset, namespace.Name)).To(Succeed())
 
 		By("waiting for cluster to heal")
-		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
-		Expect(framework.AssertAllSlotsAssigned(ctx, k8sClientset, namespace.Name, clusterName)).To(Succeed())
-		Expect(framework.AssertNoNodesInFailState(ctx, k8sClientset, namespace.Name, clusterName)).To(Succeed())
+		Expect(framework.WaitForRedkeyClusterReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
 	})
 
 	// ==================================================================================
@@ -302,7 +298,7 @@ var _ = Describe("Topology Corruption Recovery", Label("chaos", "topology"), fun
 	// ==================================================================================
 	It("recovers from forced primary to replica demotion", func() {
 		By("verifying cluster is ready")
-		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
+		Expect(framework.WaitForRedkeyClusterReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
 
 		targetPod := clusterName + "-0"
 
@@ -322,9 +318,49 @@ var _ = Describe("Topology Corruption Recovery", Label("chaos", "topology"), fun
 		Expect(framework.ScaleOperatorUp(ctx, k8sClientset, namespace.Name)).To(Succeed())
 
 		By("waiting for cluster to heal")
-		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
-		Expect(framework.AssertAllSlotsAssigned(ctx, k8sClientset, namespace.Name, clusterName)).To(Succeed())
-		Expect(framework.AssertNoNodesInFailState(ctx, k8sClientset, namespace.Name, clusterName)).To(Succeed())
+		Expect(framework.WaitForRedkeyClusterReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
+	})
+
+	// ==================================================================================
+	// Scenario 8: Robin ConfigMap stale primaries after scale-down (issue #48)
+	//
+	// Reproduces the bug where PersistRobinReplicas silently fails during a
+	// purgeKeysOnRebalance scale-down, leaving the Robin ConfigMap with the
+	// old (higher) primaries count. Robin then tries to manage ghost nodes
+	// that no longer exist.
+	// ==================================================================================
+	It("recovers when Robin ConfigMap has stale primaries from failed scale-down", func() {
+		By("verifying cluster is ready with 5 primaries")
+		Expect(framework.WaitForRedkeyClusterReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
+
+		By("scaling cluster up to 8 primaries")
+		Expect(framework.ScaleCluster(ctx, dynamicClient, namespace.Name, clusterName, 8)).To(Succeed())
+		Expect(framework.WaitForRedkeyClusterReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
+
+		By("scaling cluster down to 3 primaries")
+		Expect(framework.ScaleCluster(ctx, dynamicClient, namespace.Name, clusterName, 3)).To(Succeed())
+		Expect(framework.WaitForRedkeyClusterReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
+
+		By("scaling operator to 0")
+		Expect(framework.ScaleOperatorDown(ctx, k8sClientset, namespace.Name)).To(Succeed())
+
+		By("scaling robin to 0")
+		Expect(framework.ScaleRobinDown(ctx, k8sClientset, namespace.Name, clusterName)).To(Succeed())
+
+		By("corrupting Robin ConfigMap: primaries=8 status=ScalingUp (simulates issue #48)")
+		Expect(framework.CorruptRobinConfigMapPrimaries(ctx, k8sClientset, namespace.Name, clusterName, 8, "ScalingUp")).To(Succeed())
+
+		By("corrupting CR status: status=ScalingDown substatus=EndingFastScaling (simulates stuck doFastScaling)")
+		Expect(framework.CorruptCRStatus(ctx, dynamicClient, namespace.Name, clusterName, "ScalingDown", "EndingFastScaling")).To(Succeed())
+
+		By("scaling robin to 1")
+		Expect(framework.ScaleRobinUp(ctx, k8sClientset, namespace.Name, clusterName)).To(Succeed())
+
+		By("scaling operator to 1")
+		Expect(framework.ScaleOperatorUp(ctx, k8sClientset, namespace.Name)).To(Succeed())
+
+		By("waiting for cluster to heal — expected to timeout due to issue #48")
+		Expect(framework.WaitForRedkeyClusterReady(ctx, dynamicClient, k8sClientset, namespace.Name, clusterName, chaosReadyTimeout)).To(Succeed())
 	})
 })
 

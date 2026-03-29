@@ -12,13 +12,17 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
+
+	"github.com/inditextech/redkeyoperator/internal/robin"
 )
 
 const (
@@ -312,9 +316,83 @@ func ForcePrimaryToReplica(ctx context.Context, clientset kubernetes.Interface, 
 	return nil
 }
 
+// CorruptCRStatus overwrites the CR status subresource to simulate the
+// operator being stuck mid-reconcile. This is needed to reproduce issue #48:
+// the operator loops in doFastScaling → SubstatusEndingFastScaling, polling
+// Robin forever because the Robin ConfigMap has stale primaries.
+//
+// The caller must stop the operator BEFORE calling this function to prevent
+// the operator from immediately reconciling the status back.
+func CorruptCRStatus(ctx context.Context, dc dynamic.Interface, namespace, clusterName, status, substatus string) error {
+	unstr, err := dc.Resource(RedkeyClusterGVR).Namespace(namespace).Get(ctx, clusterName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("get RedkeyCluster %s/%s: %w", namespace, clusterName, err)
+	}
+
+	currentStatus, _, _ := unstructured.NestedString(unstr.Object, "status", "status")
+	currentSubstatus, _, _ := unstructured.NestedString(unstr.Object, "status", "substatus", "status")
+
+	ginkgo.GinkgoWriter.Printf("CorruptCRStatus: %s/%s: status %q -> %q, substatus %q -> %q\n",
+		namespace, clusterName, currentStatus, status, currentSubstatus, substatus)
+
+	if err := unstructured.SetNestedField(unstr.Object, status, "status", "status"); err != nil {
+		return fmt.Errorf("set status.status on %s/%s: %w", namespace, clusterName, err)
+	}
+	if err := unstructured.SetNestedField(unstr.Object, substatus, "status", "substatus", "status"); err != nil {
+		return fmt.Errorf("set status.substatus.status on %s/%s: %w", namespace, clusterName, err)
+	}
+
+	if _, err := dc.Resource(RedkeyClusterGVR).Namespace(namespace).UpdateStatus(ctx, unstr, metav1.UpdateOptions{}); err != nil {
+		return fmt.Errorf("update status subresource for %s/%s: %w", namespace, clusterName, err)
+	}
+
+	return nil
+}
+
 func trimNewline(s string) string {
 	for len(s) > 0 && (s[len(s)-1] == '\n' || s[len(s)-1] == '\r') {
 		s = s[:len(s)-1]
 	}
 	return s
+}
+
+// CorruptRobinConfigMapPrimaries overwrites the primaries and status fields
+// in the Robin ConfigMap. This simulates the state left behind when
+// PersistRobinReplicas silently fails during a purgeKeysOnRebalance
+// scale-down (issue #48): the ConfigMap retains the old (higher) primaries
+// count while the cluster has already scaled down to fewer nodes.
+func CorruptRobinConfigMapPrimaries(ctx context.Context, clientset kubernetes.Interface, namespace, clusterName string, primaries int, status string) error {
+	cmName := clusterName + "-robin"
+	cm, err := clientset.CoreV1().ConfigMaps(namespace).Get(ctx, cmName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("get ConfigMap %s/%s: %w", namespace, cmName, err)
+	}
+
+	data, ok := cm.Data["application-configmap.yml"]
+	if !ok {
+		return fmt.Errorf("ConfigMap %s/%s has no key 'application-configmap.yml'", namespace, cmName)
+	}
+
+	var config robin.Configuration
+	if err := yaml.Unmarshal([]byte(data), &config); err != nil {
+		return fmt.Errorf("unmarshal robin config from %s/%s: %w", namespace, cmName, err)
+	}
+
+	ginkgo.GinkgoWriter.Printf("CorruptRobinConfigMapPrimaries: %s/%s: primaries %d -> %d, status %q -> %q\n",
+		namespace, cmName, config.Redis.Cluster.Primaries, primaries, config.Redis.Cluster.Status, status)
+
+	config.Redis.Cluster.Primaries = primaries
+	config.Redis.Cluster.Status = status
+
+	updated, err := yaml.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("marshal robin config: %w", err)
+	}
+
+	cm.Data["application-configmap.yml"] = string(updated)
+	if _, err := clientset.CoreV1().ConfigMaps(namespace).Update(ctx, cm, metav1.UpdateOptions{}); err != nil {
+		return fmt.Errorf("update ConfigMap %s/%s: %w", namespace, cmName, err)
+	}
+
+	return nil
 }

@@ -30,16 +30,10 @@ func stopK6Load(namespace, depName string) {
 	Expect(framework.StopK6Load(ctx, k8sClientset, namespace, depName)).To(Succeed(), "failed to stop k6 deployment %s in namespace %s", depName, namespace)
 }
 
-// verifyClusterHealthy runs all cluster health checks.
+// verifyClusterHealthy waits for the cluster to be fully healthy.
 func verifyClusterHealthy(namespace, clusterName string) {
 	By("verifying cluster readiness")
-	Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed())
-
-	By("verifying all slots assigned")
-	Expect(framework.AssertAllSlotsAssigned(ctx, k8sClientset, namespace, clusterName)).To(Succeed())
-
-	By("verifying no nodes in fail state")
-	Expect(framework.AssertNoNodesInFailState(ctx, k8sClientset, namespace, clusterName)).To(Succeed())
+	Expect(framework.WaitForRedkeyClusterReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed())
 }
 
 // ---------------------------------------------------------------------------
@@ -86,7 +80,7 @@ func runScalingChaos(rng *rand.Rand, namespace, clusterName string, purgeKeysOnR
 		GinkgoWriter.Printf("Deleted pods: %v\n", deleted)
 
 		By(fmt.Sprintf("iteration %d/%d: waiting for cluster recovery", i, chaosIterations))
-		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed(),
+		Expect(framework.WaitForRedkeyClusterReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed(),
 			fmt.Sprintf("iteration %d/%d: cluster did not recover after pod deletion", i, chaosIterations))
 
 		// Verify the cluster spec matches what we scaled to.
@@ -102,7 +96,7 @@ func runScalingChaos(rng *rand.Rand, namespace, clusterName string, purgeKeysOnR
 		Expect(framework.ScaleCluster(ctx, dynamicClient, namespace, clusterName, downSize)).To(Succeed(),
 			fmt.Sprintf("iteration %d/%d: failed to scale cluster down to %d", i, chaosIterations, downSize))
 
-		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed(),
+		Expect(framework.WaitForRedkeyClusterReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed(),
 			fmt.Sprintf("iteration %d/%d: cluster did not become ready after scaling down", i, chaosIterations))
 
 		// Verify the cluster spec matches what we scaled to.
@@ -143,7 +137,7 @@ func runOperatorDeletionChaos(rng *rand.Rand, namespace, clusterName string) str
 		GinkgoWriter.Printf("Deleted pods: %v\n", deleted)
 
 		By(fmt.Sprintf("iteration %d/%d: waiting for recovery", i, chaosIterations))
-		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed(),
+		Expect(framework.WaitForRedkeyClusterReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed(),
 			fmt.Sprintf("iteration %d/%d: cluster did not recover after operator deletion", i, chaosIterations))
 
 		// Rate limit between iterations
@@ -154,7 +148,7 @@ func runOperatorDeletionChaos(rng *rand.Rand, namespace, clusterName string) str
 	stopK6Load(namespace, k6DepName)
 
 	By("verifying final cluster state")
-	Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed())
+	Expect(framework.WaitForRedkeyClusterReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed())
 
 	return k6DepName
 }
@@ -180,7 +174,7 @@ func runRobinDeletionChaos(rng *rand.Rand, namespace, clusterName string) string
 		GinkgoWriter.Printf("Deleted pods: %v\n", deletedRedis)
 
 		By(fmt.Sprintf("iteration %d/%d: waiting for recovery", i, chaosIterations))
-		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed(),
+		Expect(framework.WaitForRedkeyClusterReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed(),
 			fmt.Sprintf("iteration %d/%d: cluster did not recover after robin deletion", i, chaosIterations))
 
 		// Rate limit between iterations
@@ -191,7 +185,7 @@ func runRobinDeletionChaos(rng *rand.Rand, namespace, clusterName string) string
 	stopK6Load(namespace, k6DepName)
 
 	By("verifying final cluster state")
-	Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed())
+	Expect(framework.WaitForRedkeyClusterReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed())
 
 	return k6DepName
 }
@@ -247,7 +241,7 @@ func runFullChaos(rng *rand.Rand, namespace, clusterName string) string {
 		}
 
 		By(fmt.Sprintf("iteration %d/%d: waiting for recovery", i, chaosIterations))
-		Expect(framework.WaitForChaosReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed(),
+		Expect(framework.WaitForRedkeyClusterReady(ctx, dynamicClient, k8sClientset, namespace, clusterName, chaosReadyTimeout)).To(Succeed(),
 			fmt.Sprintf("iteration %d/%d: cluster did not recover after chaos actions", i, chaosIterations))
 
 		// Verify the cluster spec matches what we expect after recovery.
