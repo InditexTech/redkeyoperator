@@ -34,6 +34,7 @@ func TestUpdateScalingStatus_ScalingDown(t *testing.T) {
 	assertStatusEqual(t, rc, redkeyv1.StatusScalingDown)
 	assertConditionTrue(t, rc, redkeyv1.ConditionScalingDown)
 	assertConditionFalse(t, rc, redkeyv1.ConditionScalingUp)
+	assertConditionFalse(t, rc, redkeyv1.ConditionReady)
 }
 
 func TestUpdateScalingStatus_ScalingUp(t *testing.T) {
@@ -46,6 +47,7 @@ func TestUpdateScalingStatus_ScalingUp(t *testing.T) {
 	assertStatusEqual(t, rc, redkeyv1.StatusScalingUp)
 	assertConditionFalse(t, rc, redkeyv1.ConditionScalingDown)
 	assertConditionTrue(t, rc, redkeyv1.ConditionScalingUp)
+	assertConditionFalse(t, rc, redkeyv1.ConditionReady)
 }
 
 func TestUpdateScalingStatus_ScalingDown_Completed(t *testing.T) {
@@ -61,6 +63,7 @@ func TestUpdateScalingStatus_ScalingDown_Completed(t *testing.T) {
 	assertStatusEqual(t, rc, redkeyv1.StatusReady)
 	assertConditionFalse(t, rc, redkeyv1.ConditionScalingDown)
 	assertConditionFalse(t, rc, redkeyv1.ConditionScalingUp)
+	assertConditionTrue(t, rc, redkeyv1.ConditionReady)
 }
 
 func TestUpdateScalingStatus_ScalingUp_Completed(t *testing.T) {
@@ -81,6 +84,7 @@ func TestUpdateScalingStatus_ScalingUp_Completed(t *testing.T) {
 	assertStatusEqual(t, rc, redkeyv1.StatusReady)
 	assertConditionFalse(t, rc, redkeyv1.ConditionScalingDown)
 	assertConditionFalse(t, rc, redkeyv1.ConditionScalingUp)
+	assertConditionTrue(t, rc, redkeyv1.ConditionReady)
 }
 
 func TestUpdateScalingStatus_ScalingUp_In_Progress(t *testing.T) {
@@ -120,6 +124,7 @@ func TestUpdateUpgradingStatus_Upgrading_Config_Not_Changed(t *testing.T) {
 
 	assertStatusEqual(t, rc, redkeyv1.StatusReady)
 	assertConditionFalse(t, rc, redkeyv1.ConditionUpgrading)
+	assertConditionTrue(t, rc, redkeyv1.ConditionReady)
 }
 
 func TestUpdateUpgradingStatus_Upgrading_Completed(t *testing.T) {
@@ -137,6 +142,7 @@ func TestUpdateUpgradingStatus_Upgrading_Completed(t *testing.T) {
 
 	assertStatusEqual(t, rc, redkeyv1.StatusReady)
 	assertConditionFalse(t, rc, redkeyv1.ConditionUpgrading)
+	assertConditionTrue(t, rc, redkeyv1.ConditionReady)
 }
 
 func TestUpdateUpgradingStatus_Upgrading_Config_Changed(t *testing.T) {
@@ -158,6 +164,7 @@ func TestUpdateUpgradingStatus_Upgrading_Config_Changed(t *testing.T) {
 
 	assertStatusEqual(t, rc, redkeyv1.StatusUpgrading)
 	assertConditionTrue(t, rc, redkeyv1.ConditionUpgrading)
+	assertConditionFalse(t, rc, redkeyv1.ConditionReady)
 }
 
 func TestUpdateUpgradingStatus_Upgrading_Limits_Cpu_Changed(t *testing.T) {
@@ -179,6 +186,7 @@ func TestUpdateUpgradingStatus_Upgrading_Limits_Cpu_Changed(t *testing.T) {
 
 	assertStatusEqual(t, rc, redkeyv1.StatusUpgrading)
 	assertConditionTrue(t, rc, redkeyv1.ConditionUpgrading)
+	assertConditionFalse(t, rc, redkeyv1.ConditionReady)
 }
 
 func TestUpdateUpgradingStatus_Upgrading_Requests_Cpu_Changed(t *testing.T) {
@@ -200,6 +208,7 @@ func TestUpdateUpgradingStatus_Upgrading_Requests_Cpu_Changed(t *testing.T) {
 
 	assertStatusEqual(t, rc, redkeyv1.StatusUpgrading)
 	assertConditionTrue(t, rc, redkeyv1.ConditionUpgrading)
+	assertConditionFalse(t, rc, redkeyv1.ConditionReady)
 }
 
 func TestUpdateUpgradingStatus_Upgrading_Limits_Memory_Changed(t *testing.T) {
@@ -221,6 +230,7 @@ func TestUpdateUpgradingStatus_Upgrading_Limits_Memory_Changed(t *testing.T) {
 
 	assertStatusEqual(t, rc, redkeyv1.StatusUpgrading)
 	assertConditionTrue(t, rc, redkeyv1.ConditionUpgrading)
+	assertConditionFalse(t, rc, redkeyv1.ConditionReady)
 }
 
 func TestUpdateUpgradingStatus_Upgrading_Requests_Memory_Changed(t *testing.T) {
@@ -242,6 +252,7 @@ func TestUpdateUpgradingStatus_Upgrading_Requests_Memory_Changed(t *testing.T) {
 
 	assertStatusEqual(t, rc, redkeyv1.StatusUpgrading)
 	assertConditionTrue(t, rc, redkeyv1.ConditionUpgrading)
+	assertConditionFalse(t, rc, redkeyv1.ConditionReady)
 }
 
 func TestUpdateUpgradingStatus_Upgrading_Image_Changed(t *testing.T) {
@@ -262,6 +273,7 @@ func TestUpdateUpgradingStatus_Upgrading_Image_Changed(t *testing.T) {
 
 	assertStatusEqual(t, rc, redkeyv1.StatusUpgrading)
 	assertConditionTrue(t, rc, redkeyv1.ConditionUpgrading)
+	assertConditionFalse(t, rc, redkeyv1.ConditionReady)
 }
 
 func TestSetConditionTrue(t *testing.T) {
