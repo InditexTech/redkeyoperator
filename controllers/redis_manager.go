@@ -797,7 +797,13 @@ func (r *RedkeyClusterReconciler) doFastScaling(ctx context.Context, redkeyClust
 			return true, nil
 		}
 
-		// The cluster is now scaled, and we can set the Cluster Status as Ready again and remove the Substatus.
+		// The cluster is now scaled, and we can set the Cluster Status to Ready again, remove the Substatus and update conditions accordingly.
+		switch redkeyCluster.Status.Status {
+		case redkeyv1.StatusScalingUp:
+			setConditionFalse(logger, redkeyCluster, redkeyv1.ConditionScalingUp)
+		case redkeyv1.StatusScalingDown:
+			setConditionFalse(logger, redkeyCluster, redkeyv1.ConditionScalingDown)
+		}
 		redkeyCluster.Status.Status = redkeyv1.StatusReady
 		redkeyCluster.Status.Substatus.Status = ""
 		r.setConditionTrue(redkeyCluster, redkeyv1.ConditionReady, "Redkey cluster is ready")
