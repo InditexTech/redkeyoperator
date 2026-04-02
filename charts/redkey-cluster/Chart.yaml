@@ -6,4 +6,4 @@ name: redkey-cluster
 description: A Helm chart for deploying a RedkeyCluster custom resource
 type: application
 version: 0.1.0
-appVersion: "1.0.0"
+appVersion: "0.1.0"
