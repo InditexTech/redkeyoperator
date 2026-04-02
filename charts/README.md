@@ -1,6 +1,22 @@
+<!--
+SPDX-FileCopyrightText: 2025 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Helm Charts
 
 This directory contains Helm charts for deploying the various components of the project. Each subdirectory corresponds to a specific component and includes the necessary templates and configuration files for deployment.
+
+## redkey-operator Chart
+
+Use this chart to deploy the Redkey Operator, which manages Redkey clusters in your Kubernetes environment.
+
+You can install the Redkey Operator by running the following command:
+
+```bash
+helm install my-redkey-operator ./charts/redkey-operator
+```
 
 ## redkey-cluster Chart
 
