@@ -85,29 +85,34 @@ const (
 )
 
 var ConditionUpgrading = metav1.Condition{
-	Type:               "Upgrading",
-	LastTransitionTime: metav1.Now(),
-	Message:            "Redkey cluster is upgrading",
-	Reason:             "RedkeyClusterUpgrading",
-	Status:             metav1.ConditionTrue,
+	Type:    "Upgrading",
+	Message: "Redkey cluster is upgrading",
+	Reason:  "RedkeyClusterUpgrading",
+	Status:  metav1.ConditionTrue,
 }
 
 var ConditionScalingUp = metav1.Condition{
-	Type:               "ScalingUp",
-	LastTransitionTime: metav1.Now(),
-	Message:            "Redkey cluster is scaling up",
-	Reason:             "RedkeyClusterScalingUp",
-	Status:             metav1.ConditionTrue,
-}
-var ConditionScalingDown = metav1.Condition{
-	Type:               "ScalingDown",
-	LastTransitionTime: metav1.Now(),
-	Message:            "Redkey cluster is scaling down",
-	Reason:             "RedkeyClusterScalingDown",
-	Status:             metav1.ConditionTrue,
+	Type:    "ScalingUp",
+	Message: "Redkey cluster is scaling up",
+	Reason:  "RedkeyClusterScalingUp",
+	Status:  metav1.ConditionTrue,
 }
 
-var AllConditions = []metav1.Condition{ConditionUpgrading, ConditionScalingUp, ConditionScalingDown}
+var ConditionScalingDown = metav1.Condition{
+	Type:    "ScalingDown",
+	Message: "Redkey cluster is scaling down",
+	Reason:  "RedkeyClusterScalingDown",
+	Status:  metav1.ConditionTrue,
+}
+
+var ConditionReady = metav1.Condition{
+	Type:    "Ready",
+	Message: "Redkey cluster is ready",
+	Reason:  "RedkeyClusterReady",
+	Status:  metav1.ConditionTrue,
+}
+
+var AllConditions = []metav1.Condition{ConditionUpgrading, ConditionScalingUp, ConditionScalingDown, ConditionReady}
 
 // +kubebuilder:object:root=true
 // RedkeyClusterList contains a list of RedkeyCluster

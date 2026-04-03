@@ -58,7 +58,34 @@ Redkey operator is built using [kubebuilder](https://github.com/kubernetes-sigs/
 
 ## Quick Start
 
+### Using Helm Charts
+
 Prerrequisites:
+
+- A running Kubernetes cluster (v1.24+)
+- kubectl (v1.24+)
+- Helm (v3.0+)(v4.0+ required for post-install hook feature in redkey-cluster chart)
+
+The project provides Helm charts to easily deploy the Redkey Operator and a sample Redkey Cluster. The charts are located in the `charts` directory of the repository.
+
+Install the Redkey Operator using the provided Helm chart:
+
+```bash
+helm install redkey-operator ./charts/redkey-operator
+```
+
+Install a sample Redkey Cluster using the provided Helm chart:
+
+```bash
+helm install my-redkey-cluster ./charts/redkey-cluster
+```
+
+Take a look at the [charts/README.md](./charts/README.md) for more details on how to use the Helm charts, including how to enable the post-install hook in the redkey-cluster chart to wait for the cluster to be ready after installation.
+
+### Using Makefile
+
+Prerrequisites:
+
 - A running Kubernetes cluster (v1.24+)
 - kubectl (v1.24+)
 - Make

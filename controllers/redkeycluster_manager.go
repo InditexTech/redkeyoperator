@@ -152,6 +152,7 @@ func (r *RedkeyClusterReconciler) reconcileStatusNew(redkeyCluster *redkeyv1.Red
 		redkeyCluster.Status.Nodes = make(map[string]*redkeyv1.RedisNode, 0)
 	}
 	redkeyCluster.Status.Status = redkeyv1.StatusInitializing
+	setConditionFalse(r.getHelperLogger(redkeyCluster.NamespacedName()), redkeyCluster, redkeyv1.ConditionReady)
 	return requeue, DefaultRequeueTimeout
 }
 
@@ -253,6 +254,7 @@ func (r *RedkeyClusterReconciler) reconcileStatusConfiguring(ctx context.Context
 
 	// Redkey cluster is ok, moving to Ready status
 	redkeyCluster.Status.Status = redkeyv1.StatusReady
+	r.setConditionTrue(redkeyCluster, redkeyv1.ConditionReady, "Redkey cluster is ready")
 
 	return requeue, DefaultRequeueTimeout
 }
