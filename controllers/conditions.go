@@ -12,16 +12,19 @@ import (
 )
 
 func (r *RedkeyClusterReconciler) setConditionTrue(rc *redkeyv1.RedkeyCluster, condition metav1.Condition, message string) {
-	if !meta.IsStatusConditionTrue(rc.Status.Conditions, condition.Type) {
-		meta.SetStatusCondition(&rc.Status.Conditions, condition)
-		r.Recorder.Event(rc, "Normal", condition.Reason, message)
-	}
+	condition.ObservedGeneration = rc.Generation
+	condition.Message = message
+	alreadyTrue := meta.IsStatusConditionTrue(rc.Status.Conditions, condition.Type)
+	if meta.SetStatusCondition(&rc.Status.Conditions, condition) && !alreadyTrue {
+        r.Recorder.Event(rc, "Normal", condition.Reason, message)		// Event generated only when condition changes to true
+    }
 }
 
 func setConditionFalse(log logr.Logger, redkeyCluster *redkeyv1.RedkeyCluster, condition metav1.Condition) {
 	condition.Status = metav1.ConditionFalse
-	changed := meta.SetStatusCondition(&redkeyCluster.Status.Conditions, condition)
-	if changed {
+	condition.ObservedGeneration = redkeyCluster.Generation
+
+	if meta.SetStatusCondition(&redkeyCluster.Status.Conditions, condition) {
 		log.Info("Condition set to false", "condition", condition)
 	}
 }
