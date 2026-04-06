@@ -16,8 +16,8 @@ func (r *RedkeyClusterReconciler) setConditionTrue(rc *redkeyv1.RedkeyCluster, c
 	condition.Message = message
 	alreadyTrue := meta.IsStatusConditionTrue(rc.Status.Conditions, condition.Type)
 	if meta.SetStatusCondition(&rc.Status.Conditions, condition) && !alreadyTrue {
-        r.Recorder.Event(rc, "Normal", condition.Reason, message)		// Event generated only when condition changes to true
-    }
+		r.Recorder.Event(rc, "Normal", condition.Reason, message) // Event generated only when condition changes to true
+	}
 }
 
 func setConditionFalse(log logr.Logger, redkeyCluster *redkeyv1.RedkeyCluster, condition metav1.Condition) {
