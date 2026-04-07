@@ -5,6 +5,8 @@
 package v1
 
 import (
+	"reflect"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -610,6 +612,12 @@ func CompareStatuses(a, b *RedkeyClusterStatus) bool {
 		return false
 	}
 	if a.Substatus.Status != b.Substatus.Status {
+		return false
+	}
+	// Check the conditions array, to detect changes in the cluster status that are not reflected in
+	// the main status or substatus fields, like PDB enabling/disabiling. We need to identify
+	// ObservedGeneration changes that don't trigger a status or substatus change but do trigger a conditions change.
+	if !reflect.DeepEqual(a.Conditions, b.Conditions) {
 		return false
 	}
 	for _, nodeA := range a.Nodes {

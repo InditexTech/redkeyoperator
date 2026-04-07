@@ -65,7 +65,7 @@ func NewRedkeyClusterReconciler(mgr ctrl.Manager, maxConcurrentReconciles int, c
 func (r *RedkeyClusterReconciler) ReconcileClusterObject(ctx context.Context, req ctrl.Request, redkeyCluster *redkeyv1.RedkeyCluster) (ctrl.Result, error) {
 	var err error
 	var requeueAfter time.Duration = DefaultRequeueTimeout
-	currentStatus := redkeyCluster.Status
+	currentStatus := *redkeyCluster.Status.DeepCopy()
 
 	r.logInfo(redkeyCluster.NamespacedName(), "RedkeyCluster reconciler start", "status", redkeyCluster.Status.Status)
 
@@ -288,6 +288,12 @@ func (r *RedkeyClusterReconciler) reconcileStatusReady(ctx context.Context, redk
 		if err != nil {
 			r.logError(redkeyCluster.NamespacedName(), err, "Error when updating upgrading status")
 		}
+	}
+
+	// If the cluster is still in Ready status, update the condition to refresh the current
+	// kubernetes generation (ObserverGeneration).
+	if redkeyCluster.Status.Status == redkeyv1.StatusReady {
+		r.setConditionTrue(redkeyCluster, redkeyv1.ConditionReady, "Redkey cluster is ready")
 	}
 
 	// Requeue to check periodically the cluster is well formed and fix it if needed
