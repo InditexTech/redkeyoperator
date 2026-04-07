@@ -119,24 +119,28 @@ func (r *RedkeyClusterReconciler) updateScalingStatus(ctx context.Context, redke
 	if realExpectedReplicas < currSsetReplicas {
 		redkeyCluster.Status.Status = redkeyv1.StatusScalingDown
 		setConditionFalse(logger, redkeyCluster, redkeyv1.ConditionScalingUp)
-		r.setConditionTrue(redkeyCluster, redkeyv1.ConditionScalingDown, fmt.Sprintf("Scaling down from %d to %d nodes", currSsetReplicas, redkeyCluster.Spec.Primaries))
+		setConditionFalse(logger, redkeyCluster, redkeyv1.ConditionReady)
+		r.setConditionTrue(redkeyCluster, redkeyv1.ConditionScalingDown, fmt.Sprintf("Scaling down from %d to %d primaries", currSsetReplicas, redkeyCluster.Spec.Primaries))
 	}
 	if realExpectedReplicas > currSsetReplicas {
 		redkeyCluster.Status.Status = redkeyv1.StatusScalingUp
-		r.setConditionTrue(redkeyCluster, redkeyv1.ConditionScalingUp, fmt.Sprintf("Scaling up from %d to %d nodes", currSsetReplicas, redkeyCluster.Spec.Primaries))
+		r.setConditionTrue(redkeyCluster, redkeyv1.ConditionScalingUp, fmt.Sprintf("Scaling up from %d to %d primaries", currSsetReplicas, redkeyCluster.Spec.Primaries))
 		setConditionFalse(logger, redkeyCluster, redkeyv1.ConditionScalingDown)
+		setConditionFalse(logger, redkeyCluster, redkeyv1.ConditionReady)
 	}
 	if realExpectedReplicas == currSsetReplicas {
 		if redkeyCluster.Status.Status == redkeyv1.StatusScalingDown {
 			redkeyCluster.Status.Status = redkeyv1.StatusReady
 			redkeyCluster.Status.Substatus.Status = ""
 			setConditionFalse(logger, redkeyCluster, redkeyv1.ConditionScalingDown)
+			r.setConditionTrue(redkeyCluster, redkeyv1.ConditionReady, "Redkey cluster is ready")
 		}
 		if redkeyCluster.Status.Status == redkeyv1.StatusScalingUp {
 			if len(redkeyCluster.Status.Nodes) == int(currSsetReplicas) {
 				redkeyCluster.Status.Status = redkeyv1.StatusReady
 				redkeyCluster.Status.Substatus.Status = ""
 				setConditionFalse(logger, redkeyCluster, redkeyv1.ConditionScalingUp)
+				r.setConditionTrue(redkeyCluster, redkeyv1.ConditionReady, "Redkey cluster is ready")
 			}
 		}
 	}
@@ -169,6 +173,7 @@ func (r *RedkeyClusterReconciler) updateUpgradingStatus(ctx context.Context, red
 		r.logInfo(redkeyCluster.NamespacedName(), "Cluster Upgrade Issued", "reason", "Override changed")
 		redkeyCluster.Status.Status = redkeyv1.StatusUpgrading
 		r.setConditionTrue(redkeyCluster, redkeyv1.ConditionUpgrading, "Override changed")
+		setConditionFalse(r.getHelperLogger(redkeyCluster.NamespacedName()), redkeyCluster, redkeyv1.ConditionReady)
 		return nil
 	}
 
@@ -192,6 +197,7 @@ func (r *RedkeyClusterReconciler) updateUpgradingStatus(ctx context.Context, red
 		if int(*(statefulSet.Spec.UpdateStrategy.RollingUpdate.Partition)) > 0 {
 			r.logInfo(redkeyCluster.NamespacedName(), "Cluster Upgrade Issued", "reason", "Previous upgrade not complete")
 			redkeyCluster.Status.Status = redkeyv1.StatusUpgrading
+			setConditionFalse(r.getHelperLogger(redkeyCluster.NamespacedName()), redkeyCluster, redkeyv1.ConditionReady)
 			return nil
 		}
 	}
@@ -223,12 +229,14 @@ func (r *RedkeyClusterReconciler) updateUpgradingStatus(ctx context.Context, red
 				r.logInfo(redkeyCluster.NamespacedName(), "Cluster Upgrade Issued", "reason", "Redis Labels Changed", "observed", observedLabels, "desired", desiredLabels)
 				redkeyCluster.Status.Status = redkeyv1.StatusUpgrading
 				r.setConditionTrue(redkeyCluster, redkeyv1.ConditionUpgrading, "Redis Labels Changed")
+				setConditionFalse(r.getHelperLogger(redkeyCluster.NamespacedName()), redkeyCluster, redkeyv1.ConditionReady)
 				return nil
 			} else {
 				if value != val {
 					r.logInfo(redkeyCluster.NamespacedName(), "Cluster Upgrade Issued", "reason", "Redis Labels Changed", "observed", observedLabels, "desired", desiredLabels)
 					redkeyCluster.Status.Status = redkeyv1.StatusUpgrading
 					r.setConditionTrue(redkeyCluster, redkeyv1.ConditionUpgrading, "Redis Labels Changed")
+					setConditionFalse(r.getHelperLogger(redkeyCluster.NamespacedName()), redkeyCluster, redkeyv1.ConditionReady)
 					return nil
 				}
 			}
@@ -252,6 +260,7 @@ func (r *RedkeyClusterReconciler) updateUpgradingStatus(ctx context.Context, red
 				r.logInfo(redkeyCluster.NamespacedName(), "Cluster Upgrade Issued", "reason", "Redis Labels Changed", "observed", observedLabels, "desired", desiredLabels)
 				redkeyCluster.Status.Status = redkeyv1.StatusUpgrading
 				r.setConditionTrue(redkeyCluster, redkeyv1.ConditionUpgrading, "Redis Labels Changed")
+				setConditionFalse(r.getHelperLogger(redkeyCluster.NamespacedName()), redkeyCluster, redkeyv1.ConditionReady)
 				return nil
 			}
 		}
@@ -264,6 +273,7 @@ func (r *RedkeyClusterReconciler) updateUpgradingStatus(ctx context.Context, red
 		r.logInfo(redkeyCluster.NamespacedName(), "Cluster Upgrade Issued", "reason", reason)
 		redkeyCluster.Status.Status = redkeyv1.StatusUpgrading
 		r.setConditionTrue(redkeyCluster, redkeyv1.ConditionUpgrading, "Configuration in redis.conf is being updated")
+		setConditionFalse(r.getHelperLogger(redkeyCluster.NamespacedName()), redkeyCluster, redkeyv1.ConditionReady)
 		return nil
 	}
 
@@ -284,6 +294,7 @@ func (r *RedkeyClusterReconciler) updateUpgradingStatus(ctx context.Context, red
 			redkeyCluster.Status.Status = redkeyv1.StatusUpgrading
 
 			r.setConditionTrue(redkeyCluster, redkeyv1.ConditionUpgrading, "Redis Resource Requests & Limits Changed")
+			setConditionFalse(r.getHelperLogger(redkeyCluster.NamespacedName()), redkeyCluster, redkeyv1.ConditionReady)
 
 			return nil
 		}
@@ -298,6 +309,7 @@ func (r *RedkeyClusterReconciler) updateUpgradingStatus(ctx context.Context, red
 		redkeyCluster.Status.Status = redkeyv1.StatusUpgrading
 
 		r.setConditionTrue(redkeyCluster, redkeyv1.ConditionUpgrading, fmt.Sprintf("Redis Image Changed: observed %s desired %s", observedImage, desiredImage))
+		setConditionFalse(r.getHelperLogger(redkeyCluster.NamespacedName()), redkeyCluster, redkeyv1.ConditionReady)
 
 		return nil
 	}
@@ -309,6 +321,7 @@ func (r *RedkeyClusterReconciler) updateUpgradingStatus(ctx context.Context, red
 	if c != nil && c.Status == metav1.ConditionTrue {
 		setConditionFalse(r.getHelperLogger(redkeyCluster.NamespacedName()), redkeyCluster, redkeyv1.ConditionUpgrading)
 	}
+	r.setConditionTrue(redkeyCluster, redkeyv1.ConditionReady, "Redkey cluster is ready")
 
 	return nil
 }

@@ -5,6 +5,8 @@
 package v1
 
 import (
+	"reflect"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -85,29 +87,34 @@ const (
 )
 
 var ConditionUpgrading = metav1.Condition{
-	Type:               "Upgrading",
-	LastTransitionTime: metav1.Now(),
-	Message:            "Redkey cluster is upgrading",
-	Reason:             "RedkeyClusterUpgrading",
-	Status:             metav1.ConditionTrue,
+	Type:    "Upgrading",
+	Message: "Redkey cluster is upgrading",
+	Reason:  "RedkeyClusterUpgrading",
+	Status:  metav1.ConditionTrue,
 }
 
 var ConditionScalingUp = metav1.Condition{
-	Type:               "ScalingUp",
-	LastTransitionTime: metav1.Now(),
-	Message:            "Redkey cluster is scaling up",
-	Reason:             "RedkeyClusterScalingUp",
-	Status:             metav1.ConditionTrue,
-}
-var ConditionScalingDown = metav1.Condition{
-	Type:               "ScalingDown",
-	LastTransitionTime: metav1.Now(),
-	Message:            "Redkey cluster is scaling down",
-	Reason:             "RedkeyClusterScalingDown",
-	Status:             metav1.ConditionTrue,
+	Type:    "ScalingUp",
+	Message: "Redkey cluster is scaling up",
+	Reason:  "RedkeyClusterScalingUp",
+	Status:  metav1.ConditionTrue,
 }
 
-var AllConditions = []metav1.Condition{ConditionUpgrading, ConditionScalingUp, ConditionScalingDown}
+var ConditionScalingDown = metav1.Condition{
+	Type:    "ScalingDown",
+	Message: "Redkey cluster is scaling down",
+	Reason:  "RedkeyClusterScalingDown",
+	Status:  metav1.ConditionTrue,
+}
+
+var ConditionReady = metav1.Condition{
+	Type:    "Ready",
+	Message: "Redkey cluster is ready",
+	Reason:  "RedkeyClusterReady",
+	Status:  metav1.ConditionTrue,
+}
+
+var AllConditions = []metav1.Condition{ConditionUpgrading, ConditionScalingUp, ConditionScalingDown, ConditionReady}
 
 // +kubebuilder:object:root=true
 // RedkeyClusterList contains a list of RedkeyCluster
@@ -605,6 +612,12 @@ func CompareStatuses(a, b *RedkeyClusterStatus) bool {
 		return false
 	}
 	if a.Substatus.Status != b.Substatus.Status {
+		return false
+	}
+	// Check the conditions array, to detect changes in the cluster status that are not reflected in
+	// the main status or substatus fields, like PDB enabling/disabiling. We need to identify
+	// ObservedGeneration changes that don't trigger a status or substatus change but do trigger a conditions change.
+	if !reflect.DeepEqual(a.Conditions, b.Conditions) {
 		return false
 	}
 	for _, nodeA := range a.Nodes {
