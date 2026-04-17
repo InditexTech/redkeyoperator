@@ -68,6 +68,7 @@ func (r *RedkeyClusterReconciler) clusterScaledToZeroPrimaries(ctx context.Conte
 	if !reflect.DeepEqual(redkeyCluster.Status, redkeyv1.StatusReady) {
 		redkeyCluster.Status.Status = redkeyv1.StatusReady
 		setAllConditionsFalse(r.getHelperLogger(redkeyCluster.NamespacedName()), redkeyCluster)
+		r.setConditionTrue(redkeyCluster, redkeyv1.ConditionReady, "Redkey cluster is ready")
 		update_err = r.updateClusterStatus(ctx, redkeyCluster)
 	}
 
@@ -161,6 +162,7 @@ func (r *RedkeyClusterReconciler) doFastUpgrade(ctx context.Context, redkeyClust
 		redkeyCluster.Status.Status = redkeyv1.StatusReady
 		redkeyCluster.Status.Substatus.Status = ""
 		setConditionFalse(logger, redkeyCluster, redkeyv1.ConditionUpgrading)
+		r.setConditionTrue(redkeyCluster, redkeyv1.ConditionReady, "Redkey cluster is ready")
 
 		return true, nil
 	default:
@@ -600,6 +602,7 @@ func (r *RedkeyClusterReconciler) doSlowUpgradeScalingDown(ctx context.Context, 
 	redkeyCluster.Status.Substatus.Status = ""
 	redkeyCluster.Status.Substatus.UpgradingPartition = ""
 	setConditionFalse(logger, redkeyCluster, redkeyv1.ConditionUpgrading)
+	r.setConditionTrue(redkeyCluster, redkeyv1.ConditionReady, "Redkey cluster is ready")
 
 	return nil
 }
@@ -794,9 +797,16 @@ func (r *RedkeyClusterReconciler) doFastScaling(ctx context.Context, redkeyClust
 			return true, nil
 		}
 
-		// The cluster is now scaled, and we can set the Cluster Status as Ready again and remove the Substatus.
+		// The cluster is now scaled, and we can set the Cluster Status to Ready again, remove the Substatus and update conditions accordingly.
+		switch redkeyCluster.Status.Status {
+		case redkeyv1.StatusScalingUp:
+			setConditionFalse(logger, redkeyCluster, redkeyv1.ConditionScalingUp)
+		case redkeyv1.StatusScalingDown:
+			setConditionFalse(logger, redkeyCluster, redkeyv1.ConditionScalingDown)
+		}
 		redkeyCluster.Status.Status = redkeyv1.StatusReady
 		redkeyCluster.Status.Substatus.Status = ""
+		r.setConditionTrue(redkeyCluster, redkeyv1.ConditionReady, "Redkey cluster is ready")
 
 		return true, nil
 	default:
