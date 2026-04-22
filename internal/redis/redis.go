@@ -479,15 +479,34 @@ func cleanPodTemplateSpecResult(result, override *corev1.PodTemplateSpec) {
 		result.Spec.Volumes = nil
 	}
 
-	// Copy the default resources of each container. This is because if not, merged.Spec.Containers[].Resources will be nil (override content)
+	// Reset resources of each container based on the override content.
+	// After strategic merge patch, if the override container has no resources set (nil due to omitempty),
+	// the merged result keeps the original's resources. We need to check the override containers by name
+	// and reset to defaults when the override does not specify resources.
 	for i, container := range result.Spec.Containers {
-		if container.Resources.Requests == nil {
-			result.Spec.Containers[i].Resources.Requests = corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("20m"),
-				corev1.ResourceMemory: resource.MustParse("100Mi"),
+		var overrideContainer *corev1.Container
+		for j := range override.Spec.Containers {
+			if override.Spec.Containers[j].Name == container.Name {
+				overrideContainer = &override.Spec.Containers[j]
+				break
 			}
 		}
-		if container.Resources.Limits == nil {
+
+		if overrideContainer != nil {
+			if overrideContainer.Resources.Limits == nil {
+				result.Spec.Containers[i].Resources.Limits = corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("100Mi"),
+				}
+			}
+			if overrideContainer.Resources.Requests == nil {
+				// Set requests equal to limits to match Kubernetes API server default behavior.
+				// When requests are omitted, K8s defaults them to limits. We replicate this to
+				// avoid infinite reconciliation loops caused by the operator setting nil and K8s
+				// re-adding the defaulted values on each cycle.
+				result.Spec.Containers[i].Resources.Requests = result.Spec.Containers[i].Resources.Limits.DeepCopy()
+			}
+		} else if container.Resources.Limits == nil {
 			result.Spec.Containers[i].Resources.Limits = corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("100m"),
 				corev1.ResourceMemory: resource.MustParse("100Mi"),

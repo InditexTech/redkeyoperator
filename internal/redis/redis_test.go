@@ -1344,7 +1344,7 @@ func Test_ApplyPodTemplateSpecOverride(t *testing.T) {
 									corev1.ResourceMemory: resource.MustParse("100Mi"),
 								},
 								Requests: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("20m"),
+									corev1.ResourceCPU:    resource.MustParse("100m"),
 									corev1.ResourceMemory: resource.MustParse("100Mi"),
 								},
 							},
@@ -1668,6 +1668,66 @@ func Test_ApplyPodTemplateSpecOverride(t *testing.T) {
 			},
 			patch:       *podTemplateSpec,
 			expected:    podTemplateSpec,
+			expectedErr: nil,
+		},
+		{
+			name:     "Remove container resources",
+			original: *podTemplateSpec,
+			patch: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "redis",
+							Image: "redis:6.0.15",
+						},
+					},
+				},
+			},
+			expected: &corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "redis",
+							Image: "redis:6.0.15",
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "client",
+									ContainerPort: RedisCommPort,
+								},
+								{
+									Name:          "gossip",
+									ContainerPort: RedisGossPort,
+								},
+							},
+							Command:        []string{"redis-server", "/conf/redis.conf"},
+							LivenessProbe:  CreateProbe(15, 5),
+							ReadinessProbe: CreateProbe(10, 5),
+							Resources: corev1.ResourceRequirements{
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("100m"),
+									corev1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("100m"),
+									corev1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "config",
+									MountPath: "/conf",
+								},
+							},
+						},
+					},
+				},
+			},
 			expectedErr: nil,
 		},
 	}

@@ -266,12 +266,6 @@ func (r *RedkeyClusterReconciler) createRobinDeployment(req ctrl.Request, redkey
 	}
 
 	for i, container := range d.Spec.Template.Spec.Containers {
-		if container.Resources.Requests == nil {
-			d.Spec.Template.Spec.Containers[i].Resources.Requests = corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("20m"),
-				corev1.ResourceMemory: resource.MustParse("100Mi"),
-			}
-		}
 		if container.Resources.Limits == nil {
 			d.Spec.Template.Spec.Containers[i].Resources.Limits = corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("100m"),
