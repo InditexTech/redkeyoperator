@@ -1299,7 +1299,7 @@ func Test_ApplyPodTemplateSpecOverride(t *testing.T) {
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  "redis",
+							Name: "redis",
 							Resources: corev1.ResourceRequirements{
 								Limits: corev1.ResourceList{
 									corev1.ResourceCPU:    resource.MustParse("100m"),
