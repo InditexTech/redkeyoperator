@@ -1290,6 +1290,70 @@ func Test_ApplyPodTemplateSpecOverride(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
+			name:     "Remove container resources requests",
+			original: *podTemplateSpec,
+			patch: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "redis",
+							Resources: corev1.ResourceRequirements{
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("100m"),
+									corev1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: &corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "redis",
+							Image: "redis:6.0.15",
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "client",
+									ContainerPort: 6379,
+								},
+								{
+									Name:          "gossip",
+									ContainerPort: 16379,
+								},
+							},
+							Command:        []string{"redis-server", "/conf/redis.conf"},
+							LivenessProbe:  CreateProbe(15, 5),
+							ReadinessProbe: CreateProbe(10, 5),
+							Resources: corev1.ResourceRequirements{
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("100m"),
+									corev1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "config",
+									MountPath: "/conf",
+								},
+							},
+						},
+					},
+					// Volumes should be nil here because override Spec.Volumes is empty/nil,
+					// and cleanPodTemplateSpecResult forces result Volumes to nil in this case.
+					Volumes: nil,
+				},
+			},
+			expectedErr: nil,
+		},
+		{
 			name:     "Update container and volume",
 			original: *podTemplateSpec,
 			patch: corev1.PodTemplateSpec{
