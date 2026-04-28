@@ -9,7 +9,6 @@ import (
 	"crypto/md5"
 	"fmt"
 	"maps"
-	"reflect"
 	"time"
 
 	redkeyv1 "github.com/inditextech/redkeyoperator/api/v1"
@@ -18,6 +17,7 @@ import (
 	"gopkg.in/yaml.v3"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -225,7 +225,7 @@ func (r *RedkeyClusterReconciler) overrideRobinDeployment(req ctrl.Request, redk
 	}
 
 	// Check if the override changes something in the original PodTemplateSpec
-	changed := !reflect.DeepEqual(podTemplateSpec.Labels, patchedPodTemplateSpec.Labels) || !reflect.DeepEqual(podTemplateSpec.Annotations, patchedPodTemplateSpec.Annotations) || !reflect.DeepEqual(podTemplateSpec.Spec, patchedPodTemplateSpec.Spec)
+	changed := !equality.Semantic.DeepEqual(podTemplateSpec.Labels, patchedPodTemplateSpec.Labels) || !equality.Semantic.DeepEqual(podTemplateSpec.Annotations, patchedPodTemplateSpec.Annotations) || !equality.Semantic.DeepEqual(podTemplateSpec.Spec, patchedPodTemplateSpec.Spec)
 
 	if changed {
 		r.logInfo(req.NamespacedName, "Detected robin deployment change")
@@ -266,12 +266,6 @@ func (r *RedkeyClusterReconciler) createRobinDeployment(req ctrl.Request, redkey
 	}
 
 	for i, container := range d.Spec.Template.Spec.Containers {
-		if container.Resources.Requests == nil {
-			d.Spec.Template.Spec.Containers[i].Resources.Requests = corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("20m"),
-				corev1.ResourceMemory: resource.MustParse("100Mi"),
-			}
-		}
 		if container.Resources.Limits == nil {
 			d.Spec.Template.Spec.Containers[i].Resources.Limits = corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("100m"),

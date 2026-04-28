@@ -481,13 +481,21 @@ func cleanPodTemplateSpecResult(result, override *corev1.PodTemplateSpec) {
 
 	// Copy the default resources of each container. This is because if not, merged.Spec.Containers[].Resources will be nil (override content)
 	for i, container := range result.Spec.Containers {
-		if container.Resources.Requests == nil {
-			result.Spec.Containers[i].Resources.Requests = corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("20m"),
-				corev1.ResourceMemory: resource.MustParse("100Mi"),
+		// Ensure resources match the override, allowing removal of requests or limits
+		var overrideContainer *corev1.Container
+		for j := range override.Spec.Containers {
+			if override.Spec.Containers[j].Name == container.Name {
+				overrideContainer = &override.Spec.Containers[j]
+				break
 			}
 		}
-		if container.Resources.Limits == nil {
+
+		if overrideContainer != nil {
+			result.Spec.Containers[i].Resources = *overrideContainer.Resources.DeepCopy()
+		}
+
+		// Apply default limits if limits are still nil
+		if result.Spec.Containers[i].Resources.Limits == nil {
 			result.Spec.Containers[i].Resources.Limits = corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("100m"),
 				corev1.ResourceMemory: resource.MustParse("100Mi"),
