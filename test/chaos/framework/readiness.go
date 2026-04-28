@@ -20,15 +20,15 @@ import (
 )
 
 const (
-	defaultChaosReadyTimeout = 10 * time.Minute
-	pollInterval             = 2 * time.Second
+	defaultReadyTimeout = 10 * time.Minute
+	pollInterval        = 2 * time.Second
 )
 
-// WaitForChaosReady waits for the Redis cluster to be fully healthy.
-// Checks: CR status == Ready, redis-cli --cluster check passes, no fail/migrating states.
-func WaitForChaosReady(ctx context.Context, dc dynamic.Interface, clientset kubernetes.Interface, namespace, clusterName string, timeout time.Duration) error {
+// WaitForRedkeyClusterReady waits for the Redis cluster to be fully healthy.
+// Checks: CR status == Ready, pod count matches spec, redis-cli --cluster check passes, no fail/migrating states.
+func WaitForRedkeyClusterReady(ctx context.Context, dc dynamic.Interface, clientset kubernetes.Interface, namespace, clusterName string, timeout time.Duration) error {
 	if timeout == 0 {
-		timeout = defaultChaosReadyTimeout
+		timeout = defaultReadyTimeout
 	}
 
 	var lastReason string
@@ -108,7 +108,7 @@ func WaitForChaosReady(ctx context.Context, dc dynamic.Interface, clientset kube
 		return true, nil
 	})
 	if err != nil && lastReason != "" {
-		return fmt.Errorf("WaitForChaosReady(%s/%s): last check: %s: %w", namespace, clusterName, lastReason, err)
+		return fmt.Errorf("WaitForRedkeyClusterReady(%s/%s): last check: %s: %w", namespace, clusterName, lastReason, err)
 	}
 	return err
 }
@@ -129,56 +129,4 @@ func clusterNodesHasFailure(ctx context.Context, namespace, podName string) bool
 		return true
 	}
 	return strings.Contains(stdout, "fail") || strings.Contains(stdout, "->") || strings.Contains(stdout, "<-")
-}
-
-// AssertAllSlotsAssigned verifies that all 16384 slots are assigned.
-func AssertAllSlotsAssigned(ctx context.Context, clientset kubernetes.Interface, namespace, clusterName string) error {
-	pods, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: RedisPodsSelector(clusterName),
-	})
-	if err != nil {
-		return err
-	}
-
-	if len(pods.Items) == 0 {
-		return fmt.Errorf("no redis pods found")
-	}
-
-	stdout, _, err := RemoteCommand(ctx, namespace, pods.Items[0].Name, "redis-cli cluster info")
-	if err != nil {
-		return fmt.Errorf("failed to get cluster info: %w", err)
-	}
-
-	if !strings.Contains(stdout, "cluster_slots_ok:16384") {
-		return fmt.Errorf("not all slots assigned: %s", stdout)
-	}
-
-	return nil
-}
-
-// AssertNoNodesInFailState verifies no nodes are in fail state.
-func AssertNoNodesInFailState(ctx context.Context, clientset kubernetes.Interface, namespace, clusterName string) error {
-	pods, err := clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: RedisPodsSelector(clusterName),
-	})
-	if err != nil {
-		return err
-	}
-
-	if len(pods.Items) == 0 {
-		return fmt.Errorf("no redis pods found")
-	}
-
-	for _, pod := range pods.Items {
-		stdout, _, err := RemoteCommand(ctx, namespace, pod.Name, "redis-cli cluster nodes")
-		if err != nil {
-			return fmt.Errorf("failed to get cluster nodes from %s: %w", pod.Name, err)
-		}
-
-		if strings.Contains(stdout, "fail") {
-			return fmt.Errorf("node in fail state detected in pod %s: %s", pod.Name, stdout)
-		}
-	}
-
-	return nil
 }

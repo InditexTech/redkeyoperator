@@ -1,0 +1,1 @@
+/home/dani/org/srcs/redkeyoperator-chaostest/AGENTS.md
