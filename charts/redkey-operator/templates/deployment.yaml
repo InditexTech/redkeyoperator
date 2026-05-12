@@ -35,8 +35,6 @@ spec:
             - /manager
           args:
             - "--leader-elect={{ .Values.leaderElection.enabled }}"
-            - "--max-concurrent-reconciles"
-            - "10"
           env:
             - name: WATCH_NAMESPACE
               value: {{ .Release.Namespace }}

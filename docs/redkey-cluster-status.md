@@ -6,14 +6,32 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Redkey Cluster Status and Substatus
 
+The Redkey Operator tracks the lifecycle of each `RedkeyCluster` resource through a set of **Status** and **Substatus** fields. The `Status` field reflects the high-level phase of the cluster (e.g. initializing, ready, scaling), while the `Substatus` field provides finer-grained visibility into long-running operations such as scaling and upgrades. Together, they give operators a clear picture of what the cluster is doing at any point in time and allow automated tooling to react to state changes.
+
+## Table of Contents
+
+- [Status codes](#status-codes)
+- [Redkey Cluster creation Status transitions](#redkey-cluster-creation-status-transitions)
+- [Substatus](#substatus)
+  - [Redkey Cluster Scaling Up (Fast scaling)](#redkey-cluster-scaling-up-fast-scaling)
+  - [Redkey Cluster Scaling Up (Slow scaling)](#redkey-cluster-scaling-up-slow-scaling)
+  - [Redkey Cluster Scaling Down (Fast scaling)](#redkey-cluster-scaling-down-fast-scaling)
+  - [Redkey Cluster Scaling Down (Slow scaling)](#redkey-cluster-scaling-down-slow-scaling)
+  - [Redkey Cluster Upgrading (Fast upgrading)](#redkey-cluster-upgrading-fast-upgrading)
+  - [Redkey Cluster Upgrading (Slow upgrading)](#redkey-cluster-upgrading-slow-upgrading)
+
+---
+
+## Status codes
+
 Status codes is used to know the state of a Redis cluster.
 
 The implemented status are:
 
 - **Initializing**: The necessary Kubernetes objects have been created (primarily a StatefulSet, which manages the pods on the Redis nodes, and Redkey Robin Deployment). The operator is waiting for all the pods to be ready and Robin to start responding.
 - **Configuring**: Robin is responsible for building the cluster, performing the necessary meets between all nodes, assigning slots to ensure everyone is covered, and making sure the cluster is balanced. The operator waits for Robin to confirm that the cluster is ready.
-- **Ready**: The cluster has the correct configuration, the desired number of primaries and replicas per primary, is rebalanced and ready to be used. The Redis clusters health in this status will be checked by the Operador periodically asking their Robin services.
-- **Upgrading**: The cluster is being upgraded, reconfiguring the objects to solve the mismatches. A RedkeyCluster enters this status when when:
+- **Ready**: The cluster has the correct configuration, the desired number of primaries and replicas per primary, is rebalanced and ready to be used. The Redis clusters health in this status will be checked by the Operator periodically asking their Robin services.
+- **Upgrading**: The cluster is being upgraded, reconfiguring the objects to solve the mismatches. A RedkeyCluster enters this status when:
   - there are differences between the existing configuration in the configmap and the configuration of the RedkeyCluster object merged with the default configuration set in the code.
   - there is a mismatch between the StatefulSet object labels and the RedkeyCluster Spec labels.
   - a mismatch exists between RedkeyCluster resources defined under spec and effective resources defined in the StatefulSet.
@@ -27,8 +45,6 @@ The implemented status are:
   - Scaling down the cluster after upgradind raises an error.
   - Scaling up when in StatusScalingUp status goes wrong.
   - Scaling down when in StatusScalingDown status goes wrong.
-
-See [Redkey Robin](./redkey-robin.md) for more details.
 
 ## Redkey Cluster creation Status transitions
 
@@ -107,7 +123,7 @@ In this case, the same SubStatus rules apply as for the Fast Scaling Up operatio
 * **FastScaling**
 * **EndingFastScaling**
 
-![Redkey Cluster Scaling Up Fast](./images/redkey-cluster-substatus-scalingdown-fast.png)
+![Redkey Cluster Scaling Down Fast](./images/redkey-cluster-substatus-scalingdown-fast.png)
 
 This is an example of the Status and SubStatus changes when scaling the sample Redkey Cluster from 5 to 3 primaries:
 
@@ -176,7 +192,7 @@ When Slow upgrading a Redkey Cluster the upgrade is executed from partition to p
 
 Current partition can be shown using `kubectl get rkcl -o wide`.
 
-![Redkey Cluster Upgrading Fast](./images/redkey-cluster-substatus-upgrading-slow.png)
+![Redkey Cluster Upgrading Slow](./images/redkey-cluster-substatus-upgrading-slow.png)
 
 This is an example of the Status and SubStatus changes when upgrading the sample Redkey Cluster, having previously changed the `purgeKeysOnRebalance` parameter to **false**:
 

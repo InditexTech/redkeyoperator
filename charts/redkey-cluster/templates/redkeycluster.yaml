@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2025 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
 # SPDX-License-Identifier: Apache-2.0
 
-apiVersion: redkey.inditex.dev/v1
+apiVersion: redkey.inditex.dev/v1beta1
 kind: RedkeyCluster
 metadata:
   name: {{ include "redkey-cluster.name" . }}
@@ -15,6 +15,9 @@ spec:
   purgeKeysOnRebalance: {{ .Values.purgeKeysOnRebalance }}
   {{- end }}
   image: {{ .Values.image }}
+  {{- if .Values.version }}
+  version: {{ .Values.version | quote }}
+  {{- end }}
   {{- if and (not .Values.ephemeral) .Values.storage }}
   storage: {{ .Values.storage }}
   {{- end }}
@@ -29,6 +32,10 @@ spec:
   {{- if .Values.backup }}
   backup: {{ .Values.backup }}
   {{- end }}
+  {{- if .Values.auth }}
+  auth:
+    {{- toYaml .Values.auth | nindent 4 }}
+  {{- end }}
   {{- if .Values.labels }}
   labels:
     {{- toYaml .Values.labels | nindent 4 }}
@@ -40,6 +47,14 @@ spec:
   {{- if .Values.resources }}
   resources:
     {{- toYaml .Values.resources | nindent 4 }}
+  {{- end }}
+  {{- if .Values.pdb }}
+  pdb:
+    {{- toYaml .Values.pdb | nindent 4 }}
+  {{- end }}
+  {{- if .Values.override }}
+  override:
+    {{- toYaml .Values.override | nindent 4 }}
   {{- end }}
   robin:
     config:
