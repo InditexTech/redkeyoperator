@@ -198,9 +198,8 @@ func hasConfigError(config *redisv1.RedkeyClusterConfig) bool {
 	return config != nil && isTerminalConfigPhase(config.Status.ConfigPhase) && config.Status.Status == redisv1.ClusterPhaseError
 }
 
-// cleanupSupersededConfigs deletes the oldest contiguous terminal configs,
-// stopping at the first non-terminal config and always preserving the highest sequence.
-// It returns the remaining (non-deleted) configs.
+// cleanupSupersededConfigs deletes every config older than the last Applied config.
+// It returns the last Applied config and any newer configs unchanged.
 func (r *RedkeyClusterReconciler) cleanupSupersededConfigs(ctx context.Context, configs []redisv1.RedkeyClusterConfig) ([]redisv1.RedkeyClusterConfig, error) {
 	if len(configs) <= 1 {
 		return configs, nil
@@ -208,20 +207,26 @@ func (r *RedkeyClusterReconciler) cleanupSupersededConfigs(ctx context.Context, 
 
 	log := logf.FromContext(ctx)
 
-	// The list is sorted by sequence ascending; never delete the last config.
-	deleted := 0
-	for i := 0; i < len(configs)-1; i++ {
-		if !isTerminalConfigPhase(configs[i].Status.ConfigPhase) {
+	lastApplied := -1
+	for i := len(configs) - 1; i >= 0; i-- {
+		if configs[i].Status.ConfigPhase == redisv1.ConfigPhaseApplied {
+			lastApplied = i
 			break
 		}
+	}
 
+	if lastApplied <= 0 {
+		return configs, nil
+	}
+
+	for i := 0; i < lastApplied; i++ {
 		if err := r.Delete(ctx, &configs[i]); err != nil && !errors.IsNotFound(err) {
-			return configs[deleted:], err
+			return configs[i:], err
 		}
 		log.Info("Deleted superseded RedkeyClusterConfig", "config", configs[i].Name)
-		deleted++
 	}
-	return configs[deleted:], nil
+
+	return configs[lastApplied:], nil
 }
 
 func conditionStatus(b bool) metav1.ConditionStatus {

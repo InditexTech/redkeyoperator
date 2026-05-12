@@ -105,7 +105,7 @@ func (r *RedkeyClusterReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	if len(configs) > 0 {
-		// Cleanup any leading Applied configs while always preserving the highest-sequence config.
+		// Keep the latest Applied config as the status baseline and drop any older applied configs.
 		configs, err = r.cleanupSupersededConfigs(ctx, configs)
 		if err != nil {
 			log.Error(err, "Failed to cleanup superseded configs")

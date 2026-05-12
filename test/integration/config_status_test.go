@@ -304,7 +304,7 @@ var _ = Describe("Aggregate Status", func() {
 	})
 
 	Context("Aggregation source", func() {
-		It("should use first (lowest-sequence) config for aggregation", func() {
+		It("should use the last Applied config for aggregation after cleanup", func() {
 			const clusterName = "status-first-config"
 			namespacedName := types.NamespacedName{Name: clusterName, Namespace: namespace}
 
@@ -334,11 +334,11 @@ var _ = Describe("Aggregate Status", func() {
 
 			reconcileCluster(ctx, namespacedName)
 
-			// Cluster status should reflect the FIRST config (seq 1), not the last
+			// Cluster status should reflect the remaining Applied config (seq 2)
 			var updated redisv1.RedkeyCluster
 			Expect(k8sClient.Get(ctx, namespacedName, &updated)).To(Succeed())
-			Expect(updated.Status.Status).To(Equal(redisv1.ClusterStatusScalingUp))
-			Expect(updated.Status.Phase).To(Equal(redisv1.PhaseConfiguring))
+			Expect(updated.Status.Status).To(Equal(redisv1.ClusterStatusReady))
+			Expect(updated.Status.Phase).To(Equal(redisv1.PhaseReady))
 		})
 	})
 })

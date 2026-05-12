@@ -68,16 +68,17 @@ var _ = Describe("Cleanup of Superseded Configs", func() {
 			deleteCluster(ctx, clusterName, namespace)
 		})
 
-		It("should delete leading Applied configs", func() {
+		It("should keep the last Applied config and newer ones", func() {
 			reconcileCluster(ctx, namespacedName)
 
 			configs := listConfigs(ctx, clusterName, namespace)
-			Expect(configs).To(HaveLen(1))
-			Expect(configs[0].Spec.Sequence).To(Equal(3))
+			Expect(configs).To(HaveLen(2))
+			Expect(configs[0].Spec.Sequence).To(Equal(2))
+			Expect(configs[1].Spec.Sequence).To(Equal(3))
 		})
 	})
 
-	Context("When leading configs are Superseded", Ordered, func() {
+	Context("When no Applied config exists", Ordered, func() {
 		const clusterName = "cleanup-superseded"
 		namespacedName := types.NamespacedName{Name: clusterName, Namespace: namespace}
 
@@ -112,17 +113,21 @@ var _ = Describe("Cleanup of Superseded Configs", func() {
 			deleteCluster(ctx, clusterName, namespace)
 		})
 
-		It("should delete leading Superseded configs", func() {
+		It("should not delete any config", func() {
 			reconcileCluster(ctx, namespacedName)
 
 			configs := listConfigs(ctx, clusterName, namespace)
-			Expect(configs).To(HaveLen(1))
-			Expect(configs[0].Spec.Sequence).To(Equal(3))
-			Expect(configs[0].Status.ConfigPhase).To(Equal(redisv1.ConfigPhaseInProgress))
+			Expect(configs).To(HaveLen(3))
+			Expect(configs[0].Spec.Sequence).To(Equal(1))
+			Expect(configs[0].Status.ConfigPhase).To(Equal(redisv1.ConfigPhaseSuperseded))
+			Expect(configs[1].Spec.Sequence).To(Equal(2))
+			Expect(configs[1].Status.ConfigPhase).To(Equal(redisv1.ConfigPhaseSuperseded))
+			Expect(configs[2].Spec.Sequence).To(Equal(3))
+			Expect(configs[2].Status.ConfigPhase).To(Equal(redisv1.ConfigPhaseInProgress))
 		})
 	})
 
-	Context("When a non-terminal config breaks the chain", Ordered, func() {
+	Context("When a later Applied exists after a non-terminal config", Ordered, func() {
 		const clusterName = "cleanup-stops"
 		namespacedName := types.NamespacedName{Name: clusterName, Namespace: namespace}
 
@@ -156,13 +161,12 @@ var _ = Describe("Cleanup of Superseded Configs", func() {
 			deleteCluster(ctx, clusterName, namespace)
 		})
 
-		It("should stop at first non-terminal config", func() {
+		It("should delete everything older than the last Applied config", func() {
 			reconcileCluster(ctx, namespacedName)
 
 			configs := listConfigs(ctx, clusterName, namespace)
-			Expect(configs).To(HaveLen(2))
-			Expect(configs[0].Spec.Sequence).To(Equal(2))
-			Expect(configs[1].Spec.Sequence).To(Equal(3))
+			Expect(configs).To(HaveLen(1))
+			Expect(configs[0].Spec.Sequence).To(Equal(3))
 		})
 	})
 
@@ -223,12 +227,13 @@ var _ = Describe("Cleanup of Superseded Configs", func() {
 			deleteCluster(ctx, clusterName, namespace)
 		})
 
-		It("should delete both leading terminal configs", func() {
+		It("should keep the last Applied config and newer ones", func() {
 			reconcileCluster(ctx, namespacedName)
 
 			configs := listConfigs(ctx, clusterName, namespace)
-			Expect(configs).To(HaveLen(1))
-			Expect(configs[0].Spec.Sequence).To(Equal(3))
+			Expect(configs).To(HaveLen(2))
+			Expect(configs[0].Spec.Sequence).To(Equal(2))
+			Expect(configs[1].Spec.Sequence).To(Equal(3))
 		})
 	})
 
@@ -260,13 +265,12 @@ var _ = Describe("Cleanup of Superseded Configs", func() {
 			deleteCluster(ctx, clusterName, namespace)
 		})
 
-		It("should not delete any config when first is Pending", func() {
+		It("should delete the Pending config because it is older than the last Applied", func() {
 			reconcileCluster(ctx, namespacedName)
 
 			configs := listConfigs(ctx, clusterName, namespace)
-			Expect(configs).To(HaveLen(2))
-			Expect(configs[0].Spec.Sequence).To(Equal(1))
-			Expect(configs[1].Spec.Sequence).To(Equal(2))
+			Expect(configs).To(HaveLen(1))
+			Expect(configs[0].Spec.Sequence).To(Equal(2))
 		})
 	})
 
@@ -308,13 +312,12 @@ var _ = Describe("Cleanup of Superseded Configs", func() {
 			deleteCluster(ctx, clusterName, namespace)
 		})
 
-		It("should not delete any config when first is InProgress", func() {
+		It("should delete the InProgress config because it is older than the last Applied", func() {
 			reconcileCluster(ctx, namespacedName)
 
 			configs := listConfigs(ctx, clusterName, namespace)
-			Expect(configs).To(HaveLen(2))
-			Expect(configs[0].Spec.Sequence).To(Equal(1))
-			Expect(configs[1].Spec.Sequence).To(Equal(2))
+			Expect(configs).To(HaveLen(1))
+			Expect(configs[0].Spec.Sequence).To(Equal(2))
 		})
 	})
 })

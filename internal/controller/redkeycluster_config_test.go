@@ -206,15 +206,21 @@ func TestRedkeyClusterReconciler_UpdateConfigGeneration(t *testing.T) {
 	var configList redisv1.RedkeyClusterConfigList
 	err = fakeClient.List(context.TODO(), &configList, client.InNamespace("default"))
 	require.NoError(t, err)
-	require.Len(t, configList.Items, 1)
+	require.Len(t, configList.Items, 2)
 
-	// The newer config should be sequence 2, and the previous Applied config should have been cleaned up.
+	// The newer config should be sequence 2, while the previous Applied config remains
+	// as the last stable baseline until the new one reaches Applied.
 	var newConfig redisv1.RedkeyClusterConfig
+	var existingConfigFound bool
 	for _, c := range configList.Items {
+		if c.Spec.Sequence == 1 {
+			existingConfigFound = true
+		}
 		if c.Spec.Sequence == 2 {
 			newConfig = c
 		}
 	}
+	assert.True(t, existingConfigFound)
 	assert.Equal(t, "test-cluster-2", newConfig.Name)
 	assert.Equal(t, 2, newConfig.Spec.Sequence)
 }
@@ -258,7 +264,7 @@ func TestRedkeyClusterReconciler_CleanupSupersededConfigs(t *testing.T) {
 		},
 		Spec: redisv1.RedkeyClusterConfigSpec{Sequence: 2},
 		Status: redisv1.RedkeyClusterConfigStatus{
-			ConfigPhase: redisv1.ConfigPhasePending, // Pending shouldn't be deleted
+			ConfigPhase: redisv1.ConfigPhasePending,
 		},
 	}
 
@@ -275,14 +281,31 @@ func TestRedkeyClusterReconciler_CleanupSupersededConfigs(t *testing.T) {
 		},
 		Spec: redisv1.RedkeyClusterConfigSpec{Sequence: 3},
 		Status: redisv1.RedkeyClusterConfigStatus{
-			ConfigPhase: redisv1.ConfigPhaseApplied, // Current baseline
+			ConfigPhase: redisv1.ConfigPhaseApplied,
+		},
+	}
+
+	config4 := &redisv1.RedkeyClusterConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster-4",
+			Namespace: "default",
+			Labels: map[string]string{
+				ClusterLabel: "test-cluster",
+			},
+			Annotations: map[string]string{
+				"redkey.inditex.dev/cluster-generation": "3",
+			},
+		},
+		Spec: redisv1.RedkeyClusterConfigSpec{Sequence: 4},
+		Status: redisv1.RedkeyClusterConfigStatus{
+			ConfigPhase: redisv1.ConfigPhasePending,
 		},
 	}
 
 	fakeClient := fake.NewClientBuilder().
 		WithScheme(s).
-		WithObjects(cluster, config1, config2, config3).
-		WithStatusSubresource(cluster, config1, config2, config3).
+		WithObjects(cluster, config1, config2, config3, config4).
+		WithStatusSubresource(cluster, config1, config2, config3, config4).
 		Build()
 
 	r := &RedkeyClusterReconciler{
@@ -304,11 +327,9 @@ func TestRedkeyClusterReconciler_CleanupSupersededConfigs(t *testing.T) {
 	var configList redisv1.RedkeyClusterConfigList
 	err = fakeClient.List(context.TODO(), &configList, client.InNamespace("default"))
 	require.NoError(t, err)
-	// We expect config2 (pending) and config3 (current applied) to remain
+	// We expect the last Applied config and any later configs to remain.
 	require.Len(t, configList.Items, 2)
-	for _, c := range configList.Items {
-		assert.NotEqual(t, "test-cluster-1", c.Name) // config1 debe haber sido eliminado
-	}
+	assert.ElementsMatch(t, []string{"test-cluster-3", "test-cluster-4"}, []string{configList.Items[0].Name, configList.Items[1].Name})
 }
 
 func TestRedkeyClusterReconciler_AggregateStatus(t *testing.T) {
