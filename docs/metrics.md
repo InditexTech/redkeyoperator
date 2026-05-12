@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Metrics
 
 This document describes the metrics exposure mechanism implemented in the Redkey Operator, how to enable and disable it, the metrics currently exposed, and the custom business metrics that could be added.
