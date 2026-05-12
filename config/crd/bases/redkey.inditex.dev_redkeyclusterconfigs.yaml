@@ -33,6 +33,14 @@ spec:
       jsonPath: .status.status
       name: Status
       type: string
+    - description: The cluster substatus
+      jsonPath: .status.substatus.status
+      name: Substatus
+      type: string
+    - description: Upgrading partition
+      jsonPath: .status.substatus.upgradingPartition
+      name: Partition
+      type: string
     name: v1beta1
     schema:
       openAPIV3Schema:

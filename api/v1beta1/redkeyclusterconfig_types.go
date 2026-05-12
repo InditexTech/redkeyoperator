@@ -153,6 +153,8 @@ type RedisNode struct {
 // +kubebuilder:printcolumn:name="Sequence",type="integer",priority=0,JSONPath=".spec.sequence",description="Configuration sequence number"
 // +kubebuilder:printcolumn:name="ConfigPhase",type="string",priority=0,JSONPath=".status.configPhase",description="Configuration lifecycle phase"
 // +kubebuilder:printcolumn:name="Status",type="string",priority=0,JSONPath=".status.status",description="Cluster operational status"
+// +kubebuilder:printcolumn:name="Substatus",type="string",priority=0,JSONPath=".status.substatus.status",description="The cluster substatus"
+// +kubebuilder:printcolumn:name="Partition",type="string",priority=0,JSONPath=".status.substatus.upgradingPartition",description="Upgrading partition"
 
 // RedkeyClusterConfig is the Schema for the redkeyclusterconfigs API.
 // It represents a sequenced desired-state snapshot created by the Operator and consumed by Robin.

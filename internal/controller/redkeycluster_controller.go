@@ -96,7 +96,7 @@ func (r *RedkeyClusterReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			log.Error(err, "Failed to create new RedkeyClusterConfig")
 			return ctrl.Result{}, err
 		}
-		log.Info("Created new RedkeyClusterConfig", "cluster", cluster.Name, "generation", cluster.Generation)		
+		log.Info("Created new RedkeyClusterConfig", "cluster", cluster.Name, "generation", cluster.Generation)
 		// Re-fetch configs after creation
 		configs, err = r.listConfigs(ctx, &cluster)
 		if err != nil {
