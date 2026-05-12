@@ -529,34 +529,3 @@ bundle-deploy: manifests kustomize operator-sdk ## Deploy the operator from the 
 .PHONY: bundle-undeploy
 bundle-undeploy: operator-sdk ## Undeploy the operator from the cluster.
 	$(OPERATOR_SDK) cleanup $(NAME) --namespace operators
-
-##@ Chaos Testing
-
-K6_IMG ?= localhost:5001/redkey-k6:dev
-CHAOS_ITERATIONS ?= 10
-CHAOS_SEED ?=
-# With 10 iterations 60 m is not enough with TEST_PARALLEL_PROCESS=8 export GOMAXPROCS=8
-CHAOS_TIMEOUT ?= 100m
-CHAOS_PACKAGES ?= ./test/chaos
-CHAOS_TEST_OUTPUT = .local/chaos-test.json
-# CHAOS_KEEP_NAMESPACE_ON_FAILED=1 #  if != "" skip delete namespace if failed
-.PHONY: k6-build
-k6-build:  ## Build k6 image with xk6-redis extension
-	$(info $(M) building k6 docker image with redis extension)
-	docker build --build-arg GOLANG_VERSION=$(GOLANG_VERSION) -t $(K6_IMG) -f test/chaos/k6.Dockerfile test/chaos
-
-.PHONY: k6-push
-k6-push: k6-build  ## Push k6 image to local registry
-	$(info $(M) pushing k6 image)
-	docker push $(K6_IMG)
-
-.PHONY: test-chaos
-test-chaos: process-manifests-crd ginkgo  ## Execute chaos tests
-	$(info $(M) running chaos tests...)
-	@mkdir -p $(dir $(CHAOS_TEST_OUTPUT))
-	$(GINKGO_ENV) K6_IMG=$(K6_IMG) CHAOS_ITERATIONS=$(CHAOS_ITERATIONS) \
-		$(if $(CHAOS_SEED),CHAOS_SEED=$(CHAOS_SEED),) \
-		ginkgo \
-			--timeout=$(CHAOS_TIMEOUT) \
-			--json-report=$(CHAOS_TEST_OUTPUT) \
-			$(GINKGO_OPTS) $(CHAOS_PACKAGES)
