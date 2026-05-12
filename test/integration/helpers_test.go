@@ -6,9 +6,7 @@ package integration_test
 
 import (
 	"context"
-	"fmt"
 	"sort"
-	"strconv"
 
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +33,7 @@ func reconcileCluster(ctx context.Context, name types.NamespacedName) {
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 }
 
-func newTestCluster(name, namespace string) *redisv1.RedkeyCluster {
+func newTestCluster(name, namespace string) *redisv1.RedkeyCluster { //nolint:unparam
 	return &redisv1.RedkeyCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -48,32 +46,6 @@ func newTestCluster(name, namespace string) *redisv1.RedkeyCluster {
 	}
 }
 
-// newTestConfig creates a RedkeyClusterConfig with the given sequence and configPhase.
-// The ownerReference is NOT set here because envtest requires the owner UID, which
-// is only available after the cluster is created. Use setConfigOwner after cluster creation.
-func newTestConfig(clusterName, namespace string, seq int, configPhase string) *redisv1.RedkeyClusterConfig {
-	return &redisv1.RedkeyClusterConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-%d", clusterName, seq),
-			Namespace: namespace,
-			Labels: map[string]string{
-				clusterLabel: clusterName,
-			},
-			Annotations: map[string]string{
-				"redkey.inditex.dev/cluster-generation": strconv.FormatInt(1, 10),
-			},
-		},
-		Spec: redisv1.RedkeyClusterConfigSpec{
-			Sequence:  seq,
-			Primaries: 3,
-			Ephemeral: true,
-		},
-		Status: redisv1.RedkeyClusterConfigStatus{
-			ConfigPhase: configPhase,
-		},
-	}
-}
-
 // updateConfigStatus updates the status subresource of a RedkeyClusterConfig,
 // ensuring that required fields (Nodes) are initialised to satisfy CRD validation.
 func updateConfigStatus(ctx context.Context, config *redisv1.RedkeyClusterConfig) {
@@ -81,16 +53,6 @@ func updateConfigStatus(ctx context.Context, config *redisv1.RedkeyClusterConfig
 		config.Status.Nodes = map[string]*redisv1.RedisNode{}
 	}
 	ExpectWithOffset(1, k8sClient.Status().Update(ctx, config)).To(Succeed())
-}
-
-// createConfigWithPhase creates a RedkeyClusterConfig and sets its status via the status subresource.
-func createConfigWithPhase(ctx context.Context, clusterName, namespace string, seq int, configPhase string) {
-	config := newTestConfig(clusterName, namespace, seq, "")
-	ExpectWithOffset(1, k8sClient.Create(ctx, config)).To(Succeed())
-
-	// Status must be set via the status subresource
-	config.Status.ConfigPhase = configPhase
-	updateConfigStatus(ctx, config)
 }
 
 // listConfigs returns all configs for the given cluster sorted by sequence ascending.
@@ -108,8 +70,52 @@ func listConfigs(ctx context.Context, clusterName, namespace string) []redisv1.R
 	return items
 }
 
+// setupThreeConfigs creates a cluster and three configs via successive spec changes (primaries 3→5→7).
+func setupThreeConfigs(ctx context.Context, clusterName, namespace string) []redisv1.RedkeyClusterConfig {
+	namespacedName := types.NamespacedName{Name: clusterName, Namespace: namespace}
+
+	cluster := newTestCluster(clusterName, namespace)
+	ExpectWithOffset(1, k8sClient.Create(ctx, cluster)).To(Succeed())
+
+	reconcileCluster(ctx, namespacedName)
+	var cl redisv1.RedkeyCluster
+	ExpectWithOffset(1, k8sClient.Get(ctx, namespacedName, &cl)).To(Succeed())
+	cl.Spec.Primaries = 5
+	ExpectWithOffset(1, k8sClient.Update(ctx, &cl)).To(Succeed())
+	reconcileCluster(ctx, namespacedName)
+	ExpectWithOffset(1, k8sClient.Get(ctx, namespacedName, &cl)).To(Succeed())
+	cl.Spec.Primaries = 7
+	ExpectWithOffset(1, k8sClient.Update(ctx, &cl)).To(Succeed())
+	reconcileCluster(ctx, namespacedName)
+
+	configs := listConfigs(ctx, clusterName, namespace)
+	ExpectWithOffset(1, configs).To(HaveLen(3))
+	return configs
+}
+
+// setupAppliedReadyCluster creates a cluster, reconciles, sets its config to Applied+Ready, and reconciles again.
+func setupAppliedReadyCluster(ctx context.Context, clusterName, namespace string) redisv1.RedkeyCluster {
+	namespacedName := types.NamespacedName{Name: clusterName, Namespace: namespace}
+
+	cluster := newTestCluster(clusterName, namespace)
+	ExpectWithOffset(1, k8sClient.Create(ctx, cluster)).To(Succeed())
+
+	reconcileCluster(ctx, namespacedName)
+
+	configs := listConfigs(ctx, clusterName, namespace)
+	configs[0].Status.ConfigPhase = redisv1.ConfigPhaseApplied
+	configs[0].Status.Status = redisv1.ClusterStatusReady
+	updateConfigStatus(ctx, &configs[0])
+
+	reconcileCluster(ctx, namespacedName)
+
+	var updated redisv1.RedkeyCluster
+	ExpectWithOffset(1, k8sClient.Get(ctx, namespacedName, &updated)).To(Succeed())
+	return updated
+}
+
 // deleteCluster deletes a RedkeyCluster and all its configs.
-func deleteCluster(ctx context.Context, name, namespace string) {
+func deleteCluster(ctx context.Context, name, namespace string) { //nolint:unparam
 	cluster := &redisv1.RedkeyCluster{}
 	nn := types.NamespacedName{Name: name, Namespace: namespace}
 	if err := k8sClient.Get(ctx, nn, cluster); err == nil {

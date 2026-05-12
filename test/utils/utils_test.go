@@ -57,7 +57,7 @@ func TestGetNonEmptyLines(t *testing.T) {
 func TestGetProjectDir(t *testing.T) {
 	originalWd, err := os.Getwd()
 	assert.NoError(t, err)
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 
 	dir, err := GetProjectDir()
 	assert.NoError(t, err)
@@ -68,7 +68,7 @@ func TestGetProjectDir(t *testing.T) {
 func TestUncommentCode(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "test-uncomment-*.go")
 	assert.NoError(t, err)
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	content := "package main\n\n// func hello() {\n// \tprintln(\"hello\")\n// }\n"
 	err = os.WriteFile(tmpFile.Name(), []byte(content), 0644)

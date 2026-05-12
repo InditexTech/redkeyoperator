@@ -543,12 +543,12 @@ func TestAggregateConditions_PreserveUnchangedTransitionTimes(t *testing.T) {
 	readyCondition := meta.FindStatusCondition(aggregated, "Ready")
 	require.NotNil(t, readyCondition)
 	assert.Equal(t, metav1.ConditionTrue, readyCondition.Status)
-	assert.True(t, readyCondition.LastTransitionTime.Time.After(initialTransitionTime.Time))
+	assert.True(t, readyCondition.LastTransitionTime.After(initialTransitionTime.Time))
 
 	configPendingCondition := meta.FindStatusCondition(aggregated, "ConfigPending")
 	require.NotNil(t, configPendingCondition)
 	assert.Equal(t, metav1.ConditionFalse, configPendingCondition.Status)
-	assert.True(t, configPendingCondition.LastTransitionTime.Time.After(initialTransitionTime.Time))
+	assert.True(t, configPendingCondition.LastTransitionTime.After(initialTransitionTime.Time))
 
 	errorCondition := meta.FindStatusCondition(aggregated, "Error")
 	require.NotNil(t, errorCondition)

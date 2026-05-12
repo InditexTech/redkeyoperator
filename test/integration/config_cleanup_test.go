@@ -54,24 +54,9 @@ var _ = Describe("Cleanup of Superseded Configs", func() {
 		namespacedName := types.NamespacedName{Name: clusterName, Namespace: namespace}
 
 		BeforeAll(func() {
-			cluster := newTestCluster(clusterName, namespace)
-			Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
-
-			// Create 3 configs via successive spec changes
-			reconcileCluster(ctx, namespacedName)
-			var cl redisv1.RedkeyCluster
-			Expect(k8sClient.Get(ctx, namespacedName, &cl)).To(Succeed())
-			cl.Spec.Primaries = 5
-			Expect(k8sClient.Update(ctx, &cl)).To(Succeed())
-			reconcileCluster(ctx, namespacedName)
-			Expect(k8sClient.Get(ctx, namespacedName, &cl)).To(Succeed())
-			cl.Spec.Primaries = 7
-			Expect(k8sClient.Update(ctx, &cl)).To(Succeed())
-			reconcileCluster(ctx, namespacedName)
+			configs := setupThreeConfigs(ctx, clusterName, namespace)
 
 			// Set phases: [Applied, Applied, Pending]
-			configs := listConfigs(ctx, clusterName, namespace)
-			Expect(configs).To(HaveLen(3))
 			configs[0].Status.ConfigPhase = redisv1.ConfigPhaseApplied
 			updateConfigStatus(ctx, &configs[0])
 			configs[1].Status.ConfigPhase = redisv1.ConfigPhaseApplied
@@ -224,24 +209,9 @@ var _ = Describe("Cleanup of Superseded Configs", func() {
 		namespacedName := types.NamespacedName{Name: clusterName, Namespace: namespace}
 
 		BeforeAll(func() {
-			cluster := newTestCluster(clusterName, namespace)
-			Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
-
-			// Create 3 configs
-			reconcileCluster(ctx, namespacedName)
-			var cl redisv1.RedkeyCluster
-			Expect(k8sClient.Get(ctx, namespacedName, &cl)).To(Succeed())
-			cl.Spec.Primaries = 5
-			Expect(k8sClient.Update(ctx, &cl)).To(Succeed())
-			reconcileCluster(ctx, namespacedName)
-			Expect(k8sClient.Get(ctx, namespacedName, &cl)).To(Succeed())
-			cl.Spec.Primaries = 7
-			Expect(k8sClient.Update(ctx, &cl)).To(Succeed())
-			reconcileCluster(ctx, namespacedName)
+			configs := setupThreeConfigs(ctx, clusterName, namespace)
 
 			// Set phases: [Superseded, Applied, Pending]
-			configs := listConfigs(ctx, clusterName, namespace)
-			Expect(configs).To(HaveLen(3))
 			configs[0].Status.ConfigPhase = redisv1.ConfigPhaseSuperseded
 			updateConfigStatus(ctx, &configs[0])
 			configs[1].Status.ConfigPhase = redisv1.ConfigPhaseApplied

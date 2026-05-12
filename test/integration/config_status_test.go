@@ -192,23 +192,9 @@ var _ = Describe("Aggregate Status", func() {
 	Context("Conditions", func() {
 		It("should set Ready=True when terminal and no error", func() {
 			const clusterName = "status-ready-true"
-			namespacedName := types.NamespacedName{Name: clusterName, Namespace: namespace}
-
-			cluster := newTestCluster(clusterName, namespace)
-			Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
 			defer deleteCluster(ctx, clusterName, namespace)
 
-			reconcileCluster(ctx, namespacedName)
-
-			configs := listConfigs(ctx, clusterName, namespace)
-			configs[0].Status.ConfigPhase = redisv1.ConfigPhaseApplied
-			configs[0].Status.Status = redisv1.ClusterStatusReady
-			updateConfigStatus(ctx, &configs[0])
-
-			reconcileCluster(ctx, namespacedName)
-
-			var updated redisv1.RedkeyCluster
-			Expect(k8sClient.Get(ctx, namespacedName, &updated)).To(Succeed())
+			updated := setupAppliedReadyCluster(ctx, clusterName, namespace)
 			readyCond := findCondition(updated.Status.Conditions, "Ready")
 			Expect(readyCond).NotTo(BeNil())
 			Expect(readyCond.Status).To(Equal(metav1.ConditionTrue))
@@ -266,24 +252,9 @@ var _ = Describe("Aggregate Status", func() {
 
 		It("should set ConfigPending=False when config in terminal phase", func() {
 			const clusterName = "status-config-not-pending"
-			namespacedName := types.NamespacedName{Name: clusterName, Namespace: namespace}
-
-			cluster := newTestCluster(clusterName, namespace)
-			Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
 			defer deleteCluster(ctx, clusterName, namespace)
 
-			reconcileCluster(ctx, namespacedName)
-
-			configs := listConfigs(ctx, clusterName, namespace)
-			configs[0].Status.ConfigPhase = redisv1.ConfigPhaseApplied
-			configs[0].Status.Status = redisv1.ClusterStatusReady
-			updateConfigStatus(ctx, &configs[0])
-
-			reconcileCluster(ctx, namespacedName)
-
-			var updated redisv1.RedkeyCluster
-			Expect(k8sClient.Get(ctx, namespacedName, &updated)).To(Succeed())
-
+			updated := setupAppliedReadyCluster(ctx, clusterName, namespace)
 			pendingCond := findCondition(updated.Status.Conditions, "ConfigPending")
 			Expect(pendingCond).NotTo(BeNil())
 			Expect(pendingCond.Status).To(Equal(metav1.ConditionFalse))
@@ -291,24 +262,9 @@ var _ = Describe("Aggregate Status", func() {
 
 		It("should set Error=False when terminal without error", func() {
 			const clusterName = "status-no-error"
-			namespacedName := types.NamespacedName{Name: clusterName, Namespace: namespace}
-
-			cluster := newTestCluster(clusterName, namespace)
-			Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
 			defer deleteCluster(ctx, clusterName, namespace)
 
-			reconcileCluster(ctx, namespacedName)
-
-			configs := listConfigs(ctx, clusterName, namespace)
-			configs[0].Status.ConfigPhase = redisv1.ConfigPhaseApplied
-			configs[0].Status.Status = redisv1.ClusterStatusReady
-			updateConfigStatus(ctx, &configs[0])
-
-			reconcileCluster(ctx, namespacedName)
-
-			var updated redisv1.RedkeyCluster
-			Expect(k8sClient.Get(ctx, namespacedName, &updated)).To(Succeed())
-
+			updated := setupAppliedReadyCluster(ctx, clusterName, namespace)
 			errorCond := findCondition(updated.Status.Conditions, "Error")
 			Expect(errorCond).NotTo(BeNil())
 			Expect(errorCond.Status).To(Equal(metav1.ConditionFalse))
