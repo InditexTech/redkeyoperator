@@ -1,0 +1,293 @@
+// SPDX-FileCopyrightText: 2025 INDUSTRIA DE DISEÑO TEXTIL, S.A. (INDITEX, S.A.)
+//
+// SPDX-License-Identifier: Apache-2.0
+
+// NOTE: This file is adapted from test/e2e/operator_test.go for chaos tests.
+// It contains the operator setup functions needed to deploy the operator in the test namespace.
+package framework
+
+import (
+	"context"
+	"fmt"
+
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/ptr"
+)
+
+// EnsureOperatorSetup creates the ServiceAccount, RBAC, ConfigMap and Deployment for the operator.
+func EnsureOperatorSetup(ctx context.Context, clientset kubernetes.Interface, namespace string) error {
+	if err := ensureServiceAccount(ctx, clientset, newServiceAccount(namespace)); err != nil {
+		return fmt.Errorf("ensure ServiceAccount: %w", err)
+	}
+	if err := ensureRole(ctx, clientset, newRole(namespace, "leader-election-role", leaderElectionPolicyRules())); err != nil {
+		return fmt.Errorf("ensure leader-election-role: %w", err)
+	}
+	if err := ensureRole(ctx, clientset, newRole(namespace, "redkey-operator-role", operatorPolicyRules())); err != nil {
+		return fmt.Errorf("ensure redkey-operator-role: %w", err)
+	}
+	if err := ensureRoleBinding(ctx, clientset, newRoleBinding(namespace, "leader-election-rolebinding", "leader-election-role")); err != nil {
+		return fmt.Errorf("ensure leader-election-rolebinding: %w", err)
+	}
+	if err := ensureRoleBinding(ctx, clientset, newRoleBinding(namespace, "redkey-operator-rolebinding", "redkey-operator-role")); err != nil {
+		return fmt.Errorf("ensure redkey-operator-rolebinding: %w", err)
+	}
+	if err := ensureConfigMap(ctx, clientset, newConfigMap(namespace)); err != nil {
+		return fmt.Errorf("ensure ConfigMap: %w", err)
+	}
+	if err := ensureDeployment(ctx, clientset, newOperatorDeployment(namespace)); err != nil {
+		return fmt.Errorf("ensure Deployment: %w", err)
+	}
+
+	return nil
+}
+
+func ensureServiceAccount(ctx context.Context, clientset kubernetes.Interface, desired *corev1.ServiceAccount) error {
+	existing, err := clientset.CoreV1().ServiceAccounts(desired.Namespace).Get(ctx, desired.Name, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			_, err = clientset.CoreV1().ServiceAccounts(desired.Namespace).Create(ctx, desired, metav1.CreateOptions{})
+			return err
+		}
+		return err
+	}
+
+	desired.ResourceVersion = existing.ResourceVersion
+	desired.Secrets = existing.Secrets
+	desired.ImagePullSecrets = existing.ImagePullSecrets
+	desired.AutomountServiceAccountToken = existing.AutomountServiceAccountToken
+	_, err = clientset.CoreV1().ServiceAccounts(desired.Namespace).Update(ctx, desired, metav1.UpdateOptions{})
+	return err
+}
+
+func ensureRole(ctx context.Context, clientset kubernetes.Interface, desired *rbacv1.Role) error {
+	existing, err := clientset.RbacV1().Roles(desired.Namespace).Get(ctx, desired.Name, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			_, err = clientset.RbacV1().Roles(desired.Namespace).Create(ctx, desired, metav1.CreateOptions{})
+			return err
+		}
+		return err
+	}
+
+	desired.ResourceVersion = existing.ResourceVersion
+	_, err = clientset.RbacV1().Roles(desired.Namespace).Update(ctx, desired, metav1.UpdateOptions{})
+	return err
+}
+
+func ensureRoleBinding(ctx context.Context, clientset kubernetes.Interface, desired *rbacv1.RoleBinding) error {
+	existing, err := clientset.RbacV1().RoleBindings(desired.Namespace).Get(ctx, desired.Name, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			_, err = clientset.RbacV1().RoleBindings(desired.Namespace).Create(ctx, desired, metav1.CreateOptions{})
+			return err
+		}
+		return err
+	}
+
+	desired.ResourceVersion = existing.ResourceVersion
+	_, err = clientset.RbacV1().RoleBindings(desired.Namespace).Update(ctx, desired, metav1.UpdateOptions{})
+	return err
+}
+
+func ensureConfigMap(ctx context.Context, clientset kubernetes.Interface, desired *corev1.ConfigMap) error {
+	existing, err := clientset.CoreV1().ConfigMaps(desired.Namespace).Get(ctx, desired.Name, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			_, err = clientset.CoreV1().ConfigMaps(desired.Namespace).Create(ctx, desired, metav1.CreateOptions{})
+			return err
+		}
+		return err
+	}
+
+	desired.ResourceVersion = existing.ResourceVersion
+	_, err = clientset.CoreV1().ConfigMaps(desired.Namespace).Update(ctx, desired, metav1.UpdateOptions{})
+	return err
+}
+
+func ensureDeployment(ctx context.Context, clientset kubernetes.Interface, desired *appsv1.Deployment) error {
+	existing, err := clientset.AppsV1().Deployments(desired.Namespace).Get(ctx, desired.Name, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			_, err = clientset.AppsV1().Deployments(desired.Namespace).Create(ctx, desired, metav1.CreateOptions{})
+			return err
+		}
+		return err
+	}
+
+	desired.ResourceVersion = existing.ResourceVersion
+	_, err = clientset.AppsV1().Deployments(desired.Namespace).Update(ctx, desired, metav1.UpdateOptions{})
+	return err
+}
+
+func newServiceAccount(ns string) *corev1.ServiceAccount {
+	return &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redkey-operator-sa",
+			Namespace: ns,
+		},
+	}
+}
+
+func newRole(ns, name string, rules []rbacv1.PolicyRule) *rbacv1.Role {
+	return &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns},
+		Rules:      rules,
+	}
+}
+
+func newRoleBinding(ns, name, roleName string) *rbacv1.RoleBinding {
+	return &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns},
+		RoleRef:    rbacv1.RoleRef{APIGroup: "rbac.authorization.k8s.io", Kind: "Role", Name: roleName},
+		Subjects:   []rbacv1.Subject{{Kind: "ServiceAccount", Name: "redkey-operator-sa", Namespace: ns}},
+	}
+}
+
+func newConfigMap(ns string) *corev1.ConfigMap {
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "redkey-operator-config", Namespace: ns},
+		Data: map[string]string{
+			"redis_operator_config.yaml": `apiVersion: controller-runtime.sigs.k8s.io/v1alpha1
+kind: ControllerManagerConfig
+health:
+  healthProbeBindAddress: ":8081"
+metrics:
+  bindAddress: "127.0.0.1:8080"
+leaderElection:
+  leaderElect: true
+  resourceName: db95d8a6.inditex.com
+`,
+		},
+	}
+}
+
+func newOperatorDeployment(ns string) *appsv1.Deployment {
+	replicas := int32(1)
+	return &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redkey-operator",
+			Namespace: ns,
+			Labels:    map[string]string{"control-plane": "redkey-operator"},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"control-plane": "redkey-operator"}},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"control-plane": "redkey-operator",
+						"domain":        "DOMAIN",
+						"environment":   "ENVIRONMENT",
+						"layer":         "middleware-redkeyoperator",
+						"slot":          "default",
+						"tenant":        "TENANT",
+						"type":          "middleware",
+					},
+				},
+				Spec: corev1.PodSpec{
+					ServiceAccountName:            "redkey-operator-sa",
+					SecurityContext:               &corev1.PodSecurityContext{RunAsNonRoot: ptr.To(true)},
+					TerminationGracePeriodSeconds: ptr.To(int64(10)),
+					Containers:                    []corev1.Container{newOperatorContainer(ns)},
+				},
+			},
+		},
+	}
+}
+
+func newOperatorContainer(ns string) corev1.Container {
+	return corev1.Container{
+		Name:            "redkey-operator",
+		Image:           GetOperatorImage(),
+		Command:         []string{"/manager"},
+		Args:            []string{"--leader-elect", "--max-concurrent-reconciles", "10"},
+		Env:             []corev1.EnvVar{{Name: "WATCH_NAMESPACE", Value: ns}},
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		SecurityContext: &corev1.SecurityContext{AllowPrivilegeEscalation: ptr.To(false)},
+		Resources: corev1.ResourceRequirements{
+			Limits:   corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("500m"), corev1.ResourceMemory: resource.MustParse("500Mi")},
+			Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("300m"), corev1.ResourceMemory: resource.MustParse("250Mi")},
+		},
+	}
+}
+
+func leaderElectionPolicyRules() []rbacv1.PolicyRule {
+	return []rbacv1.PolicyRule{
+		{
+			APIGroups: []string{"coordination.k8s.io"},
+			Resources: []string{"leases"},
+			Verbs:     []string{"get", "list", "watch", "create", "update", "patch"},
+		},
+		{
+			APIGroups: []string{""},
+			Resources: []string{"configmaps"},
+			Verbs:     []string{"get", "list", "watch", "create", "update", "patch"},
+		},
+		{
+			APIGroups: []string{""},
+			Resources: []string{"events"},
+			Verbs:     []string{"create", "patch"},
+		},
+	}
+}
+
+func operatorPolicyRules() []rbacv1.PolicyRule {
+	return []rbacv1.PolicyRule{
+		{
+			APIGroups: []string{""},
+			Resources: []string{"configmaps", "pods", "services"},
+			Verbs:     []string{"get", "list", "watch"},
+		},
+		{
+			APIGroups: []string{""},
+			Resources: []string{"configmaps", "services"},
+			Verbs:     []string{"create", "update", "delete", "get", "list"},
+		},
+		{
+			APIGroups: []string{""},
+			Resources: []string{"events"},
+			Verbs:     []string{"create", "patch"},
+		},
+		{
+			APIGroups: []string{""},
+			Resources: []string{"secrets"},
+			Verbs:     []string{"get"},
+		},
+		{
+			APIGroups: []string{""},
+			Resources: []string{"persistentvolumeclaims"},
+			Verbs:     []string{"get", "list", "watch", "delete", "deletecollection"},
+		},
+		{
+			APIGroups: []string{"apps"},
+			Resources: []string{"deployments", "statefulsets"},
+			Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
+		},
+		{
+			APIGroups: []string{"policy"},
+			Resources: []string{"poddisruptionbudgets"},
+			Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
+		},
+		{
+			APIGroups: []string{"redkey.inditex.dev"},
+			Resources: []string{"redkeyclusters"},
+			Verbs:     []string{"create", "delete", "get", "list", "patch", "update", "watch"},
+		},
+		{
+			APIGroups: []string{"redkey.inditex.dev"},
+			Resources: []string{"redkeyclusters/finalizers"},
+			Verbs:     []string{"update"},
+		},
+		{
+			APIGroups: []string{"redkey.inditex.dev"},
+			Resources: []string{"redkeyclusters/status"},
+			Verbs:     []string{"get", "patch", "update"},
+		},
+	}
+}
