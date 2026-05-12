@@ -20,6 +20,34 @@ var _ = Describe("Cleanup of Superseded Configs", func() {
 
 	ctx := context.Background()
 
+	defineKeepLastAppliedContext := func(description, clusterName, firstPhase string) {
+		Context(description, Ordered, func() {
+			namespacedName := types.NamespacedName{Name: clusterName, Namespace: namespace}
+
+			BeforeAll(func() {
+				configs := setupThreeConfigs(ctx, clusterName, namespace)
+
+				configs[0].Status.ConfigPhase = firstPhase
+				updateConfigStatus(ctx, &configs[0])
+				configs[1].Status.ConfigPhase = redisv1.ConfigPhaseApplied
+				updateConfigStatus(ctx, &configs[1])
+			})
+
+			AfterAll(func() {
+				deleteCluster(ctx, clusterName, namespace)
+			})
+
+			It("should keep the last Applied config and newer ones", func() {
+				reconcileCluster(ctx, namespacedName)
+
+				configs := listConfigs(ctx, clusterName, namespace)
+				Expect(configs).To(HaveLen(2))
+				Expect(configs[0].Spec.Sequence).To(Equal(2))
+				Expect(configs[1].Spec.Sequence).To(Equal(3))
+			})
+		})
+	}
+
 	Context("When only one config exists", Ordered, func() {
 		const clusterName = "cleanup-single"
 		namespacedName := types.NamespacedName{Name: clusterName, Namespace: namespace}
@@ -49,34 +77,7 @@ var _ = Describe("Cleanup of Superseded Configs", func() {
 		})
 	})
 
-	Context("When leading configs are Applied", Ordered, func() {
-		const clusterName = "cleanup-applied"
-		namespacedName := types.NamespacedName{Name: clusterName, Namespace: namespace}
-
-		BeforeAll(func() {
-			configs := setupThreeConfigs(ctx, clusterName, namespace)
-
-			// Set phases: [Applied, Applied, Pending]
-			configs[0].Status.ConfigPhase = redisv1.ConfigPhaseApplied
-			updateConfigStatus(ctx, &configs[0])
-			configs[1].Status.ConfigPhase = redisv1.ConfigPhaseApplied
-			updateConfigStatus(ctx, &configs[1])
-			// configs[2] remains Pending (no status update)
-		})
-
-		AfterAll(func() {
-			deleteCluster(ctx, clusterName, namespace)
-		})
-
-		It("should keep the last Applied config and newer ones", func() {
-			reconcileCluster(ctx, namespacedName)
-
-			configs := listConfigs(ctx, clusterName, namespace)
-			Expect(configs).To(HaveLen(2))
-			Expect(configs[0].Spec.Sequence).To(Equal(2))
-			Expect(configs[1].Spec.Sequence).To(Equal(3))
-		})
-	})
+	defineKeepLastAppliedContext("When leading configs are Applied", "cleanup-applied", redisv1.ConfigPhaseApplied)
 
 	Context("When no Applied config exists", Ordered, func() {
 		const clusterName = "cleanup-superseded"
@@ -208,34 +209,11 @@ var _ = Describe("Cleanup of Superseded Configs", func() {
 		})
 	})
 
-	Context("When leading configs are a mix of Applied and Superseded", Ordered, func() {
-		const clusterName = "cleanup-mix"
-		namespacedName := types.NamespacedName{Name: clusterName, Namespace: namespace}
-
-		BeforeAll(func() {
-			configs := setupThreeConfigs(ctx, clusterName, namespace)
-
-			// Set phases: [Superseded, Applied, Pending]
-			configs[0].Status.ConfigPhase = redisv1.ConfigPhaseSuperseded
-			updateConfigStatus(ctx, &configs[0])
-			configs[1].Status.ConfigPhase = redisv1.ConfigPhaseApplied
-			updateConfigStatus(ctx, &configs[1])
-			// configs[2] stays Pending
-		})
-
-		AfterAll(func() {
-			deleteCluster(ctx, clusterName, namespace)
-		})
-
-		It("should keep the last Applied config and newer ones", func() {
-			reconcileCluster(ctx, namespacedName)
-
-			configs := listConfigs(ctx, clusterName, namespace)
-			Expect(configs).To(HaveLen(2))
-			Expect(configs[0].Spec.Sequence).To(Equal(2))
-			Expect(configs[1].Spec.Sequence).To(Equal(3))
-		})
-	})
+	defineKeepLastAppliedContext(
+		"When leading configs are a mix of Applied and Superseded",
+		"cleanup-mix",
+		redisv1.ConfigPhaseSuperseded,
+	)
 
 	Context("When first config is Pending", Ordered, func() {
 		const clusterName = "cleanup-noop-pending"

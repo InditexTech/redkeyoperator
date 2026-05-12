@@ -7,6 +7,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -236,9 +237,7 @@ func (r *RedkeyClusterReconciler) buildDesiredRobinDeployment(cluster *redisv1.R
 
 		// Pod-level metadata
 		if len(tpl.Metadata.Labels) > 0 {
-			for k, v := range tpl.Metadata.Labels {
-				podLabels[k] = v
-			}
+			maps.Copy(podLabels, tpl.Metadata.Labels)
 		}
 		if len(tpl.Metadata.Annotations) > 0 {
 			podAnnotations = tpl.Metadata.Annotations
