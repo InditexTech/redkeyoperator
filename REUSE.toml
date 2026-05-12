@@ -34,6 +34,7 @@ path = [
     "config/crd/bases/redkey.inditex.dev_redkeyclusterconfigs.yaml",
     "config/crd/bases/redkey.inditex.dev_redkeyclusters.yaml",
     "config/rbac/role.yaml",
+    "docs/proposals/images/redkey-logo.png",
 ]
 SPDX-FileCopyrightText = "2025 Industria Textil de Diseño, S.A."
 SPDX-License-Identifier = "Apache-2.0"

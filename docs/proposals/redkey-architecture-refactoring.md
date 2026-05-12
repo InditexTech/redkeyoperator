@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 INDUSTRIA DE DISENO TEXTIL S.A. (INDITEX S.A.)
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Redkey Architecture Refactoring Proposal
 
 ## Table of Contents
