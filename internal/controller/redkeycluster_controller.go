@@ -61,6 +61,7 @@ func (r *RedkeyClusterReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if err := r.Get(ctx, req.NamespacedName, &cluster); err != nil {
 		if errors.IsNotFound(err) {
 			// RedkeyCluster deleted — owned resources are garbage collected automatically
+			log.Info("RedkeyCluster resource not found. Ignoring since object must be deleted.", "namespace", req.Namespace, "name", req.Name)
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, err
@@ -95,6 +96,7 @@ func (r *RedkeyClusterReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			log.Error(err, "Failed to create new RedkeyClusterConfig")
 			return ctrl.Result{}, err
 		}
+		log.Info("Created new RedkeyClusterConfig", "cluster", cluster.Name, "generation", cluster.Generation)		
 		// Re-fetch configs after creation
 		configs, err = r.listConfigs(ctx, &cluster)
 		if err != nil {

@@ -137,6 +137,8 @@ func (r *RedkeyClusterReconciler) aggregateStatus(ctx context.Context, cluster *
 		// will requeue and retry on the next reconcile loop.
 		return nil
 	}
+	log := logf.FromContext(ctx)
+	log.Info("Updated RedkeyCluster status from config", "config", firstConfig.Name, "status", cluster.Status.Status, "phase", cluster.Status.Phase)
 	return err
 }
 
@@ -204,6 +206,8 @@ func (r *RedkeyClusterReconciler) cleanupSupersededConfigs(ctx context.Context, 
 		return configs, nil
 	}
 
+	log := logf.FromContext(ctx)
+
 	// The list is sorted by sequence ascending; never delete the last config.
 	deleted := 0
 	for i := 0; i < len(configs)-1; i++ {
@@ -214,6 +218,7 @@ func (r *RedkeyClusterReconciler) cleanupSupersededConfigs(ctx context.Context, 
 		if err := r.Delete(ctx, &configs[i]); err != nil && !errors.IsNotFound(err) {
 			return configs[deleted:], err
 		}
+		log.Info("Deleted superseded RedkeyClusterConfig", "config", configs[i].Name)
 		deleted++
 	}
 	return configs[deleted:], nil
