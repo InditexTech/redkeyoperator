@@ -428,8 +428,18 @@ func TestBuildDesiredRobinDeployment_Defaults(t *testing.T) {
 	assert.Equal(t, "redkey-robin", deploy.Labels["app"])
 
 	require.Len(t, deploy.Spec.Template.Spec.Containers, 1)
-	assert.Equal(t, "robin", deploy.Spec.Template.Spec.Containers[0].Name)
-	assert.Equal(t, "redkey-robin:latest", deploy.Spec.Template.Spec.Containers[0].Image)
+	container := deploy.Spec.Template.Spec.Containers[0]
+	assert.Equal(t, "robin", container.Name)
+	assert.Equal(t, "redkey-robin:latest", container.Image)
+	assert.Equal(t, []string{
+		"--cluster-name=$(CLUSTER_NAME)",
+		"--namespace=$(NAMESPACE)",
+	}, container.Args)
+	require.Len(t, container.Env, 2)
+	assert.Equal(t, "CLUSTER_NAME", container.Env[0].Name)
+	assert.Equal(t, "my-cluster", container.Env[0].Value)
+	assert.Equal(t, "NAMESPACE", container.Env[1].Name)
+	assert.Equal(t, "production", container.Env[1].Value)
 	assert.Nil(t, deploy.Spec.Template.Annotations)
 }
 
@@ -692,7 +702,8 @@ func TestBuildDesiredRobinDeployment_WithEnvAndVolumes(t *testing.T) {
 							{
 								Env: []corev1.EnvVar{
 									{Name: "LOG_LEVEL", Value: "debug"},
-									{Name: "CLUSTER_NAME", Value: "my-cluster"},
+									{Name: "CLUSTER_NAME", Value: "wrong-cluster"},
+									{Name: "NAMESPACE", Value: "wrong-namespace"},
 								},
 								EnvFrom: []corev1.EnvFromSource{
 									{ConfigMapRef: &corev1.ConfigMapEnvSource{
@@ -723,8 +734,12 @@ func TestBuildDesiredRobinDeployment_WithEnvAndVolumes(t *testing.T) {
 	deploy := r.buildDesiredRobinDeployment(cluster)
 
 	container := deploy.Spec.Template.Spec.Containers[0]
-	require.Len(t, container.Env, 2)
-	assert.Equal(t, "LOG_LEVEL", container.Env[0].Name)
+	require.Len(t, container.Env, 3)
+	assert.Equal(t, "CLUSTER_NAME", container.Env[0].Name)
+	assert.Equal(t, "my-cluster", container.Env[0].Value)
+	assert.Equal(t, "NAMESPACE", container.Env[1].Name)
+	assert.Equal(t, "default", container.Env[1].Value)
+	assert.Equal(t, "LOG_LEVEL", container.Env[2].Name)
 	require.Len(t, container.EnvFrom, 1)
 	require.Len(t, container.VolumeMounts, 1)
 	assert.Equal(t, "/etc/robin", container.VolumeMounts[0].MountPath)

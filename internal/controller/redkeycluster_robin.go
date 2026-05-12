@@ -222,6 +222,11 @@ func (r *RedkeyClusterReconciler) buildDesiredRobinDeployment(cluster *redisv1.R
 	container := corev1.Container{
 		Name:  "robin",
 		Image: "redkey-robin:latest",
+		Args: []string{
+			"--cluster-name=$(CLUSTER_NAME)",
+			"--namespace=$(NAMESPACE)",
+		},
+		Env: robinDefaultEnvVars(cluster),
 	}
 
 	// Pod spec defaults
@@ -253,7 +258,7 @@ func (r *RedkeyClusterReconciler) buildDesiredRobinDeployment(cluster *redisv1.R
 				container.Resources = src.Resources
 			}
 			if len(src.Env) > 0 {
-				container.Env = src.Env
+				container.Env = mergeEnvVars(container.Env, src.Env)
 			}
 			if len(src.EnvFrom) > 0 {
 				container.EnvFrom = src.EnvFrom
@@ -265,6 +270,8 @@ func (r *RedkeyClusterReconciler) buildDesiredRobinDeployment(cluster *redisv1.R
 				container.SecurityContext = src.SecurityContext
 			}
 		}
+
+		container.Env = mergeEnvVars(container.Env, robinDefaultEnvVars(cluster))
 
 		// Pod-level spec overrides
 		if len(tpl.Spec.NodeSelector) > 0 {
@@ -356,6 +363,38 @@ func (r *RedkeyClusterReconciler) robinDeploymentNeedsUpdate(existing, desired *
 	}
 
 	return false
+}
+
+func robinDefaultEnvVars(cluster *redisv1.RedkeyCluster) []corev1.EnvVar {
+	return []corev1.EnvVar{
+		{
+			Name:  "CLUSTER_NAME",
+			Value: cluster.Name,
+		},
+		{
+			Name:  "NAMESPACE",
+			Value: cluster.Namespace,
+		},
+	}
+}
+
+func mergeEnvVars(base, overrides []corev1.EnvVar) []corev1.EnvVar {
+	merged := append([]corev1.EnvVar(nil), base...)
+	indexByName := make(map[string]int, len(merged))
+	for index, envVar := range merged {
+		indexByName[envVar.Name] = index
+	}
+
+	for _, envVar := range overrides {
+		if index, exists := indexByName[envVar.Name]; exists {
+			merged[index] = envVar
+			continue
+		}
+		indexByName[envVar.Name] = len(merged)
+		merged = append(merged, envVar)
+	}
+
+	return merged
 }
 
 // createIfNotExists creates the object if it doesn't already exist.
