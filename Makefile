@@ -139,6 +139,27 @@ help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 
+##@ CI
+
+.PHONY: verify
+verify: fmt vet lint build test-all ## Run all verification steps (fmt, vet, lint, unit and integration tests).
+	@echo "All verification checks passed successfully!"
+
+.PHONY: version
+version:: ## Print the current version of the project.
+	@echo "$(VERSION)"
+
+.PHONY: version-next
+version-next:: ## Bump to next development version
+	@echo "Bumping to next development version"
+	sed -ri 's/(.*)(VERSION\s*:=\s*)([0-9]+)\.([0-9]+)\.([0-9]+)(.*)/echo "\1\2\3.$$((\4+1)).0-SNAPSHOT\6"/ge' Makefile
+
+.PHONY: version-set
+version-set:: ## Set the project version to the given version, using the NEW_VERSION environment variable
+	@echo "Setting version to $(NEW_VERSION)"
+	sed -ri 's/(.*)(VERSION\s*:=\s*)([0-9]+\.[0-9]+\.[0-9]+)(-SNAPSHOT)(.*)/echo "\1\2$(NEW_VERSION)\5"/ge' Makefile
+
+
 ##@ Development
 
 .PHONY: manifests
