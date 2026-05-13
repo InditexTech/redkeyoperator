@@ -94,6 +94,17 @@ make verify      # fmt + vet + lint + build + test-all
 
 ## Testing Instructions
 
+### Mandatory validation for every change
+
+For every change in this repository, before considering the task complete, run:
+
+```shell
+make lint
+make test-all
+```
+
+This requirement is mandatory even if the change is small.
+
 ### Unit tests
 
 ```shell
@@ -151,6 +162,7 @@ make cleanup-kind     # tears down the Kind cluster
 ### Code conventions
 
 - Follow standard Go idioms and the [Effective Go](https://go.dev/doc/effective_go) guidelines.
+- For every change, run `make lint` and `make test-all` before finishing the task.
 - All code must pass `go fmt`, `go vet`, and `golangci-lint` before being merged.
 - API types live in `api/v1beta1/`. After changing them, always run `make generate && make manifests`.
 - Controller logic lives in `internal/controller/`. Files are split by concern:
@@ -181,7 +193,7 @@ make cleanup-kind     # tears down the Kind cluster
 
 Follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification:
 
-```
+```text
 <type>(<optional scope>): <short description>
 
 [optional body]
@@ -205,6 +217,7 @@ Every commit in a PR **must**:
 - Open an issue before starting significant work and reference it in the PR (`Closes #<issue>`).
 - Check existing issues and PRs to avoid duplicate work.
 - Keep PRs focused; split unrelated changes into separate PRs.
+- For every change, ensure `make lint` and `make test-all` pass locally before opening or updating a PR.
 - Ensure `make verify` passes locally before opening a PR.
 - Document new features or behaviour changes in `docs/`.
 - Add or update tests for every code change.
