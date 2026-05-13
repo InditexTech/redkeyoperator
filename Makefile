@@ -198,9 +198,10 @@ test: manifests generate fmt vet ## Run unit tests.
 coverage: test ## HTML coverage from unit tests only.
 	go tool cover -html=cover.out -o coverage.html
 
+# We use count=1 to disable test caching and force the tests to run every time.
 .PHONY: test-integration
 test-integration: manifests generate fmt vet setup-envtest ## Run integration tests (envtest).
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./test/integration/ -v
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./test/integration/ -v -count=1
 
 .PHONY: test-all
 test-all: test test-integration ## Run all tests (unit + integration).
