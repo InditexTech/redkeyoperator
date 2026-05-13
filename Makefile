@@ -190,9 +190,10 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 lint-config: golangci-lint ## Verify golangci-lint linter configuration
 	$(GOLANGCI_LINT) config verify
 
+# We use count=1 to disable test caching and force the tests to run every time.
 .PHONY: test
 test: manifests generate fmt vet ## Run unit tests.
-	go test $$(go list ./... | grep -v /e2e | grep -v /test/integration) -coverprofile cover.out
+	go test $$(go list ./... | grep -v /e2e | grep -v /test/integration) -coverprofile cover.out -count=1
 
 .PHONY: coverage
 coverage: test ## HTML coverage from unit tests only.
