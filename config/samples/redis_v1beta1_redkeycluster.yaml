@@ -34,14 +34,11 @@ spec:
     config:
       reconciler:
         intervalSeconds: 30
-        operationCleanUpIntervalSeconds: 30
       cluster:
-        healthProbePeriodSeconds: 60
-        healingTimeSeconds: 60
-        maxRetries: 10
-        backOff: 10
+        connectionMaxRetries: 10
+        connectionBackOffSeconds: 10
       metrics:
-        intervalSeconds: 60
+        collectionIntervalSeconds: 60
         redisInfoKeys:
           - keyspace_hits
           - evicted_keys

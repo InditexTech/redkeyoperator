@@ -203,22 +203,19 @@ type RobinConfig struct {
 
 // RobinConfigReconciler defines reconciler configuration for Robin.
 type RobinConfigReconciler struct {
-	IntervalSeconds                 *int `json:"intervalSeconds,omitempty"`
-	OperationCleanUpIntervalSeconds *int `json:"operationCleanUpIntervalSeconds,omitempty"`
+	IntervalSeconds *int `json:"intervalSeconds,omitempty"`
 }
 
 // RobinConfigCluster defines cluster configuration for Robin.
 type RobinConfigCluster struct {
-	HealthProbePeriodSeconds *int `json:"healthProbePeriodSeconds,omitempty"`
-	HealingTimeSeconds       *int `json:"healingTimeSeconds,omitempty"`
-	MaxRetries               *int `json:"maxRetries,omitempty"`
-	BackOff                  *int `json:"backOff,omitempty"`
+	ConnectionMaxRetries     *int `json:"connectionMaxRetries,omitempty"`
+	ConnectionBackOffSeconds *int `json:"connectionBackOffSeconds,omitempty"`
 }
 
 // RobinConfigMetrics defines metrics configuration for Robin.
 type RobinConfigMetrics struct {
-	IntervalSeconds *int     `json:"intervalSeconds,omitempty"`
-	RedisInfoKeys   []string `json:"redisInfoKeys,omitempty"`
+	CollectionIntervalSeconds *int     `json:"collectionIntervalSeconds,omitempty"`
+	RedisInfoKeys             []string `json:"redisInfoKeys,omitempty"`
 }
 
 // RedisAuth defines the authentication configuration for Redis.

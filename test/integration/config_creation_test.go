@@ -145,6 +145,10 @@ var _ = Describe("Configuration Creation", func() {
 
 		BeforeAll(func() {
 			intervalSec := 30
+			connectionMaxRetries := 10
+			connectionBackOffSeconds := 5
+			collectionIntervalSeconds := 60
+			redisInfoKeys := []string{"connected_clients", "total_commands_processed"}
 			cluster := &redisv1.RedkeyCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      clusterName,
@@ -157,6 +161,14 @@ var _ = Describe("Configuration Creation", func() {
 						Config: &redisv1.RobinConfig{
 							Reconciler: &redisv1.RobinConfigReconciler{
 								IntervalSeconds: &intervalSec,
+							},
+							Cluster: &redisv1.RobinConfigCluster{
+								ConnectionMaxRetries:     &connectionMaxRetries,
+								ConnectionBackOffSeconds: &connectionBackOffSeconds,
+							},
+							Metrics: &redisv1.RobinConfigMetrics{
+								CollectionIntervalSeconds: &collectionIntervalSeconds,
+								RedisInfoKeys:             redisInfoKeys,
 							},
 						},
 					},
@@ -176,7 +188,15 @@ var _ = Describe("Configuration Creation", func() {
 			Expect(configs).To(HaveLen(1))
 			Expect(configs[0].Spec.RobinConfig).NotTo(BeNil())
 			Expect(configs[0].Spec.RobinConfig.Reconciler).NotTo(BeNil())
+			Expect(configs[0].Spec.RobinConfig.Cluster).NotTo(BeNil())
+			Expect(configs[0].Spec.RobinConfig.Metrics).NotTo(BeNil())
 			Expect(*configs[0].Spec.RobinConfig.Reconciler.IntervalSeconds).To(Equal(30))
+			Expect(*configs[0].Spec.RobinConfig.Cluster.ConnectionMaxRetries).To(Equal(10))
+			Expect(*configs[0].Spec.RobinConfig.Cluster.ConnectionBackOffSeconds).To(Equal(5))
+			Expect(*configs[0].Spec.RobinConfig.Metrics.CollectionIntervalSeconds).To(Equal(60))
+			Expect(configs[0].Spec.RobinConfig.Metrics.RedisInfoKeys).To(
+				Equal([]string{"connected_clients", "total_commands_processed"}),
+			)
 		})
 	})
 

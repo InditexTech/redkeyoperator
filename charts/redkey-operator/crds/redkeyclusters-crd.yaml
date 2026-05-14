@@ -8717,20 +8717,16 @@ spec:
                         description: RobinConfigCluster defines cluster configuration
                           for Robin.
                         properties:
-                          backOff:
+                          connectionBackOffSeconds:
                             type: integer
-                          healingTimeSeconds:
-                            type: integer
-                          healthProbePeriodSeconds:
-                            type: integer
-                          maxRetries:
+                          connectionMaxRetries:
                             type: integer
                         type: object
                       metrics:
                         description: RobinConfigMetrics defines metrics configuration
                           for Robin.
                         properties:
-                          intervalSeconds:
+                          collectionIntervalSeconds:
                             type: integer
                           redisInfoKeys:
                             items:
@@ -8742,8 +8738,6 @@ spec:
                           for Robin.
                         properties:
                           intervalSeconds:
-                            type: integer
-                          operationCleanUpIntervalSeconds:
                             type: integer
                         type: object
                     type: object
