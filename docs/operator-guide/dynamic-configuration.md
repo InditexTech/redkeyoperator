@@ -13,7 +13,7 @@ Robin applies configuration changes **at runtime without requiring a Pod restart
 All settings in `spec.robin.config` are applied dynamically:
 
 | Setting | Field | Effect |
-|---------|-------|--------|
+| ------- | ----- | ------ |
 | Reconciler interval | `reconciler.intervalSeconds` | How often Robin's reconciliation loop ticks |
 | Metrics collection interval | `metrics.collectionIntervalSeconds` | How often Robin polls Redis nodes for INFO metrics |
 | Redis INFO keys | `metrics.redisInfoKeys` | Which metrics are collected and exposed to Prometheus |
@@ -128,11 +128,10 @@ See [Redis Authentication](authentication.md) for full details on auth configura
 ## Propagation Timing
 
 | Event | Latency |
-|-------|---------|
+| ----- | ------- |
 | User applies RedkeyCluster change | Immediate (kubectl/API) |
-| Operator creates new RedkeyClusterConfig | Operator reconcile interval (typically < 5s) |
-| Robin picks up new config | Current Robin reconciler interval (default 10s) |
-| **Total worst-case** | **~15 seconds** |
+| Operator creates new RedkeyClusterConfig | Operator reconcile interval |
+| Robin picks up new config | Current Robin reconciler interval |
 
 The new values take effect on the **next cycle** of the affected component after being written to `RuntimeConfig`. There is no additional delay.
 

@@ -12,8 +12,7 @@ Robin is designed to help the Operator (Batman) in its duties, in particular:
 - Provide Redkey Cluster prometheus metrics
 - FUTURE WORK
 
-The Operator deploys a Deployment and a ConfigMap for Robin given the configuration provided in `spec.robin` for each Redkey Cluster, if configured. The operator is responsible 
-of reconcile any addition, update or delete in the `spec.robin` of a RedkeyCluster.
+The Operator deploys a Deployment and a ConfigMap for Robin given the configuration provided in `spec.robin` for each Redkey Cluster, if configured. The operator is responsible of reconcile any addition, update or delete in the `spec.robin` of a RedkeyCluster.
 
 ## How to deploy Robin
 
@@ -56,8 +55,7 @@ spec:
 Robin configuration can be included in `spec.robin.config`. This field is an string whose content is included in the key `application-configmap.yml` of the ConfigMap `<RedkeyClusterName>-robin`.
 The content is expected to be a valid YAML with several fields which can be seen in [Configuration fields](#configuration-fields) section
 
-The Redkey Operator applies the MD5 algorithm to the `spec.robin.config` content and adds the result in the `checksum/config` annotation of the Robin Deployment template. This way, any change 
-in the configuration content will trigger a Robin POD recreation, which will have always the latest content applied to the RedkeyCluster object.
+The Redkey Operator applies the MD5 algorithm to the `spec.robin.config` content and adds the result in the `checksum/config` annotation of the Robin Deployment template. This way, any change in the configuration content will trigger a Robin POD recreation, which will have always the latest content applied to the RedkeyCluster object.
 
 ### Configuration fields
 
@@ -65,17 +63,17 @@ The expected fields of the `spec.robin.config` YAML are:
 
 - `metadata`: object with the labels that will be added to the Prometheus metrics
 - `redis`: object with the cluster configuration:
-  - `operator`: 
+  - `operator`:
     - `collection_interval_seconds` (int): sleep time in seconds between two consecutive metrics polling iterations.
   - `cluster`:
     - `replicas` (int): number of nodes of the Redkey Cluster. Used to infer the Redis node domain name.
     - `name` (string): Redkey Cluster name.
     - `namespace` (string): K8s namespace of the Redkey Cluster.
-    - `health_probe_interval_seconds` (int): 
-    - `healing_time_seconds` (int): 
+    - `health_probe_interval_seconds` (int):
+    - `healing_time_seconds` (int):
     - `max_retries` (int): maximum retries to connect to a Redis node.
     - `back_off` (time.Duration): sleep time between two consecutive attempts to connect to a Redis node.
-  - `metrics`: 
+  - `metrics`:
     - `version`: Redis metrics version.
     - `redis_info_keys`: Redis info keys that are asked to each Redis node and are exported in the Prometheus metrics.
 
