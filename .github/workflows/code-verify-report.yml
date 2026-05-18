@@ -1,0 +1,47 @@
+# SPDX-FileCopyrightText: 2025 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
+# SPDX-License-Identifier: Apache-2.0
+
+name: Code verify test report
+permissions:
+  contents: read
+  actions: read
+  checks: write
+
+on:
+  workflow_run:
+    workflows:
+      - Static code analysis, unit and integration testing
+    types:
+      - completed
+
+jobs:
+  publish-reports:
+    if: ${{ github.event.workflow_run.conclusion != 'cancelled' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Publish unit test report
+        if: ${{ !cancelled() }}
+        uses: dorny/test-reporter@v3
+        with:
+          artifact: code-verify-reports
+          name: Unit test results
+          path: '**/unit-tests.json'
+          reporter: golang-json
+          fail-on-error: 'false'
+          fail-on-empty: 'false'
+          use-actions-summary: 'true'
+          report-title: Unit tests
+
+      - name: Publish integration test report
+        if: ${{ !cancelled() }}
+        uses: dorny/test-reporter@v3
+        with:
+          artifact: code-verify-reports
+          name: Integration test results
+          path: '**/integration-report.xml'
+          reporter: java-junit
+          fail-on-error: 'false'
+          fail-on-empty: 'false'
+          use-actions-summary: 'true'
+          report-title: Integration tests
