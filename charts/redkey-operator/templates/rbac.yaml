@@ -72,10 +72,12 @@ rules:
   - services
   verbs:
   - create
-  - update
   - delete
   - get
   - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - ""
   resources:
@@ -150,6 +152,49 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - redkey.inditex.dev
+  resources:
+  - redkeyclusterconfigs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - watch
+- apiGroups:
+  - redkey.inditex.dev
+  resources:
+  - redkeyclusterconfigs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - roles
+  - rolebindings
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -192,6 +237,20 @@ rules:
   - redkeyclusters/status
   verbs:
   - get
+- apiGroups:
+  - redkey.inditex.dev
+  resources:
+  - redkeyclusterconfigs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - redkey.inditex.dev
+  resources:
+  - redkeyclusterconfigs/status
+  verbs:
+  - get
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -213,6 +272,20 @@ rules:
   - redkey.inditex.dev
   resources:
   - redkeyclusters/status
+  verbs:
+  - get
+- apiGroups:
+  - redkey.inditex.dev
+  resources:
+  - redkeyclusterconfigs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - redkey.inditex.dev
+  resources:
+  - redkeyclusterconfigs/status
   verbs:
   - get
 {{- end }}

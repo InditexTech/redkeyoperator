@@ -6,6 +6,8 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Operator Guide - Table of Contents
 
+![Redkey Operator icon](../images/redkey-logo-128.png)
+
 * [Operator deployment](operator-deployment.md)
 * [Redkey Robin](robin.md)
 * [How to deploy a Redis Cluster](redis-deployment.md)

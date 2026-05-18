@@ -6,158 +6,225 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Development Guide
 
-Quickly provision Redkey cluster environments in Kubernetes.
+We have created this guide to help you get started with the development of the Redkey Operator. It includes instructions on how to set up your local environment, deploy the operator, and run tests.
 
-The operator relies on Redkey cluster functionality to serve client requests.
+We tried to make it as comprehensive as possible, but if you have any questions or suggestions, please don't hesitate to reach out to us.
 
-## Local Development and Testing
+## Table of Contents
 
-A *local K8s cluster* can be used to deploy the Redkey Operator from a pre-built image or by directly compiling from the source code.
+- [Requirements](#requirements)
+- [Devcontainers](#devcontainers)
+- [Local development](#local-development)
+  - [Create your local Kubernetes cluster](#create-you-local-kubernetes-cluster)
+  - [Run the Operator in your local cluster](#run-the-operator-in-your-local-cluster)
+    - [Run the Operator from your local machine](#run-the-operator-from-your-local-machine)
+    - [Build and push the Operator image](#build-and-push-the-operator-image)
+  - [Deploy an example Redkey Cluster](#deploy-an-example-redkey-cluster)
+  - [Cleanup](#cleanup)
+- [Local testing](#local-testing)
+  - [Unit tests](#unit-tests)
+  - [Integration tests](#integration-tests)
+  - [Chaos tests](#chaos-tests)
+    - [Chaos test environment variables](#chaos-test-environment-variables)
+    - [Relationship between parallelism and timeouts](#relationship-between-parallelism-and-timeouts)
 
-This will help develop and test new features, fix bugs, and test releases locally.
+---
 
-As we will see below, you can use the `make` command to deploy the components and an example Redkey Cluster, or run the scripts that automate the basic workflows.
+## Requirements
 
-## Create your Kubernetes Cluster
+We recommend using a local Kubernetes cluster for development and testing. You can use tools like Kind, Docker Desktop, Rancher Desktop, or K3D to create a local cluster.
 
-This guide uses Kind, but feel free to use another Kubernetes cluster tool (e.g., Docker Desktop, Rancher Desktop, K3D).
+`Kind` is the tool we chose for this project, but we do our best to make the development guide compatible with other tools. The following sections will provide instructions for setting up a local Kubernetes cluster using `Kind`, but you can adapt them to your preferred tool.
 
-Deploy a k8s cluster with a trysted repository. You can use the following proposed script (from Kind website) or use the kind command (see the [official Kind Quick Start](https://kind.sigs.k8s.io/docs/user/quick-start/) for detailed usage guide):
+The main development operations can be accomplished with the `Makefile` commands. The required tools will be downloaded and installed in the `bin` directory by the corresponding `make` goals. However, you can also install them manually if you prefer and your installation will be used by the `Makefile` commands.
 
-``` sh
-scripts/kind-with-registry.sh
-```
+The required tools are:
 
-## Redkey Operator
+- [`Go`](https://go.dev/) — the programming language used to build the operator
+- [`Make`](https://www.gnu.org/software/make/) — used to run the development workflow commands defined in the `Makefile`
+- [`Docker`](https://docs.docker.com/) or [`Podman`](https://podman.io/) — container engine for building and pushing operator images
+- [`kubectl`](https://kubernetes.io/docs/reference/kubectl/) — Kubernetes CLI for interacting with the cluster
+- [`oc`](https://docs.openshift.com/container-platform/latest/cli_reference/openshift_cli/getting-started-cli.html) — OpenShift CLI, required for OpenShift and OLM-based deployments
 
-### Deploy Redkey Operator from a custom image
+The tools that will be **downloaded and installed by `make`** in the `bin` directory are:
 
-Once your K8s cluster and registry are ready to use, make the image you want to use to deploy the Redkey Operator available. Your cluster must be configured to access your local registry.
+- [`kind`](https://sigs.k8s.io/kind) — local Kubernetes clusters using Docker
+- [`kustomize`](https://sigs.k8s.io/kustomize) — Kubernetes manifest customization
+- [`controller-gen`](https://sigs.k8s.io/controller-tools) — CRD and RBAC manifest generation
+- [`setup-envtest`](https://sigs.k8s.io/controller-runtime/tools/setup-envtest) (derived from `controller-runtime` module version) — downloads Kubernetes binaries for integration tests
+- [`golangci-lint`](https://github.com/golangci/golangci-lint) — Go linter aggregator
+- [`operator-sdk`](https://github.com/operator-framework/operator-sdk) — Operator SDK CLI for OLM bundle management
 
-> If you want to debug the operator, execute the `export PROFILE=debug` before the following make commands and read [Debugging Redkey Operator](#debugging-redkey-operator) below.
+The project is configured to use [`mise`](https://mise.jdx.dev/) or [`asdf`](https://asdf-vm.com/) for managing Go tool versions. If you have either of these tools installed, it will automatically use the Go version specified in the `.tools-version` file.
 
-Build and push the Redkey Operator image:
+## Devcontainers
+
+The project includes a `devcontainer` configuration for Visual Studio Code Remote Containers. This allows you to develop inside a containerized environment with all dependencies pre-installed and consistent across different machines.
+
+## Local development
+
+Base development cycle:
+
+- Create your local Kubernetes cluster (e.g., with Kind)
+- Edit the code and implement new features or fix bugs
+- Run the Operator in your local cluster
+- Deploy a Redkey Cluster to test your changes
+- Delete your local Kubernetes cluster when you are done
+
+By default, `Docker` is used as the container engine for building and pushing operator images. If you prefer to use `Podman`, set the `CONTAINER_ENGINE` environment variable to `podman` before running the `make` commands:
 
 ```shell
-make docker-build
-make docker-push
+export CONTAINER_ENGINE=podman
 ```
 
-> **To test a released Redkey Operator image**, you'll have to manually pull the image, tag, and push it in the local registry.
+### Create you local Kubernetes cluster
 
-Once the Redkey Operator is available in your local registry, deploy it into your K8s cluster:
+You can easyly create a local Kubernetes cluster with Kind using the following `make` command:
 
-1. Install the CRD (The `redkey-operator` or  `$NAMESPACE` if defined will be used)
+```shell
+make setup-kind
+```
+
+This will create a container registry and a Kind cluster configured to use it. The cluster will be named `redkey-operator` and the registry will be available at `localhost:5001`.
+
+Now you can access your cluster with `kubectl` and deploy the Redkey Operator to it. The `Makefile` includes commands to automate these steps, as well as deploying an example Redkey Cluster.
+
+### Run the Operator in your local cluster
+
+First required step is to install the CRDs in the cluster:
 
 ```shell
 make install
 ```
 
-2. Generate the manifests (generated in `deployment` directory) and deploy the Redkey Operator.
+This will create the CRDs `RedkeyCluster` and `RedkeyClusterConfiguration` in the cluster, which are required to deploy the Redkey Operator and create Redkey Cluster instances.
+
+#### Run the Operator from your local machine
+
+The easiest way to run the Operator in your local cluster is to run the controller manager directly from your local machine. This way you can edit the code and see the changes reflected in the cluster without having to build and push a new image.
 
 ```shell
+make run
+```
+
+#### Build and push the Operator image
+
+If you prefer to run the Operator from a container image, you can build and push the image to your local registry with the following commands:
+
+```shell
+make docker-build
+make docker-push
 make deploy
 ```
 
-3. Deploy an example Redkey Cluster from `config/examples` folder. Just so you know, a Redkey Robin image is required; to know how it can be built, see [Redkey Robin](https://github.com/InditexTech/redkeyrobin).
+These commands will build the Operator image, push it to the local registry, and deploy it to your cluster in the `redkey-operator` namespace.
+
+### Deploy an example Redkey Cluster
+
+You can deploy an example Redkey Cluster from the `config/samples` folder with the following command:
 
 ```shell
-# Create a rkcl/redis-cluster-ephemeral: 3 nodes, ephemeral: true and purgeKeysOnRebalance: true.
-make apply-rkcl
+make deploy-samples
 ```
 
-### Makefile environment variables
+This will create a Redkey Cluster with 3 nodes, ephemeral storage, and `purgeKeysOnRebalance` set to `true`. You can modify the sample manifest in `config/samples/redis-cluster-ephemeral.yaml` to test different configurations.
 
-To customize the make commands set the following variables:
+### Interact with the Redkey Cluster
 
-| Variable        | Type       | Default                                        | Definition                             |
-|-----------------|------------|------------------------------------------------|----------------------------------------|
-| `PROFILE`       | dev, debug | dev                                            | determines image and operator deployed |
-| `IMG`           | string     | `localhost:5001/redkey-operator:${PROFILE}`    | the operator image  name               |
-| `NAMESPACE`     | string     | redkey-operator                                | the namespace to deploy resources in   |
-| `PROFILE_ROBIN` | dev, debug | dev                                            | determines robin image and deployed    |
-| `IMG_ROBIN`     | string     | `localhost:5001/redkey-robin:${PROFILE_ROBIN}` | the robin image                        |
+You can interact with the Redkey Cluster using `kubectl` to edit the manifest, check the status of the cluster and its nodes, and access the Redis instances.
 
+In order to launch a Redkey Cluster reconcile loop, you can edit the RedkeyCluster manifest with `kubectl edit redkeycluster <cluster-name>` and edit any field in the `spec` section. This will trigger a reconcile loop and you can see the changes reflected in the cluster.
 
-### Debugging Redkey Operator
-
-If you followed the steps described above to deploy the Redkey Operator using the `debug` profile you'll have the CRD deployed and a redkey-operator pod running.
-
-This pod is created using a `golang` image with `Delve` installed on it. This will allow us to easily debug the manager code following these steps:
-
-#### 1. Prepare the Debug Pod
-
-Execute in a terminal (Use the go version as in .go-version file):
+To simulate Robin interactions with the `RedkeyClusterConfiguration` instances you can edit the `status` section with:
 
 ```shell
-make debug
+kubectl patch redkeyclusterconfig redkeycluster-sample-1 --subresource=status --type merge -p '{"status": {"configPhase" : "Applied", "nodes": {}, "status": "Ready", "substatus": {"status": "", "upgradingPartition": 0}}}'
 ```
-Actions performed:
 
-- Build the manager binary.
-- Copy it to the redkey-operator pod.
-- Run the manager binary inside the pod with delve in remote mode.
+### Cleanup
 
-#### 2. Port Forward
-
-In another terminal forward the `40000` port to connect from the debugger:
+To delete the example Redkey Cluster, you can run the following command:
 
 ```shell
-make port-forward
+make undeploy-samples
 ```
 
-#### 3. Connect from your IDE to remote debugging
-
-Attach the IDE/debugger to the debug session. If using VSCode, the configuration could be:
-
-```json
-{
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Connect to server",
-            "type": "go",
-            "request": "attach",
-            "mode": "remote",
-            "remotePath": "${workspaceFolder}",
-            "port": 40000,
-            "host": "127.0.0.1",
-            "trace": "verbose"
-        }
-     ]
-}
-```
-
-
-## Cleanup
-
-Delete the operator and all associated resources with:
+To delete the Operator and all associated resources from your cluster, you can run the following commands:
 
 ```shell
-make delete-rkcl
 make undeploy
-make uninstall
-kubectl delete ns redkey-operator
 ```
 
-## Tests
+To remove the CRDs from your cluster, you can run:
 
-Run unit tests:
+```shell
+make uninstall
+```
+
+To remove the Kind cluster and the local registry, you can run:
+
+```shell
+make kind-cleanup
+```
+
+## Local testing
+
+To ensure the quality of the code and the functionality of the Operator, we have implemented a set of tests that can be run locally. These tests include:
+
+- Unit tests
+- Integration tests
+- End-to-end tests
+- Chaos tests
+
+### Unit tests
+
+Unit tests are designed to test individual functions and methods in isolation. They are fast to run and provide quick feedback on the correctness of the code.
+
+They are usually ran with the majority of the `make` commands, but you can also run them separately with:
 
 ```shell
 make test
 ```
 
-End-to-end requires a Kubernetes cluster, such as kind. Run it:
+### Integration tests
+
+Integration tests verify the interactions between different components of the Operator, ensuring they work together as expected.
+
+We provide a suite of integration tests that use the `envtest` framework to simulate a Kubernetes API server and test the Operator's reconciliation logic without needing a full cluster. This allows for faster feedback during development while still providing confidence that the Operator's core logic is functioning correctly.
+
+The suite is located in the `test/integration` directory and can be run with:
+
+```shell
+make test-integration
+```
+
+You can run Unit and Integration tests together with:
+
+```shell
+make test-all
+```
+
+End-to-end tests
+
+E2E tests simulate real-world scenarios, testing the Operator's functionality from start to finish, including interactions with the Kubernetes API and the Redkey cluster.
+
+The E2E tests are located in the `test/e2e` directory. We need a Kubernetes cluster to run them, so make sure you have one running (e.g., with Kind), the CRDs are installed and Operator and Robin images are available before executing the following command:
 
 ```shell
 make test-e2e
 ```
 
-Or run only an E2E test:
+We provide an easy way to run the E2E tests with a local Kind cluster:
 
 ```shell
-make test-e2e GINKGO_EXTRA_OPTS='--focus="sets and clears custom labels"'
+# Create a Kind cluster (no registry is created with this command, the Operator image will be built and loaded directly into the cluster)
+make setup-test-e2e
+
+# Run the E2E tests
+make test-e2e
+
+# Cleanup the Kind cluster
+make cleanup-test-e2e
 ```
 
 ### Chaos tests
@@ -218,105 +285,3 @@ enough to avoid killing a spec mid-recovery. As a rule of thumb:
 `GOMAXPROCS` should always match `TEST_PARALLEL_PROCESS`. Each Ginkgo process
 creates its own Kubernetes clients with independent rate limiters (QPS=5,
 Burst=10), so they don't contend on API access — but they do share CPU.
-
-## How to test the operator with CRC and operator-sdk locally (OLM deployment)
-
-These commands allow us to deploy with OLM the Redkey Operator in a OC cluster in local environment
-
-### Prerequisites
-
-1. OpenShift 4.x (full installation or CRC)
-2. oc command
-3. docker or podman commands
-4. bash (to access environment variables)
-5. operator-sdk command
-
-### Start new CRC cluster
-
-Download the latest release of CRC. https://console.redhat.com/openshift/create/local
-
-Please note the OpenShift version in your project.
-
-Set up the new CRC
-
-```shell
-crc setup
-```
-
-Start the new CRC instance:
-
-```shell
-crc start
-```
-
-### Local Registry
-
-Ensure that the internal image registry is accessible by checking for a route. The following command can be used with OpenShift 4:
-
-```shell
-oc get route -n openshift-image-registry
-```
-
-If the route is not exposed, the following command can be run:
-
-```shell
-oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge
-```
-
-We will dynamically create an environment variable with the name of the route to the OpenShift registry. The route will have “/openshift” appended, as this is a project that all users can access:
-
-```shell
-REGISTRY="$(oc get route/default-route -n openshift-image-registry -o=jsonpath='{.spec.host}')/openshift"
-```
-
-we need to log in to the OpenShift internal registry
-
-```shell
-docker login -u kubeadmin -p $(oc whoami -t) ${REGISTRY}
-```
-
-The output should end with:
-
-```shell
-Login Succeeded
-```
-
-### OLM Integration Bundle
-
-Export environment variables
-
-```shell
-export IMG=${REGISTRY}/redkey-operator:$VERSION // location where your operator image is hosted
-export BUNDLE_IMG=${REGISTRY}/redkey-operator-bundle:$VERSION // location where your bundle will be hosted
-```
-
-Create a image with the operator
-
-```shell
-make docker-build docker-push
-```
-
-Create a bundle from the root directory of your project
-
-```shell
-make bundle
-```
-
-Build and push the bundle image
-
-```shell
-make bundle-build bundle-push
-```
-
-create a secret inside the namespace where you would like to install the bundle
-
-```shell
-kubectl create secret docker-registry regcred --docker-server="${REGISTRY}" --docker-username="kubeadmin" \
-    --docker-password=$(oc whoami -t) --dry-run=client -o yaml -n ${namespace} | kubectl apply -f -
-```
-
-Install the bundle with OLM
-
-```shell
-operator-sdk run bundle $BUNDLE_IMG --skip-tls-verify --pull-secret-name regcred
-```
