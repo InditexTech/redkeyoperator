@@ -101,7 +101,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Update pull request test report
-        if: always() && github.event_name == 'pull_request'
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         continue-on-error: true
         uses: actions/github-script@v7
         env:
@@ -131,49 +131,58 @@ jobs:
               return `${body.trimEnd()}\n\n${section}`;
             };
 
-            const summary = fs.existsSync(process.env.SUMMARY_FILE)
-              ? fs.readFileSync(process.env.SUMMARY_FILE, 'utf8').trim()
-              : '_Unit and integration report not available._';
+            try {
+              const summary = fs.existsSync(process.env.SUMMARY_FILE)
+                ? fs.readFileSync(process.env.SUMMARY_FILE, 'utf8').trim()
+                : '_Unit and integration report not available._';
 
-            const issueNumber = context.issue.number;
-            const { data: comments } = await github.rest.issues.listComments({
-              ...context.repo,
-              issue_number: issueNumber,
-              per_page: 100,
-            });
-
-            const existing = comments.find((comment) =>
-              comment.user?.type === 'Bot' && comment.body?.includes(marker)
-            );
-
-            if (!existing) {
-              const body = [
-                marker,
-                header,
-                '',
-                `${sectionStart}\n${summary}\n${sectionEnd}`,
-                '',
-                `${otherStart}\n${otherPlaceholder}\n${otherEnd}`,
-              ].join('\n');
-
-              await github.rest.issues.createComment({
+              const issueNumber = context.issue.number;
+              const { data: comments } = await github.rest.issues.listComments({
                 ...context.repo,
                 issue_number: issueNumber,
+                per_page: 100,
+              });
+
+              const existing = comments.find((comment) =>
+                comment.user?.type === 'Bot' && comment.body?.includes(marker)
+              );
+
+              if (!existing) {
+                const body = [
+                  marker,
+                  header,
+                  '',
+                  `${sectionStart}\n${summary}\n${sectionEnd}`,
+                  '',
+                  `${otherStart}\n${otherPlaceholder}\n${otherEnd}`,
+                ].join('\n');
+
+                await github.rest.issues.createComment({
+                  ...context.repo,
+                  issue_number: issueNumber,
+                  body,
+                });
+                return;
+              }
+
+              let body = upsertSection(existing.body, sectionStart, sectionEnd, summary);
+              if (!body.includes(otherStart) || !body.includes(otherEnd)) {
+                body = `${body.trimEnd()}\n\n${otherStart}\n${otherPlaceholder}\n${otherEnd}`;
+              }
+
+              await github.rest.issues.updateComment({
+                ...context.repo,
+                comment_id: existing.id,
                 body,
               });
-              return;
-            }
+            } catch (error) {
+              if (error.status === 403) {
+                core.notice('Skipping pull request report update because the workflow token cannot write PR comments in this context.');
+                return;
+              }
 
-            let body = upsertSection(existing.body, sectionStart, sectionEnd, summary);
-            if (!body.includes(otherStart) || !body.includes(otherEnd)) {
-              body = `${body.trimEnd()}\n\n${otherStart}\n${otherPlaceholder}\n${otherEnd}`;
+              throw error;
             }
-
-            await github.rest.issues.updateComment({
-              ...context.repo,
-              comment_id: existing.id,
-              body,
-            });
 
       - name: Fail workflow if checks failed
         if: always()
