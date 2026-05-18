@@ -4,6 +4,7 @@
 name: E2E tests
 permissions:
   contents: read
+  issues: write
 
 on:
   pull_request:
@@ -22,6 +23,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  CI_ARTIFACTS_DIR: .ci-artifacts
   OPERATOR_NAME: redkey-operator
   OPERATOR_VERSION: test-e2e
   KUBECONFIG: ${{ github.workspace }}/.kube/config
@@ -38,50 +40,168 @@ jobs:
         shell: bash -eu -o pipefail {0}
 
     steps:
-    - name: 📥  Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: 🏗️  Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version-file: go.mod
-        cache: true
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
 
-    - name: 🔧  Install kubectl
-      uses: azure/setup-kubectl@v3
-      with:
-        version: v1.30.0
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: v1.30.0
 
-    - name: 🌱 Kubernetes KinD Cluster
-      id: kind
-      uses: helm/kind-action@v1
-      with:
-        cluster_name: ${{ env.LOCAL_CLUSTER_NAME }}
-        registry: true
-        registry_name: ${{ env.LOCAL_REGISTRY }}
-        registry_port: ${{ env.LOCAL_REGISTRY_PORT }}
+      - name: Kubernetes KinD cluster
+        id: kind
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: ${{ env.LOCAL_CLUSTER_NAME }}
+          registry: true
+          registry_name: ${{ env.LOCAL_REGISTRY }}
+          registry_port: ${{ env.LOCAL_REGISTRY_PORT }}
 
-    - name: 🏗️  Build operator image
-      run: make docker-build IMG=${{ steps.kind.outputs.LOCAL_REGISTRY }}/redkey-operator:${{ env.OPERATOR_VERSION }}
-        
-    - name: 📥 Push operator image
-      run: make docker-push IMG=${{ steps.kind.outputs.LOCAL_REGISTRY }}/redkey-operator:${{ env.OPERATOR_VERSION }}
+      - name: Run E2E test suite
+        id: run-e2e
+        continue-on-error: true
+        env:
+          TEST_PARALLEL_PROCESSES: ${{ github.event.inputs.test_parallel_process || 2 }}
+        run: |
+          set +e
+          make ci-e2e-report \
+            KIND_CLUSTER_E2E=${{ env.LOCAL_CLUSTER_NAME }} \
+            IMG=${{ steps.kind.outputs.LOCAL_REGISTRY }}/redkey-operator:${{ env.OPERATOR_VERSION }} \
+            GOMAXPROCS=${{ env.TEST_PARALLEL_PROCESSES }} \
+            JSON_REPORT=${{ env.CI_ARTIFACTS_DIR }}/e2e-report.json \
+            JUNIT_REPORT=${{ env.CI_ARTIFACTS_DIR }}/e2e-report.xml
+          e2e_status=$?
+          set -e
 
-    - name: 📚  Install Ginkgo CLI
-      run: go install github.com/onsi/ginkgo/v2/ginkgo@latest
-    
-    - name: 📚 Install CRD
-      run: make install
+          exit "${e2e_status}"
 
-    - name: ✅  Run E2E test suite
-      env:
-        TEST_PARALLEL_PROCESSES: ${{ github.event.inputs.test_parallel_process || 2 }}
-      run: |
-        make test-e2e \
-          IMG=${{ steps.kind.outputs.LOCAL_REGISTRY }}/redkey-operator:${{ env.OPERATOR_VERSION }} \
-          TEST_PARALLEL_PROCESS=${{ env.TEST_PARALLEL_PROCESSES }} \
-          GOMAXPROCS=${{ env.TEST_PARALLEL_PROCESSES }}
+      - name: Delete KinD cluster
+        if: always()
+        run: kind delete cluster --name ${{ env.LOCAL_CLUSTER_NAME }}
 
-    - name: 🧹  Delete KinD cluster (always)
-      if: always()
-      run: kind delete cluster --name ${{ env.LOCAL_CLUSTER_NAME }}
+      - name: Render E2E summary
+        if: always()
+        run: |
+          python3 .github/scripts/render_test_report.py ginkgo \
+            --input "${{ env.CI_ARTIFACTS_DIR }}/e2e-report.json" \
+            --title "E2E tests" \
+            --output "${{ env.CI_ARTIFACTS_DIR }}/e2e-summary.md"
+
+      - name: Assemble workflow summary
+        if: always()
+        run: |
+          e2e_result="NOT RUN"
+          if [ "${{ steps.run-e2e.outcome }}" = "success" ]; then
+            e2e_result="PASS"
+          elif [ "${{ steps.run-e2e.outcome }}" = "failure" ]; then
+            e2e_result="FAIL"
+          fi
+
+          {
+            echo "### E2E execution"
+            echo
+            echo "| Check | Result |"
+            echo "| --- | --- |"
+            echo "| E2E suite | ${e2e_result} |"
+            echo
+            cat "${{ env.CI_ARTIFACTS_DIR }}/e2e-summary.md"
+          } > "${{ env.CI_ARTIFACTS_DIR }}/e2e-workflow-summary.md"
+
+          cat "${{ env.CI_ARTIFACTS_DIR }}/e2e-workflow-summary.md" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload E2E reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-reports
+          path: ${{ env.CI_ARTIFACTS_DIR }}
+          if-no-files-found: ignore
+
+      - name: Update pull request E2E report
+        if: always() && github.event_name == 'pull_request'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        env:
+          SUMMARY_FILE: ${{ env.CI_ARTIFACTS_DIR }}/e2e-workflow-summary.md
+        with:
+          script: |
+            const fs = require('fs');
+
+            const marker = '<!-- redkeyoperator:test-report -->';
+            const header = '## Redkey Operator CI report';
+            const sectionStart = '<!-- redkeyoperator:e2e:start -->';
+            const sectionEnd = '<!-- redkeyoperator:e2e:end -->';
+            const otherStart = '<!-- redkeyoperator:unit-integration:start -->';
+            const otherEnd = '<!-- redkeyoperator:unit-integration:end -->';
+            const otherPlaceholder = '_Unit and integration report pending or not available yet._';
+
+            const upsertSection = (body, start, end, content) => {
+              const escapedStart = start.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              const escapedEnd = end.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              const pattern = new RegExp(`${escapedStart}[\\s\\S]*?${escapedEnd}`);
+              const section = `${start}\n${content}\n${end}`;
+
+              if (body.includes(start) && body.includes(end)) {
+                return body.replace(pattern, section);
+              }
+
+              return `${body.trimEnd()}\n\n${section}`;
+            };
+
+            const summary = fs.existsSync(process.env.SUMMARY_FILE)
+              ? fs.readFileSync(process.env.SUMMARY_FILE, 'utf8').trim()
+              : '_E2E report not available._';
+
+            const issueNumber = context.issue.number;
+            const { data: comments } = await github.rest.issues.listComments({
+              ...context.repo,
+              issue_number: issueNumber,
+              per_page: 100,
+            });
+
+            const existing = comments.find((comment) =>
+              comment.user?.type === 'Bot' && comment.body?.includes(marker)
+            );
+
+            if (!existing) {
+              const body = [
+                marker,
+                header,
+                '',
+                `${otherStart}\n${otherPlaceholder}\n${otherEnd}`,
+                '',
+                `${sectionStart}\n${summary}\n${sectionEnd}`,
+              ].join('\n');
+
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: issueNumber,
+                body,
+              });
+              return;
+            }
+
+            let body = upsertSection(existing.body, sectionStart, sectionEnd, summary);
+            if (!body.includes(otherStart) || !body.includes(otherEnd)) {
+              body = `${body.trimEnd()}\n\n${otherStart}\n${otherPlaceholder}\n${otherEnd}`;
+            }
+
+            await github.rest.issues.updateComment({
+              ...context.repo,
+              comment_id: existing.id,
+              body,
+            });
+
+      - name: Fail workflow if E2E tests failed
+        if: always()
+        run: |
+          if [ "${{ steps.run-e2e.outcome }}" = "failure" ]; then
+            echo "Failing workflow because the E2E suite failed."
+            exit 1
+          fi

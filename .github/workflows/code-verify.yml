@@ -1,29 +1,199 @@
 # SPDX-FileCopyrightText: 2025 INDUSTRIA DE DISEÑO TEXTIL S.A. (INDITEX S.A.)
 # SPDX-License-Identifier: Apache-2.0
 
-name: Static code analysis and unit testing
+name: Static code analysis, unit and integration testing
 permissions:
   contents: read
+  issues: write
 
 on:
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
   push:
-    paths-ignore: 
+    paths-ignore:
       - 'docs/**'
   workflow_dispatch:
+
+env:
+  CI_ARTIFACTS_DIR: .ci-artifacts
 
 jobs:
   code-verify:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -eu -o pipefail {0}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - id: parse-gomod
         name: Extract Go version from go.mod file
         uses: Arthur1/parse-gomod-action@v0
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ steps.parse-gomod.outputs.go}}
-      - name: Run code checks and unit tests
+          go-version: ${{ steps.parse-gomod.outputs.go }}
+          cache: true
+
+      - name: Run verification pipeline
+        id: code-verify
+        continue-on-error: true
+        run: make ci-code-verify-report
+
+      - name: Render unit test summary
+        if: always()
         run: |
-          make verify
+          python3 .github/scripts/render_test_report.py unit \
+            --input "${{ env.CI_ARTIFACTS_DIR }}/unit-tests.json" \
+            --coverage "${{ env.CI_ARTIFACTS_DIR }}/unit-coverage.txt" \
+            --title "Unit tests" \
+            --output "${{ env.CI_ARTIFACTS_DIR }}/unit-summary.md"
+
+      - name: Render integration test summary
+        if: always()
+        run: |
+          python3 .github/scripts/render_test_report.py ginkgo \
+            --input "${{ env.CI_ARTIFACTS_DIR }}/integration-report.json" \
+            --title "Integration tests" \
+            --output "${{ env.CI_ARTIFACTS_DIR }}/integration-summary.md"
+
+      - name: Assemble workflow summary
+        if: always()
+        run: |
+          static_result="FAIL"
+          if [ -f "${{ env.CI_ARTIFACTS_DIR }}/ci-static-analysis.status" ] && [ "$(cat "${{ env.CI_ARTIFACTS_DIR }}/ci-static-analysis.status")" = "0" ]; then
+            static_result="PASS"
+          fi
+
+          build_result="FAIL"
+          if [ -f "${{ env.CI_ARTIFACTS_DIR }}/ci-build.status" ] && [ "$(cat "${{ env.CI_ARTIFACTS_DIR }}/ci-build.status")" = "0" ]; then
+            build_result="PASS"
+          fi
+
+          {
+            echo "### Static analysis and build"
+            echo
+            echo "| Check | Result |"
+            echo "| --- | --- |"
+            echo "| fmt, vet and lint | ${static_result} |"
+            echo "| Build manager binary | ${build_result} |"
+            echo
+            cat "${{ env.CI_ARTIFACTS_DIR }}/unit-summary.md"
+            echo
+            cat "${{ env.CI_ARTIFACTS_DIR }}/integration-summary.md"
+          } > "${{ env.CI_ARTIFACTS_DIR }}/code-verify-summary.md"
+
+          cat "${{ env.CI_ARTIFACTS_DIR }}/code-verify-summary.md" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload verification reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-verify-reports
+          path: ${{ env.CI_ARTIFACTS_DIR }}
+          if-no-files-found: ignore
+
+      - name: Update pull request test report
+        if: always() && github.event_name == 'pull_request'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        env:
+          SUMMARY_FILE: ${{ env.CI_ARTIFACTS_DIR }}/code-verify-summary.md
+        with:
+          script: |
+            const fs = require('fs');
+
+            const marker = '<!-- redkeyoperator:test-report -->';
+            const header = '## Redkey Operator CI report';
+            const sectionStart = '<!-- redkeyoperator:unit-integration:start -->';
+            const sectionEnd = '<!-- redkeyoperator:unit-integration:end -->';
+            const otherStart = '<!-- redkeyoperator:e2e:start -->';
+            const otherEnd = '<!-- redkeyoperator:e2e:end -->';
+            const otherPlaceholder = '_E2E report pending or not available yet._';
+
+            const upsertSection = (body, start, end, content) => {
+              const escapedStart = start.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              const escapedEnd = end.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              const pattern = new RegExp(`${escapedStart}[\\s\\S]*?${escapedEnd}`);
+              const section = `${start}\n${content}\n${end}`;
+
+              if (body.includes(start) && body.includes(end)) {
+                return body.replace(pattern, section);
+              }
+
+              return `${body.trimEnd()}\n\n${section}`;
+            };
+
+            const summary = fs.existsSync(process.env.SUMMARY_FILE)
+              ? fs.readFileSync(process.env.SUMMARY_FILE, 'utf8').trim()
+              : '_Unit and integration report not available._';
+
+            const issueNumber = context.issue.number;
+            const { data: comments } = await github.rest.issues.listComments({
+              ...context.repo,
+              issue_number: issueNumber,
+              per_page: 100,
+            });
+
+            const existing = comments.find((comment) =>
+              comment.user?.type === 'Bot' && comment.body?.includes(marker)
+            );
+
+            if (!existing) {
+              const body = [
+                marker,
+                header,
+                '',
+                `${sectionStart}\n${summary}\n${sectionEnd}`,
+                '',
+                `${otherStart}\n${otherPlaceholder}\n${otherEnd}`,
+              ].join('\n');
+
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: issueNumber,
+                body,
+              });
+              return;
+            }
+
+            let body = upsertSection(existing.body, sectionStart, sectionEnd, summary);
+            if (!body.includes(otherStart) || !body.includes(otherEnd)) {
+              body = `${body.trimEnd()}\n\n${otherStart}\n${otherPlaceholder}\n${otherEnd}`;
+            }
+
+            await github.rest.issues.updateComment({
+              ...context.repo,
+              comment_id: existing.id,
+              body,
+            });
+
+      - name: Fail workflow if checks failed
+        if: always()
+        run: |
+          failures=()
+
+          if [ ! -f "${{ env.CI_ARTIFACTS_DIR }}/ci-static-analysis.status" ] || [ "$(cat "${{ env.CI_ARTIFACTS_DIR }}/ci-static-analysis.status")" != "0" ]; then
+            failures+=("static-analysis")
+          fi
+
+          if [ ! -f "${{ env.CI_ARTIFACTS_DIR }}/ci-unit-tests.status" ] || [ "$(cat "${{ env.CI_ARTIFACTS_DIR }}/ci-unit-tests.status")" != "0" ]; then
+            failures+=("unit-tests")
+          fi
+
+          if [ ! -f "${{ env.CI_ARTIFACTS_DIR }}/ci-integration-tests.status" ] || [ "$(cat "${{ env.CI_ARTIFACTS_DIR }}/ci-integration-tests.status")" != "0" ]; then
+            failures+=("integration-tests")
+          fi
+
+          if [ ! -f "${{ env.CI_ARTIFACTS_DIR }}/ci-build.status" ] || [ "$(cat "${{ env.CI_ARTIFACTS_DIR }}/ci-build.status")" != "0" ]; then
+            failures+=("build")
+          fi
+
+          if [ "${#failures[@]}" -gt 0 ]; then
+            printf 'Failing workflow because these steps failed: %s\n' "${failures[*]}"
+            exit 1
+          fi
