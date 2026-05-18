@@ -11,6 +11,8 @@ on:
     paths-ignore:
       - 'docs/**'
   push:
+    branches:
+      - main
     paths-ignore:
       - 'docs/**'
   workflow_dispatch:
@@ -95,6 +97,7 @@ jobs:
         with:
           name: code-verify-reports
           path: ${{ env.CI_ARTIFACTS_DIR }}
+          include-hidden-files: true
           if-no-files-found: ignore
 
       - name: Update pull request test report

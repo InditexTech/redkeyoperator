@@ -121,6 +121,7 @@ jobs:
         with:
           name: e2e-test-reports
           path: ${{ env.CI_ARTIFACTS_DIR }}
+          include-hidden-files: true
           if-no-files-found: ignore
 
       - name: Update pull request E2E report
