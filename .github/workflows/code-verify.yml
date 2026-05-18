@@ -5,6 +5,7 @@ name: Static code analysis, unit and integration testing
 permissions:
   contents: read
   issues: write
+  checks: write
 
 on:
   pull_request:
