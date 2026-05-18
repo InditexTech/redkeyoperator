@@ -9,6 +9,7 @@ replicasPerPrimary: 0
 ephemeral: true
 purgeKeysOnRebalance: true
 image: redis:8-bookworm
+version: ""
 
 # Storage (only for non-ephemeral clusters)
 storage: ""
@@ -16,8 +17,12 @@ storageClassName: ""
 accessModes:
   - ReadWriteOnce
 
-# deletePVC: false
+deletePVC: false
 # backup: false
+
+# Authentication - reference a Secret containing Redis credentials
+# auth:
+#   secret: my-redis-secret
 
 labels:
   team: a-team
@@ -36,6 +41,16 @@ resources:
     cpu: 100m
     memory: 128Mi
 
+# PodDisruptionBudget configuration
+# pdb:
+#   enabled: true
+#   pdbSizeUnavailable: 1
+
+# Override generated child resources (StatefulSet, Service)
+# override:
+#   statefulSet: {}
+#   service: {}
+
 robin:
   image: ghcr.io/inditextech/redkey-robin:0.1.0
   imagePullPolicy: Always
@@ -49,14 +64,11 @@ robin:
   config:
     reconciler:
       intervalSeconds: 30
-      operationCleanUpIntervalSeconds: 30
     cluster:
-      healthProbePeriodSeconds: 60
-      healingTimeSeconds: 60
-      maxRetries: 10
-      backOff: 10
+      connectionMaxRetries: 10
+      connectionBackOffSeconds: 10
     metrics:
-      intervalSeconds: 60
+      collectionIntervalSeconds: 60
       redisInfoKeys:
         - keyspace_hits
         - evicted_keys

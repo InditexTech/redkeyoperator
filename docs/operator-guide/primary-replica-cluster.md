@@ -8,17 +8,17 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 Starting with the release 0.2.34, Redkey Operator supports primary-replica architecture of Redkey Cluster. This architecture increases resiliency of Redkey clusters as each primary has one or more replicas and in case of a primary goes down, its replica (or one of its replicas) can take over the role of its primary and continue to serve without a downtime and data loss in practice. Theoretically, there will be a small downtime and a possibility of a data loss if a data on a primary gets updated and primary go down before the data change propagate to its replicas but these are negligible.
 
-Clusters with primary-replica architecture can be created by adding `replciasPerPrimary` specification and setting to an integer value inside the `spec` definition of a Redkey Cluster object. Redkey Operator will create replica nodes matching the count of `replicasPerPrimary` definition for each primary nodes.
+Clusters with primary-replica architecture can be created by adding `replicasPerPrimary` specification and setting to an integer value inside the `spec` definition of a Redkey Cluster object. Redkey Operator will create replica nodes matching the count of `replicasPerPrimary` definition for each primary nodes.
 
 The minimum configuration for the correct operation of this function is:
 
 ```yaml
-apiVersion: redkey.inditex.dev/v1
+apiVersion: redkey.inditex.dev/v1beta1
 kind: RedkeyCluster
 ...
 spec:
   ...
-  replicas: 3
+  primaries: 3
   replicasPerPrimary: 1
 ```
 
@@ -27,7 +27,7 @@ The `primaries` definition is the total number of Redis primary nodes in the clu
 If this feature is enabled, this additional configuration should be added to `redis.conf` to improve efficiency.
 
 ```yaml
-apiVersion: redkey.inditex.dev/v1
+apiVersion: redkey.inditex.dev/v1beta1
 kind: RedkeyCluster
 ...
 spec:
@@ -48,7 +48,7 @@ spec:
 ## Examples
 
 ```yaml
-apiVersion: redkey.inditex.dev/v1
+apiVersion: redkey.inditex.dev/v1beta1
 kind: RedkeyCluster
 ...
 spec:
@@ -61,7 +61,7 @@ spec:
 Redkey Operator will create 6 pods, 3 primaries and 3 replicas (one for each primary).
 
 ```yaml
-apiVersion: redkey.inditex.dev/v1
+apiVersion: redkey.inditex.dev/v1beta1
 kind: RedkeyCluster
 ...
 spec:
@@ -73,7 +73,7 @@ spec:
 Redkey Operator will create 15 pods, 5 primaries and 10 replicas (two for each primary).
 
 ```yaml
-apiVersion: redkey.inditex.dev/v1
+apiVersion: redkey.inditex.dev/v1beta1
 kind: RedkeyCluster
 ...
 spec:
@@ -85,7 +85,7 @@ spec:
 Redkey Operator will create 5 pods, 5 primaries and no replicas.
 
 ```yaml
-apiVersion: redkey.inditex.dev/v1
+apiVersion: redkey.inditex.dev/v1beta1
 kind: RedkeyCluster
 ...
 spec:

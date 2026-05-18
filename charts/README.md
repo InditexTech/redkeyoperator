@@ -6,7 +6,23 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Helm Charts
 
+![Redkey Operator icon](../docs/images/redkey-logo-128.png)
+
 This directory contains Helm charts for deploying the various components of the project. Each subdirectory corresponds to a specific component and includes the necessary templates and configuration files for deployment.
+
+Directory structure:
+
+```ascii
+charts/
+├── redkey-operator/
+│   ├── Chart.yaml
+│   ├── values.yaml
+│   └── templates/
+└── redkey-cluster/
+    ├── Chart.yaml
+    ├── values.yaml
+    └── templates/
+```
 
 ## redkey-operator Chart
 

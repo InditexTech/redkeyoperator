@@ -19,13 +19,12 @@ of reconcile any addition, update or delete in the `spec.robin` of a RedkeyClust
 
 Robin deployment can be configured in `spec.robin.template`. This field is an object representing a [PodSpecTemplate](https://github.com/kubernetes/kubernetes/blob/v1.32.2/staging/src/k8s.io/api/core/v1/types.go#L5050). The template is then used by the Redkey Operator to create, update or delete a Deployment with Robin, whose name is `<RedkeyClusterName>-robin`.
 
-Robin connects to all the nodes of the Redkey Cluster using port 6379 and the K8s Redis Pod domain name (e.g.: redkeycluster-sample-0.redis-cluster-sample). Therefore, a DNS resolving that name 
-to the Pod IP is needed for Robin to work.
+Robin connects to all the nodes of the Redkey Cluster using port 6379 and the K8s Redis Pod domain name (e.g.: redkeycluster-sample-0.redis-cluster-sample). Therefore, a DNS resolving that name to the Pod IP is needed for Robin to work.
 
 ### Example
 
 ```yaml
-apiVersion: redkey.inditex.dev/v1
+apiVersion: redkey.inditex.dev/v1beta1
 kind: RedkeyCluster
 ...
 spec:
@@ -54,7 +53,7 @@ spec:
 
 ## How to configure Robin
 
-Robin configuration can be included in `spec.robin.config`. This field is an string whose content is included in the key `application-configmap.yml` of the ConfigMap `<RedkeyClusterName>-robin`. 
+Robin configuration can be included in `spec.robin.config`. This field is an string whose content is included in the key `application-configmap.yml` of the ConfigMap `<RedkeyClusterName>-robin`.
 The content is expected to be a valid YAML with several fields which can be seen in [Configuration fields](#configuration-fields) section
 
 The Redkey Operator applies the MD5 algorithm to the `spec.robin.config` content and adds the result in the `checksum/config` annotation of the Robin Deployment template. This way, any change 
@@ -83,7 +82,7 @@ The expected fields of the `spec.robin.config` YAML are:
 ### Example
 
 ```yaml
-apiVersion: redkey.inditex.dev/v1
+apiVersion: redkey.inditex.dev/v1beta1
 kind: RedkeyCluster
 ...
 spec:
