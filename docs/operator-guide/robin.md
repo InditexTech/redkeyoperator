@@ -138,3 +138,15 @@ spec:
 ## How to develop Robin
 
 Please refer to [Redkey Robin](https://github.com/InditexTech/redkeyrobin/docs/developer-guide.md) section of the Operador Development Guide to know how to develop, build and deploy Robin for development and debugging purposes.
+
+## Authentication
+
+Robin authenticates to Redis using a password stored in a Kubernetes Secret. The secret name is configured declaratively in `spec.auth.secret` of the `RedkeyCluster` — no CLI flags or environment variables are required.
+
+For full details on creating the Secret, configuring auth, password rotation, and troubleshooting, see the [Redis Authentication](authentication.md) guide.
+
+## Dynamic Configuration
+
+All Robin operational settings (`reconciler.intervalSeconds`, `metrics.collectionIntervalSeconds`, `metrics.redisInfoKeys`, connection retries, and the auth secret reference) are applied **at runtime without a Pod restart**. Robin continuously polls `RedkeyClusterConfig` resources and updates its internal state when new configurations are detected.
+
+For a complete explanation of the hot-reload mechanism, propagation timing, and examples, see the [Dynamic Configuration](dynamic-configuration.md) guide.
